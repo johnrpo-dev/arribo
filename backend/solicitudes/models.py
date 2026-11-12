@@ -287,9 +287,11 @@ class Solicitud(models.Model):
                 name="solicitud_motivo_solo_si_no_concretada",
                 violation_error_message="El motivo solo aplica a una solicitud no concretada.",
             ),
+            # Solo una solicitud abierta: un borrador aún no responde y cerrar una llamada perdida
+            # (no concretada) no obliga a preguntar por el regreso.
             models.CheckConstraint(
                 condition=~Q(tipo=TipoServicio.EVENTO.value)
-                | Q(estado_registro=EstadoRegistro.BORRADOR)
+                | ~Q(estado_registro=EstadoRegistro.ABIERTA)
                 | Q(tiene_regreso__isnull=False),
                 name="solicitud_evento_responde_regreso",
                 violation_error_message="En un evento hay que responder si tiene regreso.",
@@ -335,7 +337,7 @@ class Solicitud(models.Model):
             )
         if (
             self.tipo == TipoServicio.EVENTO
-            and self.estado_registro != EstadoRegistro.BORRADOR
+            and self.estado_registro == EstadoRegistro.ABIERTA
             and self.tiene_regreso is None
         ):
             errores["tiene_regreso"] = "En un evento hay que responder si tiene regreso."
