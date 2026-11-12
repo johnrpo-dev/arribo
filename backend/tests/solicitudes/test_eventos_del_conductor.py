@@ -294,6 +294,29 @@ def test_novedad_sin_motivo_se_guarda_como_conflicto(crear_servicio, evento_app,
     assert EventoEstado.objects.filter(pk=datos["id"]).exists()
 
 
+@pytest.mark.parametrize("origen", [E.ASIGNADO, E.EN_CAMINO, E.RECOGIDO])
+def test_cancelar_desde_la_app_se_guarda_como_conflicto_y_el_servicio_no_cambia(
+    crear_servicio, ana, evento_app, origen
+):
+    # El conductor no cancela: la app solo tiene En camino, Recogido, Entregado y Novedad.
+    servicio = crear_servicio(origen)
+    grua = servicio.grua
+    datos = evento_app(servicio, E.CANCELADO, motivo="El cliente no estaba")
+
+    assert aplicar_evento_del_conductor(**datos) == CONFLICTO
+
+    servicio.refresh_from_db()
+    assert (servicio.estado, servicio.conductor, servicio.grua) == (origen, ana, grua)
+    evento = guardado(datos["id"])
+    assert (evento.resultado, evento.destino, evento.motivo) == (
+        EventoEstado.Resultado.CONFLICTO,
+        E.CANCELADO,
+        "El cliente no estaba",
+    )
+    assert aplicar_evento_del_conductor(**datos) == DUPLICADO
+    assert EventoEstado.objects.count() == 1
+
+
 def test_evento_sobre_servicio_aun_sin_asignar_es_conflicto(crear_servicio, evento_app):
     servicio = crear_servicio()
     assert aplicar_evento_del_conductor(**evento_app(servicio, E.EN_CAMINO)) == CONFLICTO
