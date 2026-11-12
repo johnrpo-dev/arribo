@@ -63,6 +63,60 @@ La tarea 1a-16 se partió en dos: 1a-16a (modelo de línea de cobro con sus rest
   y verlo aparecer. Agregar al primero una segunda tarifa de traslado vigente: el admin la rechaza en
   español. En Flota, crear una grúa con placa "abc-123" y verla guardada como ABC123.
 
+### 1a-04 Solicitudes y servicios (12 de noviembre de 2026)
+- Hecho: en el núcleo, `normalizar_vin`, `validar_vin` (17 caracteres sin I, O ni Q; sin dígito
+  verificador) y `validar_identificacion` (placa o VIN; el desvare exige placa). App `solicitudes`
+  con Vehículo, Solicitud, Servicio, Evento de estado y Evidencia, todas sus reglas como
+  restricciones con nombre en PostgreSQL. `solicitudes/operaciones.py` es la única forma de cambiar
+  estado, conductor o grúa de un servicio: `asignar`, `reasignar`, `cambiar_estado`,
+  `resolver_novedad` (panel) y `aplicar_evento_del_conductor` / `aplicar_lote_del_conductor` (app).
+  Todas llaman a `nucleo/estados.py`, `nucleo/capacidad.py` y `nucleo/sincronizacion.py`, corren en
+  una transacción con la fila del servicio bloqueada y dejan exactamente un evento por cambio. Admin
+  en español sin borrado; eventos y evidencias de solo lectura. `MEDIA_ROOT` en `backend/media/`.
+- Decidido (idempotencia): el id que genera el celular es la llave primaria del evento. Primero se
+  mira si ya está guardado (el reenvío común); luego, con la fila del servicio bloqueada, se vuelve a
+  mirar (dos peticiones sobre el mismo servicio quedan en fila); y si aun así dos peticiones llegan a
+  guardar el mismo id (por ejemplo sobre servicios distintos), la llave primaria deja entrar una
+  sola: la otra se deshace entera, sin evento ni cambio de estado, y responde "duplicado". Probado
+  forzando el choque y con dos hilos reales contra la base. Un conflicto reenviado también es
+  duplicado: no se vuelve a evaluar.
+- Decidido (capacidad): al pasar a Recogido se bloquea la fila de la grúa y se cuentan sus servicios
+  a bordo con `nucleo.estados.a_bordo`, así dos recogidas simultáneas no se cuelan. Desde el panel se
+  rechaza con `CapacidadExcedida`; desde la app se aplica y el evento queda con
+  `capacidad_excedida` (decisión del orquestador: el vehículo ya está montado). La identificación
+  sí se exige también desde la app: sin ella, el evento es conflicto.
+- Decidido: guardar un servicio con otro estado, conductor o grúa sin pasar por las operaciones
+  falla (`CambioDeEstadoNoPermitido`); editar referencia u orden de ronda sí se puede. Los eventos
+  no se modifican ni se borran (instancia y consultas en lote). En el evento, textos sin límite de
+  largo y ubicación sin restricción de rango, para que un dato raro del celular nunca impida
+  guardarlo. `asignar` rechaza servicios de una solicitud en borrador o no concretada (regla de
+  `CLAUDE.md`). Exigir placa o VIN también al asignar queda como punto de extensión
+  (`identificacion_exigida_al_asignar`), apagado hasta la tarea de configuración. El Vehículo también
+  lleva la marca `es_demo`, porque un vehículo puede quedar sin solicitudes que lo marquen.
+- Decidido tras la revisión (orquestador): el conductor no cancela desde la app. El núcleo solo
+  acepta desde la app los destinos En camino, Recogido, Entregado y Novedad
+  (`DESTINOS_DESDE_LA_APP` en `nucleo/sincronizacion.py`); cualquier otro, como un Cancelado, se
+  guarda como conflicto y el servicio no cambia. Anotado en `CLAUDE.md` y resuelto en `QUESTIONS.md`.
+- Decidido tras la revisión (orquestador): la respuesta de regreso de un evento se exige solo en una
+  solicitud abierta. Una llamada perdida se cierra como no concretada sin preguntar por el regreso
+  (restricción `solicitud_evento_responde_regreso` corregida en la migración 0002).
+- Preguntas abiertas nuevas: una en `QUESTIONS.md` (obligatorios del borrador y destino del desvare).
+- Cómo probar (5 minutos): `uv run pytest -q` (602 pruebas) y `uv run python manage.py migrate`.
+  En `/admin/` → Solicitudes → Vehículos: crear uno con placa "abc-123" y verlo como ABC123; crear
+  otro con "ABC 123" y ver "Ya hay un vehículo con la placa ABC123."; poner un VIN con la letra O y
+  ver el aviso. En Solicitudes, crear un evento "Abierta" sin responder si tiene regreso y ver el
+  aviso; responder "Sí" con fecha, agregar un servicio con el vehículo y guardar: el estado dice
+  "Abierta" y en el servicio no se pueden editar estado, conductor ni grúa. Con un conductor que
+  tenga grúa vigente (Flota), en `uv run python manage.py shell`:
+  `from solicitudes import operaciones as op; from solicitudes.models import Servicio;`
+  `from flota.models import Conductor; s = Servicio.objects.last(); c = Conductor.objects.first()`,
+  luego `op.asignar(s, c, actor=None)`, `op.cambiar_estado(s, "en_camino", actor=None)` y
+  `op.cambiar_estado(s, "cancelado", actor=None)` (falla: exige motivo). Para la idempotencia:
+  `import uuid; from django.utils import timezone; d = dict(id=uuid.uuid4(), servicio=s,`
+  `conductor=c, destino="recogido", secuencia=1, hora_dispositivo=timezone.now())` y llamar dos
+  veces `op.aplicar_evento_del_conductor(**d)`: la primera da aplicado, la segunda duplicado. En el
+  admin, el servicio muestra sus eventos y no deja modificarlos ni borrarlos.
+
 ## Escalamientos
 
 Ninguno todavía.

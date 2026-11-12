@@ -23,7 +23,7 @@ Toda tarea termina con `uv run pytest -q` y `uv run ruff check .` en verde, más
   App `clientes`: Cliente con tipo, teléfonos únicos, modalidad de cobro; Contacto; Tarifa.
   Verificar: prueba de teléfono único; crear un cliente con tarifa en el admin.
 
-- [ ] **1a-04 Solicitudes y servicios** (2 h). Depende de: 03.
+- [x] **1a-04 Solicitudes y servicios** (2 h). Depende de: 03.
   App `solicitudes`: Solicitud, Vehículo, Servicio, Evento de estado, Evidencia. El modelo Servicio
   cambia de estado solo a través de `nucleo/estados.py`.
   Verificar: pruebas de que el modelo rechaza lo mismo que el núcleo y de que cada cambio deja un evento; validación de placa y VIN.

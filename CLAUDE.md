@@ -115,6 +115,8 @@ no reimplementan la regla. Si una regla cambia, se cambia en `nucleo/` con su pr
 - El id (UUID) se genera en el celular. Un evento repetido no se aplica dos veces.
 - Lo que el conductor hizo físicamente nunca se rechaza ni se descarta. Si no encaja (servicio cancelado,
   reasignado, salto de estado), el resultado es CONFLICTO: se guarda el evento y se abre una alerta a logística.
+- Desde la app solo se aceptan los destinos En camino, Recogido, Entregado y Novedad; cualquier otro
+  (por ejemplo, cancelar) es CONFLICTO.
 - El orden lo da la secuencia del dispositivo, no su reloj. Se guardan hora del dispositivo y hora de sincronización.
 - Los eventos son de solo agregar: no se editan ni se borran.
 
