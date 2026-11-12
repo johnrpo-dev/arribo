@@ -126,16 +126,51 @@ def test_no_concretada_con_motivo_se_acepta(cliente, motivo):
     assert solicitud.estado == "no_concretada"
 
 
-@pytest.mark.parametrize("registro", [EstadoRegistro.ABIERTA, EstadoRegistro.NO_CONCRETADA])
-def test_evento_sin_responder_si_tiene_regreso_rechazado_por_la_base(cliente, registro):
-    motivo = MotivoNoConcretada.PRECIO if registro == EstadoRegistro.NO_CONCRETADA else ""
+def test_evento_abierto_sin_responder_si_tiene_regreso_rechazado_por_la_base(cliente):
     rechazada_por_la_base(
         "solicitud_evento_responde_regreso",
         cliente,
         tipo=EVENTO,
-        estado_registro=registro,
-        motivo_no_concretada=motivo,
+        estado_registro=EstadoRegistro.ABIERTA,
     )
+
+
+def test_evento_no_concretado_sin_responder_si_tiene_regreso_se_acepta(cliente):
+    # Cerrar una llamada perdida no obliga a preguntar por el regreso.
+    solicitud = crear_solicitud(
+        cliente,
+        tipo=EVENTO,
+        estado_registro=EstadoRegistro.NO_CONCRETADA,
+        motivo_no_concretada=MotivoNoConcretada.PRECIO,
+    )
+    solicitud.refresh_from_db()
+    assert (solicitud.estado, solicitud.tiene_regreso) == ("no_concretada", None)
+
+
+def test_un_evento_en_borrador_sin_respuesta_de_regreso_se_cierra_como_no_concretada(cliente):
+    solicitud = crear_solicitud(cliente, tipo=EVENTO, estado_registro=EstadoRegistro.BORRADOR)
+    solicitud.estado_registro = EstadoRegistro.NO_CONCRETADA
+    solicitud.motivo_no_concretada = MotivoNoConcretada.DESISTIO
+    solicitud.full_clean()  # el admin tampoco lo exige
+    solicitud.save()
+    solicitud.refresh_from_db()
+    assert (solicitud.estado_registro, solicitud.tiene_regreso) == (
+        EstadoRegistro.NO_CONCRETADA,
+        None,
+    )
+
+
+def test_la_base_deja_quitar_la_respuesta_de_regreso_de_un_evento_no_concretado(cliente):
+    solicitud = crear_solicitud(
+        cliente,
+        tipo=EVENTO,
+        tiene_regreso=False,
+        estado_registro=EstadoRegistro.NO_CONCRETADA,
+        motivo_no_concretada=MotivoNoConcretada.DEMORA,
+    )
+    Solicitud.objects.filter(pk=solicitud.pk).update(tiene_regreso=None)
+    solicitud.refresh_from_db()
+    assert solicitud.tiene_regreso is None
 
 
 def test_evento_en_borrador_puede_no_responder_aun_si_tiene_regreso(cliente):
@@ -225,6 +260,16 @@ def test_el_admin_avisa_que_un_evento_debe_responder_si_tiene_regreso(cliente):
     assert errores_de(solicitud) == {
         "tiene_regreso": ["En un evento hay que responder si tiene regreso."]
     }
+
+
+def test_el_admin_no_pide_el_regreso_al_cerrar_un_evento_como_no_concretado(cliente):
+    solicitud = Solicitud(
+        solicitante=cliente,
+        tipo=EVENTO,
+        estado_registro=EstadoRegistro.NO_CONCRETADA,
+        motivo_no_concretada=MotivoNoConcretada.SIN_GRUA,
+    )
+    solicitud.full_clean()
 
 
 def test_el_admin_avisa_que_el_regreso_exige_fecha(cliente):
