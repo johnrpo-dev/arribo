@@ -29,6 +29,18 @@ La tarea 1a-16 se partió en dos: 1a-16a (modelo de línea de cobro con sus rest
   son los eventos de estado (solo agregar) y el historial de cambios de valor del cobro.
 - Cómo probar: desde `backend/`, `uv run pytest -q` (55 pruebas).
 
+### 1a-02 Flota y usuarios (12 de noviembre de 2026)
+- Hecho: app `flota` con Grúa, Conductor y Asignación conductor–grúa; función `grua_vigente`;
+  grupos administrador, logistica, facturacion y conductor (migración de datos); admin sin borrado.
+- Decidido: los traslapes los impide PostgreSQL con restricciones de exclusión sobre `[inicio, fin)`
+  (extensión `btree_gist`); periodos contiguos sí se permiten. `clean()` repite la regla solo para que
+  el admin muestre el error en español. La placa normalizada y la capacidad 1 o 2 también son
+  restricciones de la base. Los grupos aún no tienen permisos: los asigna cada tarea que los use.
+- Preguntas abiertas: cuatro en `QUESTIONS.md` (grúa inactiva, motivo de temporal, guiones en la placa,
+  formato del celular).
+- Cómo probar: `uv run pytest -q` (94 pruebas); en `/admin/`, crear una grúa y un conductor, asignarlo,
+  y ver el mensaje en español al intentar una segunda asignación que se cruce.
+
 ## Escalamientos
 
 Ninguno todavía.

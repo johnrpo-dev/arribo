@@ -14,7 +14,7 @@ Toda tarea termina con `uv run pytest -q` y `uv run ruff check .` en verde, más
   (comando en `conductor/README.md`).
   Verificar: `uv run pytest -q` pasa contra PostgreSQL; `flutter test` pasa; la app vacía abre en el celular.
 
-- [ ] **1a-02 Flota y usuarios** (2 h). Depende de: 01.
+- [x] **1a-02 Flota y usuarios** (2 h). Depende de: 01.
   App `flota`: Grúa (capacidad, estado), Conductor, asignación conductor–grúa con inicio y fin.
   Roles como grupos: administrador, logística, facturación, conductor. Todo editable en el admin.
   Verificar: pruebas de que no hay asignaciones traslapadas por conductor ni por grúa; crear una grúa y un conductor en `/admin/`.
