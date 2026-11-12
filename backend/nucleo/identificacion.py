@@ -1,20 +1,39 @@
-"""Normalización de placas y teléfonos: la misma placa o el mismo número se escriben de muchas formas.
+"""Normalización de placas, VIN y teléfonos, y la regla de identificación del vehículo.
 
-Se normaliza antes de guardar y antes de buscar, para que "abc-123" encuentre "ABC123" y
-"+57 300 123 4567" encuentre "3001234567". Python puro: lo usan los modelos y, más adelante, la app.
+La misma placa o el mismo número se escriben de muchas formas. Se normaliza antes de guardar y
+antes de buscar, para que "abc-123" encuentre "ABC123" y "+57 300 123 4567" encuentre "3001234567".
+Python puro: lo usan los modelos y, más adelante, la app.
 """
 import re
+
+from nucleo.tipos import TipoServicio
 
 INDICATIVO_COLOMBIA = "57"
 MIN_DIGITOS_TELEFONO = 7
 MAX_DIGITOS_TELEFONO = 15
 
+LARGO_VIN = 17
+# Letras y dígitos sin I, O ni Q (se confunden con 1 y 0). No se valida el dígito verificador.
+CARACTERES_VIN = "A-HJ-NPR-Z0-9"
+# Para la restricción de la base (PostgreSQL); en Python se usa fullmatch con el mismo conjunto.
+PATRON_VIN = rf"^[{CARACTERES_VIN}]{{{LARGO_VIN}}}$"
+
 _NO_ALFANUMERICO = re.compile(r"[^A-Z0-9]")
 _NO_DIGITO = re.compile(r"[^0-9]")
+_SEPARADORES_VIN = re.compile(r"[\s-]")
+_VIN_VALIDO = re.compile(rf"[{CARACTERES_VIN}]{{{LARGO_VIN}}}")
 
 
 class TelefonoInvalido(ValueError):
     """El texto no se puede leer como un teléfono."""
+
+
+class VinInvalido(ValueError):
+    """El VIN no tiene 17 caracteres válidos."""
+
+
+class IdentificacionIncompleta(ValueError):
+    """Al vehículo le falta la placa o el VIN que el servicio exige."""
 
 
 def normalizar_placa(texto: str | None) -> str:
@@ -37,3 +56,37 @@ def normalizar_telefono(texto: str | None) -> str:
             f"dígitos; se leyeron {len(digitos)} en {texto!r}."
         )
     return digitos
+
+
+def normalizar_vin(texto: str | None) -> str:
+    """Mayúsculas, sin espacios ni guiones: "1hg-cm826 33a004352" da "1HGCM82633A004352".
+
+    Otros símbolos se dejan, para que validar_vin los rechace en vez de esconder un error de digitación.
+    """
+    return _SEPARADORES_VIN.sub("", (texto or "").upper())
+
+
+def validar_vin(vin: str) -> None:
+    """Un VIN ya normalizado: exactamente 17 letras o dígitos, sin I, O ni Q.
+
+    No se valida el dígito verificador (muchos VIN reales no lo cumplen).
+    """
+    if not _VIN_VALIDO.fullmatch(vin or ""):
+        raise VinInvalido(
+            f"El VIN debe tener exactamente {LARGO_VIN} letras o dígitos, sin I, O ni Q; "
+            f"se leyó {vin!r} ({len(vin or '')} caracteres)."
+        )
+
+
+def validar_identificacion(
+    placa: str | None, vin: str | None, tipo_servicio: TipoServicio | str
+) -> None:
+    """El vehículo tiene placa o VIN (al menos uno); un desvare exige la placa.
+
+    Solo revisa que estén; el formato del VIN lo revisa validar_vin.
+    """
+    tiene_placa = bool(normalizar_placa(placa))
+    if TipoServicio(tipo_servicio) == TipoServicio.DESVARE and not tiene_placa:
+        raise IdentificacionIncompleta("Un desvare exige la placa del vehículo.")
+    if not tiene_placa and not normalizar_vin(vin):
+        raise IdentificacionIncompleta("El vehículo necesita placa o VIN (al menos uno).")

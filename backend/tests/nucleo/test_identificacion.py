@@ -1,8 +1,22 @@
-"""Placas y teléfonos escritos de distintas formas quedan iguales."""
+"""Placas, VIN y teléfonos escritos de distintas formas quedan iguales; identificación del vehículo."""
+import re
+
 import pytest
 
-from nucleo.identificacion import TelefonoInvalido, normalizar_placa, normalizar_telefono
+from nucleo.identificacion import (
+    PATRON_VIN,
+    IdentificacionIncompleta,
+    TelefonoInvalido,
+    VinInvalido,
+    normalizar_placa,
+    normalizar_telefono,
+    normalizar_vin,
+    validar_identificacion,
+    validar_vin,
+)
 from nucleo.tipos import TipoServicio
+
+VIN = "1HGCM82633A004352"
 
 
 @pytest.mark.parametrize("texto", ["abc-123", "ABC 123", "abc123", " a.b.c_1/2 3 "])
@@ -51,3 +65,107 @@ def test_tipos_de_servicio():
     assert [t.value for t in TipoServicio] == ["traslado", "evento", "desvare"]
     assert TipoServicio("desvare") is TipoServicio.DESVARE
     assert TipoServicio.EVENTO.etiqueta == "Evento o muestra de concesionario"
+
+
+# --- VIN -------------------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "texto",
+    [VIN, "1hgcm82633a004352", " 1HG-CM826-33A004352 ", "1HG CM826 33A 004352", "1hg\tcm82633a004352"],
+)
+def test_normalizar_vin_deja_mayusculas_sin_espacios_ni_guiones(texto):
+    assert normalizar_vin(texto) == VIN
+
+
+def test_normalizar_vin_vacio_o_nulo_da_texto_vacio():
+    assert normalizar_vin("") == ""
+    assert normalizar_vin(None) == ""
+    assert normalizar_vin(" - ") == ""
+
+
+def test_normalizar_vin_no_esconde_otros_simbolos():
+    # Un punto o una barra son un error de digitación: se dejan para que la validación lo rechace.
+    assert normalizar_vin("1HGCM.82633A004352") == "1HGCM.82633A004352"
+    with pytest.raises(VinInvalido):
+        validar_vin(normalizar_vin("1HGCM.82633A004352"))
+
+
+@pytest.mark.parametrize("vin", [VIN, "WVWZZZ1JZXW000001", "12345678901234567", "ABCDEFGHJKLMNPRST"])
+def test_vin_de_17_caracteres_sin_i_o_q_es_valido(vin):
+    validar_vin(vin)
+
+
+@pytest.mark.parametrize("letra", ["I", "O", "Q"])
+def test_vin_con_i_o_q_es_invalido(letra):
+    with pytest.raises(VinInvalido, match="sin I, O ni Q"):
+        validar_vin(VIN[:-1] + letra)
+
+
+@pytest.mark.parametrize("vin", ["", VIN[:16], VIN + "1", "1" * 30])
+def test_vin_con_largo_distinto_de_17_es_invalido(vin):
+    with pytest.raises(VinInvalido, match="exactamente 17"):
+        validar_vin(vin)
+
+
+@pytest.mark.parametrize(
+    "vin", ["1HGCM82633A00435*", "1HGCM82633A00435-", "1hgcm82633a004352", "1HGCM82633A00435Ñ"]
+)
+def test_vin_con_simbolos_minusculas_o_tildes_es_invalido(vin):
+    # validar_vin recibe el VIN ya normalizado: así es como se guarda.
+    with pytest.raises(VinInvalido):
+        validar_vin(vin)
+
+
+def test_vin_con_salto_de_linea_al_final_es_invalido():
+    with pytest.raises(VinInvalido):
+        validar_vin(VIN + "\n")
+
+
+def test_vin_invalido_es_un_value_error():
+    assert issubclass(VinInvalido, ValueError)
+
+
+def test_el_patron_de_la_base_acepta_y_rechaza_lo_mismo_que_validar_vin():
+    for vin in [VIN, VIN[:-1] + "I", VIN[:16], "1hgcm82633a004352"]:
+        try:
+            validar_vin(vin)
+            valido = True
+        except VinInvalido:
+            valido = False
+        assert bool(re.search(PATRON_VIN, vin)) is valido, vin
+
+
+# --- Identificación del vehículo -------------------------------------------------------------
+
+
+@pytest.mark.parametrize("tipo", [TipoServicio.TRASLADO, TipoServicio.EVENTO])
+@pytest.mark.parametrize(("placa", "vin"), [("ABC123", ""), ("", VIN), ("ABC123", VIN)])
+def test_traslado_o_evento_con_placa_o_vin_es_suficiente(tipo, placa, vin):
+    validar_identificacion(placa, vin, tipo)
+
+
+@pytest.mark.parametrize("tipo", list(TipoServicio))
+@pytest.mark.parametrize(("placa", "vin"), [("", ""), (None, None), (" - ", "  ")])
+def test_sin_placa_ni_vin_falta_identificacion(tipo, placa, vin):
+    with pytest.raises(IdentificacionIncompleta):
+        validar_identificacion(placa, vin, tipo)
+
+
+def test_sin_placa_ni_vin_el_mensaje_lo_explica():
+    with pytest.raises(IdentificacionIncompleta, match="placa o VIN"):
+        validar_identificacion("", "", TipoServicio.TRASLADO)
+
+
+def test_desvare_exige_placa_aunque_tenga_vin():
+    with pytest.raises(IdentificacionIncompleta, match="Un desvare exige la placa"):
+        validar_identificacion("", VIN, TipoServicio.DESVARE)
+
+
+def test_desvare_con_placa_es_suficiente():
+    validar_identificacion("ABC123", "", TipoServicio.DESVARE)
+    validar_identificacion("abc-123", "", "desvare")
+
+
+def test_identificacion_incompleta_es_un_value_error():
+    assert issubclass(IdentificacionIncompleta, ValueError)
