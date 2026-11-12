@@ -21,11 +21,6 @@ Formato: fecha, tarea, pregunta, qué se asumió mientras tanto (si se asumió a
   puede repetirse, por ejemplo sedes de un mismo concesionario registradas como clientes distintos).
   Si debe ser único, se normaliza (solo dígitos, sin dígito de verificación o con él) y se agrega la
   restricción en la base.
-- **2026-11-12, 1a-04. ¿El conductor puede cancelar un servicio desde la app?** `nucleo/sincronizacion.py`
-  aplica un evento Cancelado de la app si trae motivo y viene del conductor asignado. Asumido: se
-  respeta el núcleo (se aplica); la app de la 1a-12 no ofrece ese botón, solo En camino, Recogido,
-  Entregado y Novedad. Si la respuesta es "no", se cambia el núcleo para que un Cancelado de la app
-  sea conflicto (con su prueba) y logística decide.
 - **2026-11-12, 1a-04. ¿Qué datos son obligatorios para que una solicitud deje de ser borrador? En
   particular, ¿un desvare tiene destino?** Asumido: en el modelo, origen y destino pueden quedar
   vacíos (así se guarda un borrador incompleto); la base solo exige lo de los eventos (respuesta de
@@ -33,6 +28,12 @@ Formato: fecha, tarea, pregunta, qué se asumió mientras tanto (si se asumió a
   si un desvare no tiene destino, el formulario no lo pedirá en ese tipo.
 
 ## Resueltas
+
+- **2026-11-12, 1a-04 → resuelta en 1a-04. ¿El conductor puede cancelar un servicio desde la app?**
+  Decisión: no. La app solo tiene los botones En camino, Recogido, Entregado y Novedad, y el servidor
+  solo acepta esos cuatro destinos desde la app (`DESTINOS_DESDE_LA_APP` en
+  `nucleo/sincronizacion.py`). Cualquier otro, por ejemplo un Cancelado, se guarda como conflicto
+  y el servicio no cambia: cancelar es de logística, con motivo. Decisión del orquestador.
 
 - **2026-11-12, 1a-02 → resuelta en 1a-03. ¿Cómo se escriben las placas de grúa?** Decisión: se
   guardan en mayúsculas y solo con letras y dígitos (se quitan espacios, guiones y cualquier otro
