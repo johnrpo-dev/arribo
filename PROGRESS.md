@@ -41,6 +41,28 @@ La tarea 1a-16 se partió en dos: 1a-16a (modelo de línea de cobro con sus rest
 - Cómo probar: `uv run pytest -q` (94 pruebas); en `/admin/`, crear una grúa y un conductor, asignarlo,
   y ver el mensaje en español al intentar una segunda asignación que se cruce.
 
+### 1a-03 Clientes (12 de noviembre de 2026)
+- Hecho: `nucleo/identificacion.py` (`normalizar_placa`, `normalizar_telefono`) y `nucleo/tipos.py`
+  (`TipoServicio`: traslado, evento, desvare). App `clientes` con Cliente, Teléfono de cliente,
+  Contacto y Tarifa; funciones `buscar_cliente_por_telefono` y `tarifa_propuesta`; admin sin borrado
+  con teléfonos y tarifas dentro del cliente, y búsqueda por teléfono digitado de cualquier forma.
+  En `flota`, la placa ya no admite guiones ni símbolos y el celular del conductor se guarda solo con
+  dígitos (la migración normaliza lo ya guardado). Campo `es_demo` (no editable) en Grúa, Conductor y
+  Cliente para que la 1a-20 borre solo los datos ficticios.
+- Decidido: placas y teléfonos se normalizan (resueltas en `QUESTIONS.md`). Teléfono: solo dígitos,
+  sin el 57 cuando antecede a un número de 10, entre 7 y 15 dígitos. El teléfono de cliente es único en
+  toda la tabla; el de contacto no. Como máximo una tarifa vigente por cliente y tipo de servicio
+  (las anteriores se conservan como no vigentes), valor mayor que cero; todo garantizado por la base.
+  Si la migración encuentra dos placas o celulares que quedan iguales al normalizar, se detiene con un
+  mensaje en vez de fusionar o borrar.
+- Preguntas abiertas nuevas: dos en `QUESTIONS.md` (convenio compartido entre clientes, NIT único).
+- Cómo probar (5 minutos): `uv run pytest -q` (192 pruebas) y `uv run python manage.py migrate`; en
+  `/admin/` → Clientes → Añadir cliente: crear un concesionario con el teléfono "+57 300 123 4567" y
+  una tarifa de traslado vigente; al guardar, el teléfono queda como 3001234567. Crear otro cliente
+  con "300-123-4567": el admin avisa a quién pertenece. En la lista de clientes, buscar "300 123 4567"
+  y verlo aparecer. Agregar al primero una segunda tarifa de traslado vigente: el admin la rechaza en
+  español. En Flota, crear una grúa con placa "abc-123" y verla guardada como ABC123.
+
 ## Escalamientos
 
 Ninguno todavía.

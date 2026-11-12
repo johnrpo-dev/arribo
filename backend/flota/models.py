@@ -10,14 +10,12 @@ from django.contrib.postgres.fields import DateTimeRangeField, RangeBoundary, Ra
 from django.core.exceptions import ValidationError
 from django.db import models
 from django.db.models import F, Func, Q
-from django.db.models.functions import Upper
 from django.utils import timezone
 from django.utils.formats import date_format
 
+from nucleo.identificacion import TelefonoInvalido, normalizar_placa, normalizar_telefono
 
-def normalizar_placa(placa: str) -> str:
-    """Mayúsculas y sin espacios, para que "abc 123" y "ABC123" sean la misma placa."""
-    return "".join((placa or "").split()).upper()
+ES_DEMO_AYUDA = "Dato ficticio de demostración; el comando de borrado de la demo lo quita."
 
 
 class Grua(models.Model):
@@ -37,6 +35,8 @@ class Grua(models.Model):
         default=EstadoOperativo.OPERATIVA,
     )
     activa = models.BooleanField("activa", default=True)
+    es_demo = models.BooleanField("dato de demostración", default=False, editable=False,
+                                  help_text=ES_DEMO_AYUDA)
 
     class Meta:
         verbose_name = "grúa"
@@ -49,11 +49,11 @@ class Grua(models.Model):
                 violation_error_message="La capacidad de una grúa es 1 o 2 vehículos.",
             ),
             # Aunque alguien guarde sin pasar por save() (update, SQL), la placa queda normalizada
-            # y la unicidad no se puede burlar con minúsculas o espacios.
+            # y la unicidad no se puede burlar con minúsculas, espacios o guiones.
             models.CheckConstraint(
-                condition=Q(placa=Upper("placa")) & ~Q(placa__regex=r"\s") & ~Q(placa=""),
+                condition=Q(placa__regex=r"^[A-Z0-9]+$"),
                 name="grua_placa_normalizada",
-                violation_error_message="La placa va en mayúsculas y sin espacios.",
+                violation_error_message="La placa va en mayúsculas, solo con letras y dígitos.",
             ),
         )
 
@@ -81,14 +81,35 @@ class Conductor(models.Model):
         help_text="Opcional. Lo usará el ingreso del conductor a la app.",
     )
     activo = models.BooleanField("activo", default=True)
+    es_demo = models.BooleanField("dato de demostración", default=False, editable=False,
+                                  help_text=ES_DEMO_AYUDA)
 
     class Meta:
         verbose_name = "conductor"
         verbose_name_plural = "conductores"
         ordering = ("nombre",)
+        constraints = (
+            # El celular se guarda normalizado (ver nucleo/identificacion.py) para que la unicidad
+            # no se burle con espacios, guiones o el +57.
+            models.CheckConstraint(
+                condition=Q(celular__regex=r"^[0-9]+$"),
+                name="conductor_celular_solo_digitos",
+                violation_error_message="El celular va solo con dígitos.",
+            ),
+        )
 
     def __str__(self):
         return self.nombre
+
+    def clean(self):
+        try:
+            self.celular = normalizar_telefono(self.celular)
+        except TelefonoInvalido as error:
+            raise ValidationError({"celular": str(error)}) from error
+
+    def save(self, *args, **kwargs):
+        self.celular = normalizar_telefono(self.celular)
+        super().save(*args, **kwargs)
 
 
 class TsTzRange(Func):

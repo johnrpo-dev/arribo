@@ -19,7 +19,7 @@ Toda tarea termina con `uv run pytest -q` y `uv run ruff check .` en verde, más
   Roles como grupos: administrador, logística, facturación, conductor. Todo editable en el admin.
   Verificar: pruebas de que no hay asignaciones traslapadas por conductor ni por grúa; crear una grúa y un conductor en `/admin/`.
 
-- [ ] **1a-03 Clientes** (1 h). Depende de: 02.
+- [x] **1a-03 Clientes** (1 h). Depende de: 02.
   App `clientes`: Cliente con tipo, teléfonos únicos, modalidad de cobro; Contacto; Tarifa.
   Verificar: prueba de teléfono único; crear un cliente con tarifa en el admin.
 
