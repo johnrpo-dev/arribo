@@ -93,8 +93,15 @@ La tarea 1a-16 se partió en dos: 1a-16a (modelo de línea de cobro con sus rest
   `CLAUDE.md`). Exigir placa o VIN también al asignar queda como punto de extensión
   (`identificacion_exigida_al_asignar`), apagado hasta la tarea de configuración. El Vehículo también
   lleva la marca `es_demo`, porque un vehículo puede quedar sin solicitudes que lo marquen.
-- Preguntas abiertas nuevas: dos en `QUESTIONS.md` (cancelar desde la app, obligatorios del borrador).
-- Cómo probar (5 minutos): `uv run pytest -q` (585 pruebas) y `uv run python manage.py migrate`.
+- Decidido tras la revisión (orquestador): el conductor no cancela desde la app. El núcleo solo
+  acepta desde la app los destinos En camino, Recogido, Entregado y Novedad
+  (`DESTINOS_DESDE_LA_APP` en `nucleo/sincronizacion.py`); cualquier otro, como un Cancelado, se
+  guarda como conflicto y el servicio no cambia. Anotado en `CLAUDE.md` y resuelto en `QUESTIONS.md`.
+- Decidido tras la revisión (orquestador): la respuesta de regreso de un evento se exige solo en una
+  solicitud abierta. Una llamada perdida se cierra como no concretada sin preguntar por el regreso
+  (restricción `solicitud_evento_responde_regreso` corregida en la migración 0002).
+- Preguntas abiertas nuevas: una en `QUESTIONS.md` (obligatorios del borrador y destino del desvare).
+- Cómo probar (5 minutos): `uv run pytest -q` (602 pruebas) y `uv run python manage.py migrate`.
   En `/admin/` → Solicitudes → Vehículos: crear uno con placa "abc-123" y verlo como ABC123; crear
   otro con "ABC 123" y ver "Ya hay un vehículo con la placa ABC123."; poner un VIN con la letra O y
   ver el aviso. En Solicitudes, crear un evento "Abierta" sin responder si tiene regreso y ver el
