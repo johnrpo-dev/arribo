@@ -262,8 +262,9 @@ def _aplicar_evento(evento: EventoDelConductor) -> Resultado:
                 _cambiar(servicio, nuevo)
     except IntegrityError:
         # Otra petición guardó el mismo id mientras esta trabajaba: esta transacción ya se
-        # deshizo completa (ni evento ni cambio de estado).
-        if _ya_recibido(evento_id):
+        # deshizo completa (ni evento ni cambio de estado). Se confirma en la base que el evento
+        # existe; si el error fue otro, no se esconde.
+        if EventoEstado.objects.filter(pk=evento_id).exists():
             return Resultado.DUPLICADO
         raise
     return resultado
