@@ -1,21 +1,29 @@
 # App del conductor
 
-Flutter, solo Android, instalada por APK directo.
+App Flutter de Arribo para los conductores de grúa: solo Android, distribuida por APK directo
+(sin tiendas). Por ahora es un proyecto mínimo con una sola pantalla que dice "Arribo conductor";
+la base local, la cola de salida, la cámara y el push llegan en tareas posteriores de
+`docs/fase-1a-tareas.md`.
 
-Esta carpeta todavía no tiene el proyecto: Flutter no estaba instalado en el equipo cuando se armó el
-esqueleto. Se crea en la tarea 1a-01 de `docs/fase-1a-tareas.md`.
+- Paquete: `co.arribo.arribo_conductor`
+- `minSdk = 26` (Android 8.0 o superior), fijado en `android/app/build.gradle.kts`.
 
-## Crear el proyecto
+## Requisitos
 
-1. Instalar Flutter (canal estable) y Android Studio siguiendo https://docs.flutter.dev/get-started/install/windows
-2. Comprobar la instalación: `flutter doctor`
-3. Desde la raíz del repositorio:
+- Flutter estable (probado con Flutter 3.50.0 / Dart 3.14.0) y el SDK de Android con sus licencias
+  aceptadas (`flutter doctor --android-licenses`).
+- Para correr en un celular: Android 8.0 o superior con la depuración USB activada.
+
+## Comandos
+
+Desde `conductor/`:
 
 ```
-flutter create --org co.arribo --project-name arribo_conductor --platforms=android conductor
+flutter test                 # pruebas de la app
+flutter devices              # ver si el celular conectado por USB aparece
+flutter run                  # instalar y correr en el Android físico conectado por USB
+flutter build apk --debug    # APK de depuración en build/app/outputs/flutter-apk/app-debug.apk
 ```
 
-4. Verificar: `cd conductor`, `flutter test` y `flutter run` con el celular conectado.
-
-Las dependencias (base local, cámara, push) se agregan con `flutter pub add` en la tarea que las use,
-para que queden en su versión vigente.
+Las dependencias se agregan con `flutter pub add` en la tarea que las use, para que queden en su
+versión vigente.
