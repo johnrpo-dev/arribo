@@ -35,3 +35,6 @@ conductor/android/key.properties
 .vscode/
 Thumbs.db
 .DS_Store
+
+# Copias de trabajo de los agentes
+.claude/worktrees/
