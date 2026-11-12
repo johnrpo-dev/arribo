@@ -1,0 +1,32 @@
+# Secretos y entorno
+.env
+*.keystore
+*.jks
+google-services.json
+firebase-adminsdk*.json
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+.ruff_cache/
+db.sqlite3
+
+# Archivos subidos en desarrollo
+backend/media/
+
+# Flutter
+conductor/.dart_tool/
+conductor/build/
+conductor/.flutter-plugins
+conductor/.flutter-plugins-dependencies
+conductor/android/.gradle/
+conductor/android/local.properties
+conductor/android/key.properties
+
+# Editores y sistema
+.idea/
+.vscode/
+Thumbs.db
+.DS_Store
