@@ -6,7 +6,7 @@ import dj_database_url
 from dotenv import load_dotenv
 
 BASE_DIR = Path(__file__).resolve().parent.parent
-load_dotenv(BASE_DIR.parent / ".env")
+load_dotenv(BASE_DIR / ".env")
 
 DEBUG = os.environ.get("ARRIBO_DEBUG", "1") == "1"
 SECRET_KEY = os.environ.get("ARRIBO_SECRET_KEY", "solo-para-desarrollo-no-usar-en-produccion")
@@ -53,15 +53,12 @@ TEMPLATES = [
     },
 ]
 
-# Sin DATABASE_URL se usa SQLite solo para que el esqueleto arranque.
-# El desarrollo real y las pruebas con base de datos van contra PostgreSQL (tarea 1a-01).
-DATABASES = {
-    "default": dj_database_url.config(
-        env="DATABASE_URL",
-        default=f"sqlite:///{BASE_DIR / 'db.sqlite3'}",
-        conn_max_age=60,
-    )
-}
+# Solo PostgreSQL, también en desarrollo y en pruebas: no hay respaldo a SQLite a propósito,
+# para que ninguna prueba pase sobre un motor distinto al de producción.
+DATABASE_URL = os.environ.get("DATABASE_URL", "")
+if not DATABASE_URL.startswith(("postgres://", "postgresql://")):
+    raise RuntimeError("Falta DATABASE_URL de PostgreSQL en backend/.env (ver .env.example)")
+DATABASES = {"default": dj_database_url.parse(DATABASE_URL, conn_max_age=60)}
 
 LANGUAGE_CODE = "es-co"
 TIME_ZONE = "America/Bogota"

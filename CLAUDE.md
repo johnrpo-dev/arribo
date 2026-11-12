@@ -59,6 +59,16 @@ Despliegue (tarea 1a-21): todavía no existe; al crearlo, documentar aquí el co
 3. Informar al dueño: qué cambió, cómo verificarlo a mano en menos de 5 minutos, y qué quedó sin hacer.
 4. Marcar la tarea en `docs/fase-1a-tareas.md`. No adelantar tareas de fases posteriores.
 
+## Git y GitHub
+
+- Remoto: `origin` en https://github.com/johnrpo-dev/arribo.git. La rama principal es `main`.
+- Cada tarea se trabaja en una rama propia; puede quedarse local. Al terminar se fusiona en `main`.
+- Después de cada tarea fusionada, subir `main` a GitHub (`git push origin main`) como respaldo.
+- No abrir pull requests salvo que el dueño lo pida. Nunca hacer force push a `main`.
+- Antes de cada push, revisar que no vayan `.env`, bases locales ni credenciales.
+- El JSON de cuenta de servicio de Firebase (el que usa el servidor para enviar notificaciones) es una
+  credencial: nunca va al repositorio. Se entrega por variable de entorno o en una ruta fuera del repositorio.
+
 ## Reglas de negocio críticas
 
 Están implementadas y probadas en `nucleo/`. Los modelos, vistas y la API **llaman** a esas funciones;

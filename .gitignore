@@ -1,9 +1,14 @@
 # Secretos y entorno
 .env
+.env.*
+!.env.example
 *.keystore
 *.jks
 google-services.json
-firebase-adminsdk*.json
+# Cuenta de servicio de Firebase (la usa el servidor para enviar push): es una credencial.
+*firebase-adminsdk*.json
+*service-account*.json
+*serviceAccount*.json
 
 # Python
 __pycache__/

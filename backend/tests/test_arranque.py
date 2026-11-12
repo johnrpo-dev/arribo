@@ -11,6 +11,16 @@ def test_salud_responde(client):
     assert respuesta.json()["estado"] == "ok"
 
 
+def test_las_pruebas_corren_sobre_postgresql(db):
+    from django.db import connection
+
+    assert connection.vendor == "postgresql"
+    with connection.cursor() as cursor:
+        cursor.execute("select current_database()")
+        base = cursor.fetchone()[0]
+    assert base.startswith("test_"), f"Las pruebas deben usar su propia base, no {base}"
+
+
 def test_zona_horaria_es_bogota(settings):
     assert settings.TIME_ZONE == "America/Bogota"
     assert settings.USE_TZ is True

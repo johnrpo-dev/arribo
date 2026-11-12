@@ -11,10 +11,12 @@ vehículo, cobro por pagador y control de documentos con vencimiento.
 ## Requisitos
 
 - [uv](https://docs.astral.sh/uv/) (instala Python y las dependencias).
-- PostgreSQL para desarrollo real. Sin `DATABASE_URL` el esqueleto arranca con SQLite.
+- PostgreSQL, con un usuario que tenga permiso `CREATEDB` (las pruebas crean su propia base).
 - Flutter, para la app del conductor.
 
 ## Instalar y ejecutar
+
+Copiar `backend/.env.example` a `backend/.env` y completar los valores. Luego:
 
 ```
 cd backend
@@ -25,5 +27,3 @@ uv run python manage.py runserver
 ```
 
 Abrir http://127.0.0.1:8000/salud/ : debe responder `{"estado": "ok", "servicio": "arribo"}`.
-
-Para configurar el entorno, copiar `.env.example` a `.env` en la raíz y completar los valores.
