@@ -17,6 +17,11 @@ def test_el_admin_abre_la_lista_y_el_formulario(admin_client, modelo):
     assert admin_client.get(f"/admin/flota/{modelo}/add/").status_code == 200
 
 
+@pytest.mark.parametrize("modelo", ["grua", "conductor"])
+def test_la_marca_de_demostracion_no_se_edita_en_el_admin(admin_client, modelo):
+    assert 'name="es_demo"' not in admin_client.get(f"/admin/flota/{modelo}/add/").content.decode()
+
+
 def test_el_admin_no_deja_borrar(admin_client):
     grua = Grua.objects.create(placa="GRU001", capacidad=1)
     assert admin_client.get(f"/admin/flota/grua/{grua.pk}/delete/").status_code == 403
