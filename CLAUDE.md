@@ -59,6 +59,20 @@ Despliegue (tarea 1a-21): todavía no existe; al crearlo, documentar aquí el co
 3. Informar al dueño: qué cambió, cómo verificarlo a mano en menos de 5 minutos, y qué quedó sin hacer.
 4. Marcar la tarea en `docs/fase-1a-tareas.md`. No adelantar tareas de fases posteriores.
 
+## Reglas de trabajo por tarea
+
+- Una rama por tarea (`tarea/1a-NN-nombre`), commits pequeños. Se fusiona en `main` solo con todas las pruebas en verde.
+- Pruebas automáticas para cada regla de negocio tocada. Prohibido desactivar, saltar o debilitar pruebas para que pasen.
+- Toda regla que dependa de PostgreSQL (restricciones, unicidad, transacciones) se prueba contra la base, no solo en `nucleo/`.
+- Una regla de negocio que no esté escrita no se inventa: se anota en `QUESTIONS.md` y se sigue con lo independiente.
+- Al terminar, actualizar `PROGRESS.md`: qué se hizo, qué se decidió, cómo lo prueba el dueño a mano.
+- Detenerse y preguntar antes de: cambiar la arquitectura, agregar una dependencia grande, desplegar, borrar
+  datos, o cuando una prueba siga fallando tras 3 enfoques distintos.
+- Cuentas y servicios externos (Firebase, VPS, dominio, correo) los crea el dueño: darle los pasos.
+- Sin Docker en local. PostgreSQL nativo; la app se prueba en un Android físico por USB, no en emulador.
+- App: minSdk 26. Cámara y cola sin señal pensadas para gama media con poca memoria: fotos a disco, nunca
+  retenidas en memoria; el estado de la pantalla sobrevive a que el sistema mate la app al abrir la cámara.
+
 ## Git y GitHub
 
 - Remoto: `origin` en https://github.com/johnrpo-dev/arribo.git. La rama principal es `main`.
