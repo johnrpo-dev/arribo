@@ -25,6 +25,7 @@ INSTALLED_APPS = [
     "django.contrib.postgres",
     "rest_framework",
     "flota",
+    "clientes",
 ]
 
 MIDDLEWARE = [
