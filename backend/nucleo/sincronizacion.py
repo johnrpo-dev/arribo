@@ -16,7 +16,7 @@ from enum import StrEnum
 
 from nucleo.estados import Estado, Servicio, puede_transicionar, transicionar
 
-
+# Los cuatro botones de la app del conductor.
 DESTINOS_DESDE_LA_APP = frozenset(
     {Estado.EN_CAMINO, Estado.RECOGIDO, Estado.ENTREGADO, Estado.NOVEDAD}
 )
