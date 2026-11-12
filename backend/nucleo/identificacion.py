@@ -61,7 +61,7 @@ def normalizar_telefono(texto: str | None) -> str:
 def normalizar_vin(texto: str | None) -> str:
     """Mayúsculas, sin espacios ni guiones: "1hg-cm826 33a004352" da "1HGCM82633A004352".
 
-    Otros símbolos se dejan, para que validar_vin los rechace en vez de esconder un error de digitación.
+    Otros símbolos se dejan: validar_vin los rechaza en vez de esconder un error al digitar.
     """
     return _SEPARADORES_VIN.sub("", (texto or "").upper())
 

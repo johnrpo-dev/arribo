@@ -1,4 +1,4 @@
-"""Placas, VIN y teléfonos escritos de distintas formas quedan iguales; identificación del vehículo."""
+"""Placas, VIN y teléfonos escritos de distintas formas quedan iguales; placa o VIN exigidos."""
 import re
 
 import pytest
@@ -72,7 +72,13 @@ def test_tipos_de_servicio():
 
 @pytest.mark.parametrize(
     "texto",
-    [VIN, "1hgcm82633a004352", " 1HG-CM826-33A004352 ", "1HG CM826 33A 004352", "1hg\tcm82633a004352"],
+    [
+        VIN,
+        "1hgcm82633a004352",
+        " 1HG-CM826-33A004352 ",
+        "1HG CM826 33A 004352",
+        "1hg\tcm8263-3a004352",
+    ],
 )
 def test_normalizar_vin_deja_mayusculas_sin_espacios_ni_guiones(texto):
     assert normalizar_vin(texto) == VIN
@@ -91,7 +97,9 @@ def test_normalizar_vin_no_esconde_otros_simbolos():
         validar_vin(normalizar_vin("1HGCM.82633A004352"))
 
 
-@pytest.mark.parametrize("vin", [VIN, "WVWZZZ1JZXW000001", "12345678901234567", "ABCDEFGHJKLMNPRST"])
+@pytest.mark.parametrize(
+    "vin", [VIN, "WVWZZZ1JZXW000001", "12345678901234567", "ABCDEFGHJKLMNPRST"]
+)
 def test_vin_de_17_caracteres_sin_i_o_q_es_valido(vin):
     validar_vin(vin)
 
