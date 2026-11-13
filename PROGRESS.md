@@ -196,6 +196,41 @@ La tarea 1a-16 se partió en dos: 1a-16a (modelo de línea de cobro con sus rest
   desplazable. En `/admin/`, crear un usuario en el grupo `facturacion`, entrar con él en otra
   ventana privada: solo ve Cobros, y `/tablero/` da "Sin acceso a esta página". Pulsar Salir.
 
+### 1a-05 Configuración (12 de noviembre de 2026)
+- Hecho: app `configuracion` con un solo registro (`Configuracion`) que se obtiene con
+  `configuracion_vigente()` (lo crea con los valores por defecto de `docs/arquitectura.md` si no
+  existe). Campos: momento de placa o VIN, mínimo de fotos (0 a 20), roles que ven valores,
+  retención de fotos (6, 12, 24 meses o indefinida), seis umbrales de alertas, horario nocturno
+  (inicio y fin) y formato de exportación de factura. `configuracion/operaciones.py` trae
+  `guardar_configuracion` (deja un registro de historial por campo cambiado: quién, cuándo, campo,
+  valor anterior y nuevo; el historial es de solo agregar) y `puede_ver_valores(usuario)`.
+  Pantalla en `/configuracion/` (solo administrador), conectada en `panel/secciones.py`, con
+  mensaje "Configuración guardada." y errores junto a cada campo.
+- Decidido: el registro único lo garantiza la base (campo `unico` siempre verdadero y único). Toda
+  regla de la configuración tiene restricción en PostgreSQL: mínimo de fotos de 0 a 20, umbrales
+  mayores que cero, inicio y fin del horario nocturno distintos (el horario puede cruzar la
+  medianoche), opciones válidas, y el administrador siempre ve valores (se muestra marcado y
+  deshabilitado; no se puede desmarcar). El conductor no es opción: nunca ve valores, aunque tenga
+  otro rol; el superusuario cuenta como administrador. Los costos de retención están en una tabla
+  de `configuracion/models.py` (son del proveedor de almacenamiento, no del cliente). La
+  exportación es un campo de opciones con una sola opción ("Excel/CSV genérico"): el formato depende
+  del cliente, así que vive en la configuración, y los adaptadores futuros serán opciones nuevas.
+  El horario nocturno se guarda pero aún no tiene efecto (lo dice la pantalla). CSS nuevo: solo el
+  componente `grupo-opciones`/`opcion` para radios y casillas, que no existía. Parcial nuevo
+  `parciales/campo.html` (etiqueta, control, ayuda y errores) para reutilizar en otros formularios.
+- Fuera de esta tarea: modalidad de cobro y firma ya están en `clientes.Cliente`; precio en
+  `clientes.Tarifa`; tipos de documento llegan con 1a-15. El historial no se muestra aún en pantalla.
+- Cómo probar (5 minutos): `uv run pytest -q` (855 pruebas), `uv run python manage.py migrate` y
+  `uv run python manage.py runserver`. Entrar como administrador y abrir Configuración: ver los
+  valores por defecto (al recoger, 4 fotos, administrador marcado y gris, facturación marcada,
+  12 meses con su costo, umbrales 10/2/15/4/5/30, 19:00 a 06:00). Cambiar el mínimo de fotos a 25 y
+  guardar: error junto al campo. Ponerlo en 6 y guardar: "Configuración guardada." y al recargar
+  sigue en 6. Poner inicio y fin del horario iguales: error junto a Fin. En
+  `uv run python manage.py shell`: `from configuracion.models import HistorialConfiguracion;`
+  `HistorialConfiguracion.objects.values_list("campo", "valor_anterior", "valor_nuevo", "usuario__username")`
+  muestra `("minimo_fotos", "4", "6", ...)`. Con un usuario de logística, `/configuracion/` da
+  "Sin acceso a esta página". Angostar la ventana a 375 px: sin desplazamiento horizontal.
+
 ## Escalamientos
 
 Ninguno todavía.

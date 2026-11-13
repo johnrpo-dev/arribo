@@ -28,7 +28,7 @@ Toda tarea termina con `uv run pytest -q` y `uv run ruff check .` en verde, más
   cambia de estado solo a través de `nucleo/estados.py`.
   Verificar: pruebas de que el modelo rechaza lo mismo que el núcleo y de que cada cambio deja un evento; validación de placa y VIN.
 
-- [ ] **1a-05 Configuración** (5 h). Depende de: 04.
+- [x] **1a-05 Configuración** (5 h). Depende de: 04.
   App `configuracion`: registro único con las opciones de `docs/arquitectura.md` y pantalla propia
   (no el admin) para cambiarlas en vivo, con el costo de cada opción de retención de fotos.
   Verificar: prueba de valores por defecto; cambiar el mínimo de fotos en la pantalla y verlo guardado.
