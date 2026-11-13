@@ -70,6 +70,11 @@
         {% for error in formulario.tiene_regreso.errors %}<p class="campo-error">{{ error }}</p>{% endfor %}
       </fieldset>
       {% include "parciales/campo.html" with campo=formulario.fecha_regreso %}
+      {% if formulario.pagador_a_conservar %}
+      {{ formulario.pagador_actual }}
+      <p>Paga hoy <strong>{{ formulario.pagador_a_conservar.nombre }}</strong>. Se conserva salvo que escriba el teléfono de otro pagador o marque la opción de abajo.</p>
+      <label class="opcion">{{ formulario.paga_solicitante }} {{ formulario.paga_solicitante.label }}</label>
+      {% endif %}
       {% include "parciales/campo.html" with campo=formulario.pagador_telefono %}
       <div id="resultado-pagador" aria-live="polite">
         {% include "solicitudes/parcial_cliente.html" with busqueda=pagador %}

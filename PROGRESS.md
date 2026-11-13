@@ -300,12 +300,14 @@ La tarea 1a-16 se partió en dos: 1a-16a (modelo de línea de cobro con sus rest
   exigirá la placa o el VIN según la configuración. Sin CSS nuevo: las filas de vehículo usan
   `grupo-opciones` (leyenda "Vehículo N") y los componentes existentes; sin migraciones (la
   referencia externa ya estaba en el servicio).
-- Límite conocido: completar un borrador muestra el primer teléfono del solicitante y del
-  pagador; un cliente creado en el admin sin teléfono obliga a escribir uno (y un pagador sin
-  teléfono volvería a ser el solicitante al guardar).
+- Decidido tras la revisión (orquestador): al completar un borrador el pagador se conserva
+  aunque no tenga teléfono (el formulario dice "Paga hoy ..." y lleva su id oculto, validado
+  contra la solicitud); solo cambia si se escribe el teléfono de otro pagador o se marca "Que
+  pague quien llama". Nunca cambia por ausencia de un dato. Límite: un solicitante creado en el
+  admin sin teléfono obliga a escribir uno al completar el borrador.
 - Preguntas abiertas nuevas: cinco en `QUESTIONS.md` (referencia por vehículo, cuándo se cierra
   como no concretada, fecha de regreso, quitar vehículo de un borrador, qué es duplicado).
-- Cómo probar (5 minutos): `uv run pytest -q` (1024 pruebas) y `uv run python manage.py runserver`.
+- Cómo probar (5 minutos): `uv run pytest -q` (1030 pruebas) y `uv run python manage.py runserver`.
   Entrar con logística o administrador y abrir Nueva solicitud. Escribir un teléfono (cliente
   nuevo: nombre y tipo), elegir "Evento o muestra de concesionario", origen y destino, placa
   "abc123" en Vehículo 1, pulsar "Agregar otro vehículo" y poner "xyz789" en Vehículo 2. Sin

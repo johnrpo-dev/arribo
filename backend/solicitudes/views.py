@@ -56,10 +56,12 @@ def _formulario(request, solicitud):
         servicios = list(servicios_de_ida(solicitud).select_related("vehiculo"))
     permitidos = {s.pk for s in servicios}
     if request.method == "POST":
-        formulario = FormularioSolicitud(request.POST)
+        formulario = FormularioSolicitud(request.POST, solicitud=solicitud)
         vehiculos = FormularioVehiculos(request.POST, servicios=permitidos)
     else:
-        formulario = FormularioSolicitud(initial=inicial_de(solicitud) if solicitud else None)
+        formulario = FormularioSolicitud(
+            initial=inicial_de(solicitud) if solicitud else None, solicitud=solicitud
+        )
         vehiculos = FormularioVehiculos(initial=inicial_vehiculos(servicios), servicios=permitidos)
 
     duplicados = []

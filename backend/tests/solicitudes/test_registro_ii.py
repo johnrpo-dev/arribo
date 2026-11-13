@@ -668,3 +668,81 @@ def test_un_evento_abierto_sin_respuesta_de_regreso_se_puede_cerrar(cliente):
     registro.cerrar_no_concretada(solicitud, motivo="desistio")
     solicitud.refresh_from_db()
     assert solicitud.estado_registro == EstadoRegistro.NO_CONCRETADA
+
+
+# --- Pagador al completar un borrador ----------------------------------------------------------
+
+
+@pytest.fixture
+def borrador_con_pagador_sin_telefono(con_telefono):
+    """Borrador cuyo pagador (creado en el admin) no tiene teléfono registrado."""
+    pagador = Cliente.objects.create(nombre="Flota Sin Teléfono", tipo=TipoCliente.CONCESIONARIO)
+    solicitud = crear_solicitud(
+        con_telefono, destino="", pagador=pagador, estado_registro=EstadoRegistro.BORRADOR
+    )
+    return solicitud, pagador
+
+
+def test_completar_conserva_el_pagador_sin_telefono(
+    client, logistica, borrador_con_pagador_sin_telefono
+):
+    solicitud, pagador = borrador_con_pagador_sin_telefono
+    html = client.get(ruta(solicitud, "completar/")).content.decode()
+    assert "Paga hoy <strong>Flota Sin Teléfono</strong>" in html
+    assert f'name="pagador_actual" value="{pagador.pk}"' in html
+    client.post(ruta(solicitud, "completar/"), datos(pagador_actual=str(pagador.pk)))
+    solicitud.refresh_from_db()
+    assert solicitud.estado_registro == EstadoRegistro.ABIERTA
+    assert solicitud.pagador == pagador
+
+
+def test_completar_conserva_el_pagador_aunque_falte_el_campo_oculto(
+    client, logistica, borrador_con_pagador_sin_telefono
+):
+    # El pagador nunca cambia por ausencia de un dato.
+    solicitud, pagador = borrador_con_pagador_sin_telefono
+    client.post(ruta(solicitud, "completar/"), datos())
+    solicitud.refresh_from_db()
+    assert solicitud.pagador == pagador
+
+
+def test_completar_cambia_al_solicitante_solo_si_se_marca(
+    client, logistica, borrador_con_pagador_sin_telefono
+):
+    solicitud, pagador = borrador_con_pagador_sin_telefono
+    client.post(
+        ruta(solicitud, "completar/"),
+        datos(pagador_actual=str(pagador.pk), paga_solicitante="on"),
+    )
+    solicitud.refresh_from_db()
+    assert solicitud.pagador == solicitud.solicitante
+
+
+def test_completar_cambia_el_pagador_si_se_busca_otro_telefono(
+    client, logistica, borrador_con_pagador_sin_telefono, aseguradora
+):
+    solicitud, pagador = borrador_con_pagador_sin_telefono
+    client.post(
+        ruta(solicitud, "completar/"),
+        datos(pagador_actual=str(pagador.pk), pagador_telefono="604 555 1234"),
+    )
+    solicitud.refresh_from_db()
+    assert solicitud.pagador == aseguradora
+
+
+def test_un_pagador_actual_que_no_coincide_no_guarda(
+    client, logistica, borrador_con_pagador_sin_telefono, aseguradora
+):
+    solicitud, pagador = borrador_con_pagador_sin_telefono
+    respuesta = client.post(ruta(solicitud, "completar/"), datos(pagador_actual=str(aseguradora.pk)))
+    assert "El pagador de esta solicitud cambió mientras tanto" in respuesta.content.decode()
+    solicitud.refresh_from_db()
+    assert (solicitud.pagador, solicitud.estado_registro) == (pagador, EstadoRegistro.BORRADOR)
+
+
+def test_en_una_solicitud_nueva_sin_pagador_paga_quien_llama(client, logistica, con_telefono):
+    html = client.get(RUTA).content.decode()
+    assert "Paga hoy" not in html
+    client.post(RUTA, datos(paga_solicitante="on"))
+    solicitud = Solicitud.objects.get()
+    assert solicitud.pagador == solicitud.solicitante

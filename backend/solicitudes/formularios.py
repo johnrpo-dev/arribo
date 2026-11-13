@@ -127,8 +127,42 @@ class FormularioSolicitud(forms.Form):
         widget=forms.TextInput(attrs=_busqueda_htmx("pagador")),
     )
 
+    # Solo al completar un borrador cuyo pagador no es el solicitante: el pagador se conserva
+    # aunque no tenga teléfono, y solo cambia si se busca otro o se marca `paga_solicitante`.
+    pagador_actual = forms.IntegerField(required=False, widget=forms.HiddenInput)
+    paga_solicitante = forms.BooleanField(
+        label="Que pague quien llama (en vez del pagador actual)", required=False
+    )
+
     solicitante: Cliente | None = None
     pagador: Cliente | None = None
+
+    def __init__(self, *args, solicitud: Solicitud | None = None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.solicitud = solicitud
+
+    @property
+    def pagador_a_conservar(self) -> Cliente | None:
+        """El pagador del borrador, si es distinto del solicitante (None en otro caso)."""
+        s = self.solicitud
+        if s is None or s.pagador_id is None or s.pagador_id == s.solicitante_id:
+            return None
+        return s.pagador
+
+    def _pagador(self, datos):
+        """Quién paga. Sin teléfono de pagador: en un registro nuevo, quien llama; al completar
+        un borrador, el pagador que ya tenía, salvo que se marque `paga_solicitante`. El
+        pagador nunca cambia por ausencia de un dato."""
+        conservar = self.pagador_a_conservar
+        mostrado = datos.get("pagador_actual")
+        if mostrado is not None and (conservar is None or mostrado != conservar.pk):
+            # El formulario se abrió con otro pagador: otra persona lo cambió mientras tanto.
+            self.add_error(
+                None, "El pagador de esta solicitud cambió mientras tanto. Recargue la página."
+            )
+            return
+        if self.pagador is None and conservar is not None and not datos.get("paga_solicitante"):
+            self.pagador = conservar
 
     # --- Campos -----------------------------------------------------------------------------
 
@@ -168,6 +202,8 @@ class FormularioSolicitud(forms.Form):
         for lugar in ("origen", "destino"):
             self._contacto(datos, lugar)
         self._regreso(datos)
+        if "pagador_telefono" not in self.errors:
+            self._pagador(datos)
         return datos
 
     def _solicitante(self, datos):
@@ -238,9 +274,10 @@ class FormularioSolicitud(forms.Form):
 
 def inicial_de(solicitud: Solicitud) -> dict:
     """Los datos de un borrador para mostrarlos en el formulario al completarlo."""
-    pagador_telefono = ""
+    pagador_telefono, pagador_actual = "", None
     if solicitud.pagador_id != solicitud.solicitante_id:
         pagador_telefono = _primer_telefono(solicitud.pagador)
+        pagador_actual = solicitud.pagador_id
     regreso = {True: SI, False: NO}.get(solicitud.tiene_regreso, "")
     inicial = {
         "telefono": _primer_telefono(solicitud.solicitante),
@@ -251,6 +288,7 @@ def inicial_de(solicitud: Solicitud) -> dict:
         "tiene_regreso": regreso,
         "fecha_regreso": _hora_local(solicitud.fecha_regreso),
         "pagador_telefono": pagador_telefono,
+        "pagador_actual": pagador_actual,
     }
     for lugar in ("origen", "destino"):
         contacto = getattr(solicitud, f"contacto_{lugar}")
