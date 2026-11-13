@@ -1,0 +1,52 @@
+{% if busqueda.telefono_completo %}
+{% if busqueda.para == "solicitante" %}
+{% if busqueda.cliente %}
+<div class="formulario">
+  <p><strong>{{ busqueda.cliente.nombre }}</strong> <span class="texto-secundario">· {{ busqueda.cliente.get_tipo_display }}</span></p>
+  {% if busqueda.historial %}
+  <p class="ayuda" id="t-historial">Últimas solicitudes</p>
+  <div class="tabla-contenedor">
+    <table class="tabla" aria-labelledby="t-historial">
+      <thead>
+        <tr>
+          <th scope="col">N.º</th>
+          <th scope="col">Fecha</th>
+          <th scope="col">Tipo</th>
+          <th scope="col">Origen</th>
+          <th scope="col">Destino</th>
+          <th scope="col">Estado</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for s in busqueda.historial %}
+        <tr>
+          <td class="cifra"><a href="{% url 'detalle_solicitud' s.pk %}">{{ s.pk }}</a></td>
+          <td><time datetime="{{ s.creada_en|date:'c' }}">{{ s.creada_en|date:"d/m/Y H:i" }}</time></td>
+          <td>{{ s.get_tipo_display }}</td>
+          <td>{{ s.origen|default:"—" }}</td>
+          <td>{{ s.destino|default:"—" }}</td>
+          <td>{{ s.estado_etiqueta }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <p class="ayuda">Sin solicitudes anteriores.</p>
+  {% endif %}
+</div>
+{% else %}
+<div class="formulario">
+  <p class="ayuda">No hay ningún cliente con ese teléfono. Se crea al guardar con estos datos:</p>
+  <div class="fila-campos">
+    {% include "parciales/campo.html" with campo=formulario.nuevo_nombre %}
+    {% include "parciales/campo.html" with campo=formulario.nuevo_tipo %}
+  </div>
+</div>
+{% endif %}
+{% elif busqueda.cliente %}
+<p>Paga <strong>{{ busqueda.cliente.nombre }}</strong> <span class="texto-secundario">· {{ busqueda.cliente.get_tipo_display }}</span></p>
+{% elif not formulario.pagador_telefono.errors %}
+<p class="campo-error">No hay ningún cliente con ese teléfono.</p>
+{% endif %}
+{% endif %}

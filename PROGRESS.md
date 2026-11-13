@@ -231,6 +231,45 @@ La tarea 1a-16 se partió en dos: 1a-16a (modelo de línea de cobro con sus rest
   muestra `("minimo_fotos", "4", "6", ...)`. Con un usuario de logística, `/configuracion/` da
   "Sin acceso a esta página". Angostar la ventana a 375 px: sin desplazamiento horizontal.
 
+### 1a-06 Registro de solicitud I (12 de noviembre de 2026)
+- Hecho: en el núcleo, `nucleo/registro.py` con `faltantes_para_abrir` (qué le falta a una
+  solicitud para dejar de ser borrador) y sus pruebas. En `solicitudes`: `registro.py`
+  (`registrar_solicitud`, una sola transacción que crea cliente nuevo, contactos, vehículo,
+  solicitud y servicio), `formularios.py`, `views.py` y `urls.py`. Pantalla "Nueva solicitud" en
+  `/solicitudes/nueva/` (logística y administrador), conectada en `panel/secciones.py`. Al escribir
+  el teléfono, HTMX busca al cliente sin recargar (`/solicitudes/nueva/cliente/`): si existe, su
+  nombre y sus últimas 5 solicitudes; si no, los campos nombre y tipo para crearlo al guardar.
+  Detalle de solo lectura en `/solicitudes/<n>/` (datos, estado derivado, lo que falta y servicios).
+- Decidido: "Guardar" deja la solicitud abierta, con su servicio pendiente de asignar, si tiene
+  solicitante, tipo, origen, destino (no en desvare) y vehículo; si falta algo queda borrador y el
+  aviso dice qué falta (también el detalle). "Guardar como borrador" siempre deja borrador. Sin
+  teléfono (solicitante) ni tipo no se guarda nada: la base los exige. Un borrador con vehículo
+  también guarda su servicio pendiente, para no perder lo digitado; no se puede asignar
+  (`operaciones.asignar` lo impide). Un evento queda en borrador hasta la 1a-07, porque la base
+  exige responder si tiene regreso y esa pregunta es de la 1a-07 (lo dice la pantalla). La placa o
+  el VIN no se exigen para abrir; si se digitan, se normalizan y el VIN se valida. Un vehículo ya
+  registrado con esa placa o VIN se reutiliza y se completa lo que le faltaba; si la placa y el VIN
+  son de vehículos distintos, error junto al campo. El pagador es el solicitante salvo que se
+  escriba el teléfono de otro cliente ya registrado. Un contacto con el mismo nombre y teléfono se
+  reutiliza. "Programada para" vacío = inmediato; la hora se digita en hora de Colombia y se guarda
+  en UTC. Sin CSS nuevo.
+- Fuera de esta tarea: editar o completar un borrador (no hay pantalla todavía), varios vehículos,
+  regreso del evento, momento configurable de placa o VIN, duplicados y no concretada (1a-07);
+  la lista de solicitudes.
+- Preguntas abiertas nuevas: dos en `QUESTIONS.md` (qué cuenta como vehículo; contacto ligado al
+  cliente). La de obligatorios del borrador (1a-04) queda aplicada pero sigue abierta.
+- Cómo probar (5 minutos): `uv run pytest -q` (928 pruebas) y `uv run python manage.py runserver`.
+  Entrar con un usuario de logística o administrador y abrir Nueva solicitud: el cursor queda en el
+  teléfono. Escribir "+57 310 555 0000": aparecen nombre y tipo del cliente nuevo. Llenarlos,
+  elegir Traslado, origen, destino, placa "abc-123" y Guardar: abre el detalle con "Queda abierta",
+  estado Abierta, pagador igual al solicitante y el servicio ABC123 "Pendiente de asignar". Volver a
+  Nueva solicitud, escribir "310 555 0000": aparece el cliente con esa solicitud en su historial.
+  Elegir Traslado, solo origen y Guardar: queda borrador y dice "falta el destino y al menos un
+  vehículo". Repetir como Desvare sin destino con una placa: queda abierta. Con "Programada para"
+  20/11 2:30 p. m., el detalle muestra 20/11/2026 14:30. Con un usuario de facturación,
+  `/solicitudes/nueva/` da "Sin acceso a esta página". Angostar a 375 px: sin desplazamiento
+  horizontal. Lo que se registre en esta prueba queda en la base local (nada se borra).
+
 ## Escalamientos
 
 Ninguno todavía.
