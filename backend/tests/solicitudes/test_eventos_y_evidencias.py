@@ -178,3 +178,74 @@ def test_un_evento_con_evidencia_no_se_puede_borrar_ni_su_servicio(media_tempora
     )
     with pytest.raises(ProtectedError):
         evento.servicio.delete()
+
+
+# --- Restricciones de la sincronización (1a-10) ------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("resultado", "motivo_conflicto"),
+    [
+        (ResultadoEvento.APLICADO, "servicio_cancelado"),  # un aplicado no lleva motivo
+        (ResultadoEvento.CONFLICTO, "porque_si"),  # motivo que no es de los conocidos
+        (ResultadoEvento.CONFLICTO, "id_reutilizado"),  # es un motivo de rechazo, no de conflicto
+    ],
+)
+def test_la_base_solo_guarda_motivo_de_conflicto_conocido_y_en_un_conflicto(
+    crear_servicio, resultado, motivo_conflicto
+):
+    with (
+        pytest.raises(IntegrityError, match="evento_motivo_solo_en_conflicto"),
+        transaction.atomic(),
+    ):
+        EventoEstado.objects.create(
+            servicio=crear_servicio(),
+            destino=E.EN_CAMINO,
+            origen=OrigenEvento.APP,
+            resultado=resultado,
+            motivo_conflicto=motivo_conflicto,
+        )
+
+
+def test_una_evidencia_en_espera_guarda_el_id_del_evento_que_acompana(media_temporal, evento):
+    esperado = uuid.uuid4()
+    evidencia = Evidencia.objects.create(
+        servicio=evento.servicio,
+        evento_esperado=esperado,
+        tipo=Evidencia.Tipo.RECOGIDA,
+        archivo=foto(),
+    )
+    evidencia.refresh_from_db()
+    assert (evidencia.evento, evidencia.evento_esperado) == (None, esperado)
+
+
+def test_la_base_rechaza_una_evidencia_sin_evento_ni_evento_en_espera(media_temporal, evento):
+    with (
+        pytest.raises(IntegrityError, match="evidencia_con_evento_o_en_espera"),
+        transaction.atomic(),
+    ):
+        Evidencia.objects.create(
+            servicio=evento.servicio, tipo=Evidencia.Tipo.RECOGIDA, archivo=foto()
+        )
+
+
+@pytest.mark.parametrize("huella", ["abc", "Z" * 64, "A" * 64])
+def test_la_base_rechaza_una_huella_que_no_es_un_sha256(media_temporal, evento, huella):
+    with pytest.raises(IntegrityError, match="evidencia_sha256_valido"), transaction.atomic():
+        Evidencia.objects.create(
+            servicio=evento.servicio,
+            evento=evento,
+            tipo=Evidencia.Tipo.RECOGIDA,
+            archivo=foto(),
+            sha256=huella,
+        )
+
+
+def test_el_nombre_del_archivo_no_usa_nada_del_que_manda_el_celular(media_temporal, evento):
+    evidencia = Evidencia.objects.create(
+        servicio=evento.servicio,
+        evento=evento,
+        tipo=Evidencia.Tipo.RECOGIDA,
+        archivo=foto("../../malo.php"),
+    )
+    assert evidencia.archivo.name == f"evidencias/{evento.servicio_id}/{evidencia.pk}.jpg"
