@@ -688,6 +688,24 @@ def test_un_evento_ilegible_se_rechaza_solo_y_los_demas_del_lote_se_aplican(
     assert "datos que no se pueden leer" in alerta.mensaje
 
 
+def test_si_no_se_puede_avisar_de_un_evento_ilegible_el_celular_lo_conserva(
+    sesion, monkeypatch, crear_servicio
+):
+    def sin_alertas(**datos):
+        raise RuntimeError("No se pudo abrir la alerta")
+
+    monkeypatch.setattr(operaciones, "registrar_evento_rechazado", sin_alertas)
+    servicio = crear_servicio(E.ASIGNADO)
+    malo = {**evento_json(servicio, E.EN_CAMINO, secuencia=1), "destino": "volando"}
+
+    ilegible, aplicado = enviar(sesion, malo, evento_json(servicio, E.EN_CAMINO, secuencia=2))
+
+    # Rechazarlo sin dejar rastro sería perderlo: mejor que lo reenvíe.
+    assert (ilegible["resultado"], ilegible["motivo"]) == ("reintentar", "error_del_servidor")
+    assert "campos" not in ilegible
+    assert aplicado["resultado"] == "aplicado"
+
+
 @pytest.mark.parametrize("basura", ["texto", 7, None, ["lista"]])
 def test_un_elemento_del_lote_que_no_es_un_objeto_se_rechaza_solo(
     sesion, crear_servicio, basura
@@ -725,6 +743,7 @@ def test_un_evento_sobre_un_servicio_que_no_existe_se_rechaza_y_avisa(sesion, an
         {"latitud": "norte", "longitud": "oeste"},
         {"latitud": "nan", "longitud": "inf"},
         {"nombre_quien": {"nombre": "Juan"}},
+        {"nombre_quien": "Juan\x00"},  # un carácter nulo, que PostgreSQL no guarda en un texto
     ],
 )
 def test_un_dato_secundario_ilegible_no_impide_guardar_lo_que_hizo_el_conductor(

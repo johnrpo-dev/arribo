@@ -349,7 +349,7 @@ def test_una_foto_del_tamano_maximo_exacto_se_recibe(sesion, recogido):
 def test_una_foto_que_pasa_del_tamano_maximo_responde_413_y_no_guarda_nada(
     sesion, recogido, media_temporal, sobra
 ):
-    # Con 1 byte de más la corta la escritura a disco; con 200 KB, el tamaño del cuerpo, sin leerlo.
+    # Con 1 byte de más la corta la escritura a disco; con 200 KB, el tamaño del cuerpo, sin guardarlo.
     servicio, evento_id = recogido
 
     respuesta, _ = subir(

@@ -8,6 +8,7 @@ Lo que el conductor hizo no se pierde por un dato raro del celular: de un evento
 indispensables su id, el servicio, el destino y la secuencia. La hora del celular, la ubicación y
 los textos que no se puedan leer se guardan vacíos en vez de rechazar el evento.
 """
+import logging
 import math
 from datetime import UTC
 
@@ -17,6 +18,8 @@ from nucleo.estados import Estado, a_bordo
 from nucleo.sincronizacion import DETALLE, Motivo, Resultado
 from solicitudes import operaciones
 from solicitudes.models import VALORES_EN_RONDA, Servicio
+
+registro = logging.getLogger(__name__)
 
 MAXIMO_DE_EVENTOS_POR_LOTE = 100
 ENTERO_MAXIMO = 2**63 - 1  # lo que cabe en la columna de la secuencia
@@ -104,11 +107,8 @@ def _para_aplicar(datos) -> dict:
 def _ilegible(conductor, crudo, errores) -> dict:
     """Un evento sin id, servicio, destino o secuencia legibles no se puede guardar: se rechaza,
     queda en el registro del servidor y abre una alerta a logística con lo que llegó."""
-    operaciones.registrar_evento_rechazado(
-        conductor=conductor, motivo=Motivo.DATOS_INVALIDOS, contenido=crudo
-    )
     identificador = crudo.get("id") if isinstance(crudo, dict) else None
-    return {
+    resultado = {
         "id": identificador if isinstance(identificador, str) else None,
         "resultado": Resultado.RECHAZADO.value,
         "duplicado": False,
@@ -118,6 +118,21 @@ def _ilegible(conductor, crudo, errores) -> dict:
         "capacidad_excedida": False,
         "servicio": None,
     }
+    try:
+        operaciones.registrar_evento_rechazado(
+            conductor=conductor, motivo=Motivo.DATOS_INVALIDOS, contenido=crudo
+        )
+    # Si ni el aviso se pudo dejar, el evento no se da por recibido: el celular lo reenvía. Como
+    # en `sincronizar_lote_del_conductor`, la falla de uno no tumba los demás.
+    except Exception:  # noqa: BLE001
+        registro.exception("No se pudo avisar de un evento ilegible de la app")
+        resultado.update(
+            resultado=Resultado.REINTENTAR.value,
+            motivo=Motivo.ERROR_DEL_SERVIDOR.value,
+            detalle=DETALLE[Motivo.ERROR_DEL_SERVIDOR],
+        )
+        del resultado["campos"]
+    return resultado
 
 
 def _resultado(aplicacion, servicio) -> dict:

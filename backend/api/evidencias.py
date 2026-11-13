@@ -22,6 +22,19 @@ from .errores import FotoDemasiadoGrande
 
 # Lo que puede ocupar el resto del cuerpo (los otros campos y los separadores del multipart).
 MARGEN_DEL_CUERPO = 64 * 1024
+# De un cuerpo que ya se sabe demasiado grande se descarta como mucho esto antes de responder.
+DESCARTE_MAXIMO = 4 * TAMANO_MAXIMO_FOTO
+TROZO = 64 * 1024
+
+
+def _descartar(stream, tope: int) -> None:
+    """Lee por partes y bota lo leído, sin pasar de `tope` bytes."""
+    restante = tope
+    while restante > 0:
+        parte = stream.read(min(TROZO, restante))
+        if not parte:
+            return
+        restante -= len(parte)
 
 
 class FotoADisco(TemporaryFileUploadHandler):
@@ -67,7 +80,10 @@ class FotoEnMultipart(BaseParser):
         except ValueError:
             largo = 0
         if largo > TAMANO_MAXIMO_FOTO + MARGEN_DEL_CUERPO:
-            raise FotoDemasiadoGrande()  # sin leer el cuerpo
+            # No se guarda ni se analiza: se lee y se descarta (hasta un tope) solo para que el
+            # celular alcance a recibir el 413 en vez de una conexión cortada, que reintentaría.
+            _descartar(stream, DESCARTE_MAXIMO)
+            raise FotoDemasiadoGrande()
         a_disco = FotoADisco(request)
         try:
             datos, archivos = AnalizadorDeDjango(
