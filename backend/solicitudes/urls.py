@@ -33,4 +33,14 @@ urlpatterns = [
         _con_rol(views.no_concretada),
         name="no_concretada_solicitud",
     ),
+    path(
+        "solicitudes/<int:pk>/servicios/<int:servicio_pk>/asignar/",
+        _con_rol(views.asignar_servicio),
+        name="asignar_servicio",
+    ),
+    path(
+        "solicitudes/<int:pk>/servicios/<int:servicio_pk>/ronda/",
+        _con_rol(views.mover_en_ronda),
+        name="mover_en_ronda",
+    ),
 ]

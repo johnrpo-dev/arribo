@@ -4,7 +4,8 @@ Cada función corre en su propia transacción, bloquea la fila del servicio (`se
 deja exactamente un EventoEstado por cambio. Las reglas son las de `nucleo/`: aquí solo se cargan
 los datos, se llama al núcleo y se guarda lo que decide.
 
-- Panel: `asignar`, `reasignar`, `cambiar_estado`, `resolver_novedad`. Si una regla no se cumple,
+- Panel: `asignar`, `reasignar`, `cambiar_estado`, `resolver_novedad`, y `mover_en_ronda` (el
+  orden en que el conductor atiende sus servicios; no es un cambio de estado). Si una regla no se cumple,
   lanzan la excepción del núcleo (TransicionInvalida, CapacidadExcedida, IdentificacionIncompleta)
   o una de este módulo, y no queda ni evento ni cambio.
 - App del conductor: `aplicar_evento_del_conductor` y `aplicar_lote_del_conductor`. Nunca rechazan
@@ -19,6 +20,7 @@ from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 
 from django.db import IntegrityError, transaction
+from django.db.models import F
 
 from configuracion.models import configuracion_vigente
 from flota.models import Conductor, Grua, grua_vigente
@@ -40,9 +42,13 @@ from nucleo.identificacion import (
     identificacion_exigida,
     validar_identificacion,
 )
+from nucleo.ronda import MovimientoInvalido, numerar, siguiente_orden
+from nucleo.ronda import mover as mover_en_nucleo
 from nucleo.sincronizacion import Evento, Resultado, aplicar_evento, ordenar
 
+from .disponibilidad import motivos_de_bloqueo
 from .models import (
+    VALORES_EN_RONDA,
     EstadoRegistro,
     EventoEstado,
     OrigenEvento,
@@ -53,12 +59,20 @@ from .models import (
 from .senales import servicio_entregado
 
 
-class SinGruaVigente(Exception):
+class ConductorBloqueado(Exception):
+    """El conductor no puede recibir asignaciones nuevas (ver `disponibilidad.motivos_de_bloqueo`)."""
+
+
+class SinGruaVigente(ConductorBloqueado):
     """El conductor no tiene una grúa asignada en este momento."""
 
 
 class SolicitudNoAsignable(Exception):
     """La solicitud es un borrador o no se concretó: sus servicios no se asignan."""
+
+
+class MismoConductor(Exception):
+    """Se intentó reasignar un servicio al conductor que ya lo tiene."""
 
 
 def identificacion_exigida_al_asignar() -> bool:
@@ -75,6 +89,8 @@ def identificacion_exigida_al_asignar() -> bool:
 def asignar(servicio, conductor, *, actor, motivo=None) -> EventoEstado:
     """Pendiente de asignar → Asignado. La grúa sale de la asignación vigente del conductor y
     queda guardada en el servicio (si después el conductor cambia de grúa, el servicio no cambia).
+    El servicio entra al final de la ronda del conductor. Un conductor bloqueado (sin grúa, grúa
+    fuera de servicio o inactiva, conductor inactivo) no recibe asignaciones.
     """
     with transaction.atomic():
         bloqueado = _bloquear(servicio)
@@ -82,23 +98,47 @@ def asignar(servicio, conductor, *, actor, motivo=None) -> EventoEstado:
         _exigir_solicitud_asignable(bloqueado)
         if identificacion_exigida_al_asignar():
             _exigir_identificacion(bloqueado)
-        bloqueado.conductor_id = _pk(conductor)
-        bloqueado.grua = _grua_vigente_o_error(conductor)
+        _pasar_al_conductor(bloqueado, conductor)
         evento = _guardar_desde_el_panel(bloqueado, nuevo, actor=actor, motivo=motivo)
     _refrescar(servicio)
     return evento
 
 
 def reasignar(servicio, conductor, *, actor, motivo=None) -> EventoEstado:
-    """Pasar el servicio a otro conductor antes de recoger el vehículo (queda Asignado)."""
+    """Pasar el servicio a otro conductor antes de recoger el vehículo (queda Asignado, con la
+    grúa vigente del nuevo conductor y al final de su ronda)."""
     with transaction.atomic():
         bloqueado = _bloquear(servicio)
         nuevo = reasignar_en_nucleo(bloqueado.como_nucleo())
-        bloqueado.conductor_id = _pk(conductor)
-        bloqueado.grua = _grua_vigente_o_error(conductor)
+        if bloqueado.conductor_id == _pk(conductor):
+            raise MismoConductor("El servicio ya es de ese conductor: elija otro para reasignar.")
+        _pasar_al_conductor(bloqueado, conductor)
         evento = _guardar_desde_el_panel(bloqueado, nuevo, actor=actor, motivo=motivo)
     _refrescar(servicio)
     return evento
+
+
+def mover_en_ronda(servicio, direccion) -> list[int]:
+    """Sube o baja el servicio un puesto en la ronda de su conductor y la numera de nuevo 1, 2,
+    3... Devuelve la ronda (llaves de los servicios) en el orden nuevo. El orden no es un cambio de
+    estado: no deja evento."""
+    with transaction.atomic():
+        actual = Servicio.objects.filter(pk=_pk(servicio)).values("conductor_id", "estado").get()
+        if actual["conductor_id"] is None or actual["estado"] not in VALORES_EN_RONDA:
+            raise MovimientoInvalido("El servicio no está en la ronda de ningún conductor.")
+        # Mismo orden de bloqueo que asignar y reasignar: primero el conductor.
+        Conductor.objects.select_for_update().get(pk=actual["conductor_id"])
+        ronda = list(
+            _ronda(actual["conductor_id"]).select_for_update().values_list("pk", flat=True)
+        )
+        nueva = mover_en_nucleo(ronda, _pk(servicio), direccion)
+        _numerar(nueva)
+    return nueva
+
+
+def ronda_de(conductor) -> list[Servicio]:
+    """Los servicios no terminales del conductor en el orden en que los atiende."""
+    return list(_ronda(_pk(conductor)).select_related("vehiculo", "solicitud"))
 
 
 def cambiar_estado(servicio, destino, *, actor, motivo=None, nombre_quien=None) -> EventoEstado:
@@ -341,6 +381,35 @@ def _grua_vigente_o_error(conductor) -> Grua:
     return grua
 
 
+def _pasar_al_conductor(servicio: Servicio, conductor):
+    """Conductor, grúa vigente y puesto al final de la ronda, con la fila del conductor bloqueada
+    (dos asignaciones simultáneas al mismo conductor toman puestos distintos)."""
+    conductor = Conductor.objects.select_for_update().get(pk=_pk(conductor))
+    grua = _grua_vigente_o_error(conductor)
+    motivos = motivos_de_bloqueo(conductor, grua)
+    if motivos:
+        raise ConductorBloqueado(f"{conductor} no puede recibir servicios: {' '.join(motivos)}")
+    servicio.conductor = conductor
+    servicio.grua = grua
+    servicio.orden_ronda = siguiente_orden(
+        _ronda(conductor.pk).exclude(pk=servicio.pk).values_list("orden_ronda", flat=True)
+    )
+
+
+def _ronda(conductor_id):
+    return Servicio.objects.filter(conductor_id=conductor_id, estado__in=VALORES_EN_RONDA).order_by(
+        F("orden_ronda").asc(nulls_last=True), "pk"
+    )
+
+
+def _numerar(ronda: list[int]):
+    """Fija los puestos 1, 2, 3... Primero se vacían, para no chocar con la restricción de puesto
+    único mientras se renumera."""
+    Servicio.objects.filter(pk__in=ronda).update(orden_ronda=None)
+    for pk, puesto in numerar(ronda).items():
+        Servicio.objects.filter(pk=pk).update(orden_ronda=puesto)
+
+
 def _verificar_capacidad(servicio):
     """Antes de marcar Recogido: la grúa del servicio no lleva ya tantos vehículos como puestos.
 
@@ -371,6 +440,7 @@ def _cambiar(servicio: Servicio, nuevo: ServicioNucleo, *, actor=None):
     if nuevo.estado == Estado.PENDIENTE_ASIGNAR:
         servicio.conductor = None
         servicio.grua = None
+        servicio.orden_ronda = None  # vuelve a la cola: deja la ronda
     servicio._guardar_cambio_operativo()
     if queda_entregado:
         servicio_entregado.send(sender=Servicio, servicio=servicio, actor=actor)

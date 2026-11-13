@@ -11,6 +11,11 @@ Formato: fecha, tarea, pregunta, qué se asumió mientras tanto (si se asumió a
   conductor inactivo a una grúa?** Asumido: el modelo no lo bloquea; solo se impiden los traslapes.
   Si la respuesta es "no", se agrega la validación en la asignación y una prueba (y la tarea 1a-08 no
   ofrecería esos conductores como disponibles).
+  **Aplicado en 1a-08 lo más conservador, del lado de los servicios** (`nucleo/disponibilidad.py`):
+  un conductor inactivo, o cuya grúa vigente esté inactiva o fuera de servicio, no recibe
+  servicios nuevos (ni al asignar ni al reasignar) y la lista lo muestra bloqueado con el motivo; lo
+  que ya lleva en curso no se interrumpe. La asignación conductor–grúa en Flota sigue sin
+  bloquearse. Si la respuesta es "sí se puede", se quitan esos motivos de `motivos_de_bloqueo`.
 - **2026-11-12, 1a-02. ¿El motivo es obligatorio en una asignación temporal?** Asumido: es opcional
   en todas. Si es obligatorio, se agrega una restricción en la base (temporal ⇒ motivo no vacío) y su prueba.
 - **2026-11-12, 1a-03. ¿Un convenio de tarifa se comparte entre varios clientes?** `docs/arquitectura.md`
@@ -77,6 +82,19 @@ Formato: fecha, tarea, pregunta, qué se asumió mientras tanto (si se asumió a
 - **2026-11-13, 1a-07. ¿Qué cuenta como duplicado?** Asumido: el mismo vehículo (por placa o VIN)
   con un servicio no terminal en otra solicitud en borrador o abierta; las no concretadas no
   cuentan. Es solo una advertencia: el operador la confirma pulsando de nuevo Guardar.
+- **2026-11-13, 1a-08. ¿Cómo se fija el orden de ronda?** Asumido (lo más simple consistente):
+  cada servicio asignado o reasignado entra al final de la ronda de su conductor; el operador lo
+  sube o lo baja un puesto. El puesto es único por conductor entre sus servicios no terminales
+  (restricción en la base); al terminar o volver a la cola un servicio, su puesto queda libre y la
+  ronda puede tener huecos hasta el siguiente movimiento (el orden relativo no cambia). No se
+  ordena solo por hora programada ni por cercanía. Si el orden debe salir de la hora programada, o
+  el operador debe digitar el puesto, cambia `nucleo/ronda.py`.
+- **2026-11-13, 1a-08. ¿Reasignar exige motivo?** Asumido: no; la operación lo admite opcional y
+  la pantalla lo pide como "Motivo del cambio (opcional)"; queda en el evento. Si es obligatorio,
+  se exige en `operaciones.reasignar` con su prueba.
+- **2026-11-13, 1a-08. ¿Se puede reasignar al mismo conductor?** Asumido: no (no tendría efecto
+  y, desde En camino, lo devolvería a Asignado); `operaciones.reasignar` lo rechaza y la lista no
+  ofrece al conductor actual.
 
 ## Resueltas
 

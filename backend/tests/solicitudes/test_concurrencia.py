@@ -12,7 +12,7 @@ import pytest
 from django.db import connection
 
 from nucleo.capacidad import CapacidadExcedida
-from nucleo.estados import Estado
+from nucleo.estados import Estado, TransicionInvalida
 from nucleo.registro import CierreNoPermitido
 from nucleo.sincronizacion import Resultado
 from solicitudes import operaciones, registro
@@ -151,6 +151,41 @@ def test_cerrar_como_no_concretada_y_asignar_a_la_vez_deja_pasar_solo_uno(
         servicio.refresh_from_db()
         cerrada = solicitud.estado_registro == EstadoRegistro.NO_CONCRETADA
         assert cerrada != (servicio.estado == E.ASIGNADO)
+
+
+def test_asignar_a_la_vez_el_mismo_servicio_a_dos_conductores_deja_uno_solo(
+    crear_servicio, ana, beto, usuario
+):
+    for _ in range(5):
+        servicio = crear_servicio()
+
+        salidas = en_paralelo(
+            lambda s=servicio: operaciones.asignar(s, ana, actor=usuario),
+            lambda s=servicio: operaciones.asignar(s, beto, actor=usuario),
+        )
+
+        errores = [s for s in salidas if isinstance(s, Exception)]
+        assert len(errores) == 1 and isinstance(errores[0], TransicionInvalida), salidas
+        servicio.refresh_from_db()
+        assert servicio.estado == E.ASIGNADO
+        assert servicio.conductor_id in (ana.pk, beto.pk)
+        assert servicio.eventos.count() == 1
+
+
+def test_dos_asignaciones_a_la_vez_al_mismo_conductor_toman_puestos_distintos_de_la_ronda(
+    crear_servicio, beto, usuario
+):
+    primero, segundo = crear_servicio(), crear_servicio()
+
+    salidas = en_paralelo(
+        lambda: operaciones.asignar(primero, beto, actor=usuario),
+        lambda: operaciones.asignar(segundo, beto, actor=usuario),
+    )
+
+    assert not any(isinstance(s, Exception) for s in salidas), salidas
+    primero.refresh_from_db()
+    segundo.refresh_from_db()
+    assert sorted([primero.orden_ronda, segundo.orden_ronda]) == [1, 2]
 
 
 def test_asignar_que_espera_al_cierre_ve_la_solicitud_ya_cerrada(

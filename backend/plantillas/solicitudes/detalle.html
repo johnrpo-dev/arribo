@@ -64,6 +64,95 @@
   {% endif %}
 </section>
 
+{% if asignaciones %}
+<section class="bloque" aria-labelledby="t-asignar">
+  <h2 class="titulo-seccion" id="t-asignar">Asignar conductores</h2>
+  <p class="ayuda">La grúa es la que el conductor tiene asignada hoy en Flota y queda guardada en el servicio. Un conductor puede recibir más vehículos que los puestos de su grúa: los atiende en rondas. Se reasigna solo antes de recoger el vehículo.</p>
+  {% for a in asignaciones %}
+  {% url 'asignar_servicio' solicitud.pk a.servicio.pk as accion %}
+  <form method="post" action="{{ accion }}" hx-post="{{ accion }}" hx-target="#contenido" hx-select="#contenido" hx-swap="outerHTML" class="formulario" novalidate>
+    {% csrf_token %}
+    <fieldset class="grupo-opciones">
+      <legend>N.º {{ a.servicio.pk }} · {{ a.servicio.vehiculo }} · {{ a.servicio.get_estado_display }}{% if a.reasignar %} con {{ a.servicio.conductor }}{% endif %}</legend>
+      {% include "parciales/campo.html" with campo=a.formulario.conductor %}
+      {% if a.reasignar %}{% include "parciales/campo.html" with campo=a.formulario.motivo %}{% endif %}
+    </fieldset>
+    <div class="acciones">
+      <button type="submit" class="boton {% if a.reasignar %}boton--secundario{% else %}boton--principal{% endif %}">{% if a.reasignar %}Reasignar{% else %}Asignar{% endif %}</button>
+    </div>
+  </form>
+  {% endfor %}
+</section>
+{% endif %}
+
+{% if disponibilidades %}
+<section class="bloque" aria-labelledby="t-conductores">
+  <h2 class="titulo-seccion" id="t-conductores">Conductores</h2>
+  <div class="tabla-contenedor">
+    <table class="tabla">
+      <thead>
+        <tr>
+          <th scope="col">Conductor</th>
+          <th scope="col">Grúa</th>
+          <th scope="col">Puestos</th>
+          <th scope="col">En ronda</th>
+          <th scope="col">Montados</th>
+          <th scope="col">Disponibilidad</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for d in disponibilidades %}
+        <tr>
+          <td>{{ d.conductor }}</td>
+          <td>{{ d.grua.placa|default:"—" }}</td>
+          <td class="cifra">{{ d.grua.capacidad|default:"—" }}</td>
+          <td class="cifra">{{ d.no_terminales }}</td>
+          <td class="cifra">{{ d.montados }}</td>
+          <td>{% if d.bloqueado %}<strong>Bloqueado.</strong> {{ d.motivos|join:" " }}{% else %}Disponible{% endif %}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endif %}
+
+{% for r in rondas %}
+<section class="bloque" aria-labelledby="t-ronda-{{ r.conductor.pk }}">
+  <h2 class="titulo-seccion" id="t-ronda-{{ r.conductor.pk }}">Ronda de {{ r.conductor }}</h2>
+  <p class="ayuda">Orden en que atiende sus servicios, incluidos los de otras solicitudes.</p>
+  <div class="tabla-contenedor">
+    <table class="tabla">
+      <thead>
+        <tr>
+          <th scope="col">Puesto</th>
+          <th scope="col">Servicio</th>
+          <th scope="col">Estado</th>
+          <th scope="col">Orden</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for s in r.servicios %}
+        {% url 'mover_en_ronda' solicitud.pk s.pk as accion %}
+        <tr>
+          <td class="cifra">{{ forloop.counter }}</td>
+          <td>N.º {{ s.pk }} · {{ s.vehiculo }}{% if s.solicitud_id != solicitud.pk %} · <a href="{% url 'detalle_solicitud' s.solicitud_id %}">solicitud {{ s.solicitud_id }}</a>{% endif %}</td>
+          <td><span class="estado estado--{{ s.estado }}">{{ s.get_estado_display }}</span></td>
+          <td>
+            <form method="post" action="{{ accion }}" hx-post="{{ accion }}" hx-target="#contenido" hx-select="#contenido" hx-swap="outerHTML" class="fila-etiquetas">
+              {% csrf_token %}
+              <button type="submit" name="direccion" value="subir" class="boton boton--secundario"{% if forloop.first %} disabled{% endif %} aria-label="Subir el servicio N.º {{ s.pk }}">Subir</button>
+              <button type="submit" name="direccion" value="bajar" class="boton boton--secundario"{% if forloop.last %} disabled{% endif %} aria-label="Bajar el servicio N.º {{ s.pk }}">Bajar</button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endfor %}
+
 <div class="acciones">
   {% if solicitud.estado_registro == "borrador" %}
   <a class="boton boton--principal" href="{% url 'completar_solicitud' solicitud.pk %}">Completar borrador</a>

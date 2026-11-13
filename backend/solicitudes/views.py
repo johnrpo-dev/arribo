@@ -8,10 +8,19 @@ from django.views.decorators.http import require_POST
 
 from clientes.models import buscar_cliente_por_telefono
 from configuracion.models import MomentoPlacaVin, configuracion_vigente
-from nucleo.identificacion import TelefonoInvalido, normalizar_telefono
+from nucleo.estados import REASIGNABLE_DESDE, Estado, TransicionInvalida
+from nucleo.identificacion import (
+    IdentificacionIncompleta,
+    TelefonoInvalido,
+    normalizar_telefono,
+)
 from nucleo.registro import CierreNoPermitido, describir_faltantes
+from nucleo.ronda import MovimientoInvalido
 
+from . import operaciones
+from .disponibilidad import disponibilidad_de_conductores
 from .formularios import (
+    FormularioAsignacion,
     FormularioNoConcretada,
     FormularioSolicitud,
     FormularioVehiculos,
@@ -19,7 +28,8 @@ from .formularios import (
     inicial_de,
     inicial_vehiculos,
 )
-from .models import EstadoRegistro, Solicitud
+from .models import VALORES_EN_RONDA, EstadoRegistro, Servicio, Solicitud
+from .operaciones import SolicitudNoAsignable
 from .registro import (
     SolicitudNoEditable,
     cerrar_no_concretada,
@@ -142,23 +152,129 @@ def buscar_cliente(request):
 
 def detalle(request, pk, formulario_cierre=None):
     """Datos de la solicitud, estado derivado y servicios. Un borrador se completa desde aquí; una
-    solicitud que nunca se asignó se puede cerrar como no concretada."""
+    solicitud que nunca se asignó se puede cerrar como no concretada; en una abierta se asigna y
+    se reasigna cada servicio y se ordena la ronda de sus conductores."""
     solicitud = get_object_or_404(_con_relaciones(), pk=pk)
-    servicios = solicitud.servicios.select_related("vehiculo", "conductor", "grua")
+    # Por número: el orden de ronda (orden por defecto del modelo) es de cada conductor, no de la
+    # solicitud.
+    servicios = list(
+        solicitud.servicios.select_related("vehiculo", "conductor", "grua").order_by("pk")
+    )
     faltantes = []
     if solicitud.estado_registro == EstadoRegistro.BORRADOR:
         faltantes = faltantes_de(solicitud)
-    return render(
-        request,
-        "solicitudes/detalle.html",
-        {
-            "solicitud": solicitud,
-            "servicios": servicios,
-            "faltantes": describir_faltantes(faltantes),
-            "puede_cerrar": puede_cerrarse_no_concretada(solicitud),
-            "formulario_cierre": formulario_cierre or FormularioNoConcretada(),
-        },
+    contexto = {
+        "solicitud": solicitud,
+        "servicios": servicios,
+        "faltantes": describir_faltantes(faltantes),
+        "puede_cerrar": puede_cerrarse_no_concretada(solicitud),
+        "formulario_cierre": formulario_cierre or FormularioNoConcretada(),
+    }
+    if solicitud.estado_registro == EstadoRegistro.ABIERTA:
+        contexto.update(_contexto_asignacion(servicios))
+    return render(request, "solicitudes/detalle.html", contexto)
+
+
+def _contexto_asignacion(servicios):
+    """Formularios de asignar (pendientes) y reasignar (antes de recoger), la lista de conductores
+    con su disponibilidad y la ronda de cada conductor de esta solicitud."""
+    disponibilidades = disponibilidad_de_conductores()
+    asignaciones = []
+    for servicio in servicios:
+        estado = Estado(servicio.estado)
+        if estado == Estado.PENDIENTE_ASIGNAR or estado in REASIGNABLE_DESDE:
+            asignaciones.append(
+                {
+                    "servicio": servicio,
+                    "reasignar": estado != Estado.PENDIENTE_ASIGNAR,
+                    "formulario": FormularioAsignacion(
+                        prefix=f"s{servicio.pk}",
+                        disponibilidades=disponibilidades,
+                        excluir=servicio.conductor_id,
+                    ),
+                }
+            )
+    conductores = {}
+    for servicio in servicios:
+        if servicio.conductor_id and servicio.estado in VALORES_EN_RONDA:
+            conductores.setdefault(servicio.conductor_id, servicio.conductor)
+    rondas = []
+    for conductor in sorted(conductores.values(), key=lambda c: c.nombre):
+        ronda = operaciones.ronda_de(conductor)
+        rondas.append({"conductor": conductor, "servicios": ronda, "total": len(ronda)})
+    return {
+        "asignaciones": asignaciones,
+        "disponibilidades": disponibilidades,
+        "rondas": rondas,
+    }
+
+
+@require_POST
+def asignar_servicio(request, pk, servicio_pk):
+    """Asigna un servicio pendiente o reasigna uno ya asignado; las reglas son de las operaciones.
+    Con HTMX, la respuesta (tras la redirección) reemplaza el contenido sin recargar la página."""
+    servicio = get_object_or_404(
+        Servicio.objects.select_related("vehiculo"), pk=servicio_pk, solicitud_id=pk
     )
+    reasignando = servicio.estado != Estado.PENDIENTE_ASIGNAR
+    formulario = FormularioAsignacion(
+        request.POST,
+        prefix=f"s{servicio.pk}",
+        disponibilidades=disponibilidad_de_conductores(),
+        excluir=servicio.conductor_id,
+    )
+    nombre = f"el servicio N.º {servicio.pk} ({servicio.vehiculo})"
+    if not formulario.is_valid():
+        errores = [e for lista in formulario.errors.values() for e in lista]
+        messages.error(request, f"No se asignó {nombre}: {' '.join(errores)}")
+        return redirect("detalle_solicitud", pk=pk)
+    operacion = operaciones.reasignar if reasignando else operaciones.asignar
+    try:
+        operacion(
+            servicio,
+            formulario.cleaned_data["conductor"],
+            actor=request.user,
+            motivo=formulario.cleaned_data["motivo"],
+        )
+    except IdentificacionIncompleta as error:
+        messages.error(
+            request,
+            f"No se asignó {nombre}: {error} La configuración exige placa o VIN al asignar.",
+        )
+    except (
+        SolicitudNoAsignable,
+        operaciones.ConductorBloqueado,
+        operaciones.MismoConductor,
+    ) as error:
+        messages.error(request, f"No se asignó {nombre}: {error}")
+    except TransicionInvalida:
+        accion = "reasignar" if reasignando else "asignar"
+        messages.error(
+            request,
+            f"No se pudo {accion} {nombre}: su estado cambió mientras tanto (otra persona lo "
+            "asignó o el conductor avanzó). Revise la tabla de servicios.",
+        )
+    else:
+        accion = "reasignado" if reasignando else "asignado"
+        messages.success(
+            request, f"Servicio N.º {servicio.pk} {accion} a {servicio.conductor}."
+        )
+    return redirect("detalle_solicitud", pk=pk)
+
+
+@require_POST
+def mover_en_ronda(request, pk, servicio_pk):
+    """Sube o baja un servicio en la ronda de su conductor (puede ser de otra solicitud) y vuelve
+    al detalle de la solicitud `pk`."""
+    servicio = get_object_or_404(Servicio.objects.select_related("conductor"), pk=servicio_pk)
+    try:
+        operaciones.mover_en_ronda(servicio, request.POST.get("direccion", ""))
+    except ValueError as error:  # MovimientoInvalido o dirección desconocida
+        texto = str(error) if isinstance(error, MovimientoInvalido) else "Dirección desconocida."
+        messages.error(request, f"No se movió el servicio N.º {servicio.pk}: {texto}")
+    else:
+        messages.success(request, f"Ronda de {servicio.conductor} actualizada.")
+    return redirect("detalle_solicitud", pk=pk)
 
 
 @require_POST

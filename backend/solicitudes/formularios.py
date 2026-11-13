@@ -5,6 +5,7 @@
 - `FormularioVehiculos`: una fila por vehículo (cada vehículo es un servicio); se agregan filas
   con HTMX y, al completar un borrador, una fila de un servicio ya guardado se puede quitar.
 - `FormularioNoConcretada`: motivo y detalle para cerrar una solicitud que no se concretó.
+- `FormularioAsignacion`: el conductor (con su disponibilidad) para asignar o reasignar un servicio.
 
 Lo que guarda es `solicitudes/registro.py`.
 """
@@ -448,6 +449,64 @@ class FormularioNoConcretada(forms.Form):
         max_length=500,
         widget=forms.Textarea(attrs={"rows": 2}),
     )
+
+
+class SelectConDeshabilitadas(forms.Select):
+    """Un select en el que algunas opciones se ven pero no se pueden elegir."""
+
+    def __init__(self, *args, deshabilitadas=(), **kwargs):
+        super().__init__(*args, **kwargs)
+        self.deshabilitadas = {str(valor) for valor in deshabilitadas}
+
+    def create_option(self, name, value, *args, **kwargs):
+        opcion = super().create_option(name, value, *args, **kwargs)
+        if str(value) in self.deshabilitadas:
+            opcion["attrs"]["disabled"] = True
+        return opcion
+
+
+def describir_disponibilidad(disponibilidad) -> str:
+    """Texto de un conductor en la lista para elegir: grúa, carga o por qué está bloqueado."""
+    nombre = disponibilidad.conductor.nombre
+    if disponibilidad.bloqueado:
+        return f"{nombre} · bloqueado: {' '.join(disponibilidad.motivos)}"
+    grua = disponibilidad.grua
+    puestos = "1 puesto" if grua.capacidad == 1 else f"{grua.capacidad} puestos"
+    return (
+        f"{nombre} · {grua.placa}, {puestos} · {disponibilidad.no_terminales} en ronda, "
+        f"{disponibilidad.montados} montados"
+    )
+
+
+class FormularioAsignacion(forms.Form):
+    """Elegir conductor para asignar o reasignar un servicio. Los bloqueados se ven deshabilitados
+    con su motivo; si de todos modos llegan, la operación los rechaza."""
+
+    conductor = forms.TypedChoiceField(
+        label="Conductor",
+        coerce=int,
+        error_messages={
+            "required": "Elija el conductor.",
+            "invalid_choice": "Elija un conductor de la lista.",
+        },
+    )
+    motivo = forms.CharField(
+        label="Motivo del cambio (opcional)", required=False, max_length=200
+    )
+
+    def __init__(self, *args, disponibilidades, excluir=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        opciones = [
+            (d.conductor.pk, describir_disponibilidad(d))
+            for d in disponibilidades
+            if d.conductor.pk != excluir
+        ]
+        campo = self.fields["conductor"]
+        campo.choices = [("", "Elija el conductor")] + opciones
+        campo.widget = SelectConDeshabilitadas(
+            choices=campo.choices,
+            deshabilitadas=[d.conductor.pk for d in disponibilidades if d.bloqueado],
+        )
 
 
 def _mensaje_telefono(error: TelefonoInvalido) -> str:
