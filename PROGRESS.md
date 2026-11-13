@@ -446,6 +446,102 @@ La tarea 1a-16 se partió en dos: 1a-16a (modelo de línea de cobro con sus rest
   revocado, y en Intentos de ingreso, 3109999999 bloqueado. Lo que se cree en esta prueba queda en
   la base local.
 
+### 1a-10 API: sincronización (13 de noviembre de 2026)
+- Hecho: `POST /api/v1/eventos/` (lotes de toques del conductor) y `PUT /api/v1/evidencias/<uuid>/`
+  (una foto de evidencia), y el contrato definitivo de las dos en `docs/api-conductor.md` (ya no hay
+  borradores). En el núcleo, `nucleo/sincronizacion.py` dice ahora por qué un evento es conflicto
+  (`Motivo`, con su texto en español) y cuándo un id repetido es un reenvío (`es_reenvio`), y
+  `nucleo/evidencia.py` tiene las reglas de las fotos (JPEG, 5 MB, a qué evento acompaña, cuándo es
+  la misma foto). App nueva `alertas`, solo lo mínimo: modelo Alerta (tipo, registro al que apunta,
+  mensaje, abierta o resuelta, creada, resuelta por y cuándo), `abrir_alerta` y `resolver_alerta`, y
+  el admin para verlas y marcarlas como resueltas. Sin pantallas ni comando: son de la 1a-18.
+- Decidido (un solo camino): la API usa `solicitudes.operaciones.sincronizar_lote_del_conductor`,
+  que pasa por el mismo `_aplicar_evento` de `aplicar_evento_del_conductor` y
+  `aplicar_lote_del_conductor` (siguen iguales). Las alertas las abre `alertas` al oír dos señales
+  nuevas de `solicitudes` (`evento_del_conductor_guardado` y `evento_del_conductor_rechazado`),
+  igual que `cobros` con la línea: `solicitudes` no importa `alertas` (lo vigila una prueba), así la
+  1a-18 puede importar `solicitudes` sin ciclo.
+- Decidido (transacciones): cada evento va en su propia transacción con todos sus efectos: la fila
+  del evento, el cambio de estado, la línea de cobro al quedar Entregado, el enlace de sus fotos y
+  la alerta. O queda todo o nada. El lote no es una sola transacción: así no se sostienen bloqueos
+  de varios servicios a la vez (evita abrazos mortales con el panel) y un evento que falla no
+  deshace los anteriores. Si un evento falla por el servidor responde `reintentar` (no quedó nada:
+  el celular lo reenvía), los de otros servicios siguen y los posteriores del mismo servicio en ese
+  lote también responden `reintentar` sin evaluarse (dependen de él; evaluarlos daría un conflicto
+  falso y definitivo).
+- Decidido (idempotencia): la llave primaria del evento es el id del celular. Probado con dos
+  peticiones HTTP simultáneas con el mismo lote y dos conexiones reales a PostgreSQL (el reintento
+  por timeout mientras la primera sigue en curso): cada evento lo aplica una y la otra lo ve
+  duplicado, nunca un conflicto. Un duplicado responde lo que quedó guardado la primera vez
+  (resultado, motivo y marca de capacidad) con `duplicado: true`; un conflicto no se vuelve a evaluar
+  aunque ahora encajaría. Por eso el evento guarda su motivo (`motivo_conflicto`, migración 0004 de
+  solicitudes, con restricción en la base).
+- Decidido (mismo id, otro contenido): si el id ya guardado llega con otro servicio, destino,
+  secuencia o conductor, se responde `rechazado` (`id_reutilizado`): no se aplica, no pisa al
+  guardado ni se guarda como conflicto nuevo, y abre una alerta sobre el evento original con lo que
+  llegó. **Cambia dos pruebas de la 1a-04** que para ese caso (mismo id en dos servicios) esperaban
+  "duplicado": ahora esperan "rechazado"; lo demás que comprobaban (entra uno solo, el otro se
+  deshace entero) sigue igual.
+- Decidido (orden): dentro del lote, por secuencia del dispositivo, nunca por la hora del celular ni
+  por el orden de la lista. Entre lotes, cada evento se evalúa contra el estado que encuentra. El
+  contrato le pide a la app un lote a la vez y siempre desde el pendiente más antiguo; si aun así la
+  secuencia 7 llega antes que la 6, la 7 queda guardada como conflicto (`salto_de_estado`) con
+  alerta y la 6 se aplica al llegar: nada se pierde y logística corrige desde el panel. No se
+  retienen eventos esperando huecos (un evento perdido bloquearía todos los demás).
+- Decidido (lo que se rechaza): solo lo que no se puede guardar: id reutilizado, servicio que no
+  existe o un evento sin id, servicio, destino o secuencia legibles. Cada rechazo queda en el
+  registro del servidor y abre una alerta "evento que no se pudo guardar" (sobre el conductor, o
+  sobre el evento original). Un dato secundario ilegible (hora del celular, ubicación, textos) no
+  tumba el evento: se guarda vacío. Un evento sobre un servicio ajeno no se rechaza: es conflicto
+  guardado con alerta. Tope de 100 eventos por lote.
+- Verificado (capacidad): un Recogido que excede la capacidad se aplica, queda marcado
+  (`capacidad_excedida`, también en la respuesta) y abre la alerta "capacidad excedida", que dice
+  qué vehículo ya iba montado. Entregar uno y recoger otro en el mismo lote no la excede.
+- Decidido (fotos): la foto se escribe en disco por partes de 64 KB, sea grande o pequeña (la vista
+  no usa el manejador de Django que deja en memoria lo que pesa menos de 2,5 MB), con su tamaño y su
+  SHA-256 calculados al vuelo, y al guardar se mueve a `MEDIA_ROOT/evidencias/<servicio>/<uuid>.jpg`.
+  El nombre lo pone el servidor; del que manda el celular no se usa ni la extensión. Solo JPEG (se
+  mira el contenido) y máximo 5 MB (413; es un límite técnico, no configuración del cliente). La
+  misma foto con el mismo UUID responde 200 y no duplica; el mismo UUID con otro contenido u otros
+  datos, 409, sin tocar la guardada. Sin subida por partes: se reintenta la foto completa.
+- Decidido (foto antes que el evento): se guarda igual, sin evento y con el id que el celular
+  anunció (`evento_esperado`), y se enlaza sola cuando el evento llega, se aplique o quede en
+  conflicto. La subida y la llegada del evento bloquean la misma fila del servicio, así que no se
+  cruzan (probado con hilos). Una foto se enlaza solo a un evento de su mismo servicio, tocado por
+  el mismo conductor y del tipo que corresponde (recogida con Recogido, entrega con Entregado); si
+  no, queda guardada sin enlazar. La Evidencia guarda además quién la subió, el tamaño y la huella.
+- Decidido (foto de servicio ajeno): la sube el conductor que tiene el servicio o que lo tuvo
+  (hay un evento suyo en el historial), también si ya está entregado o si se lo reasignaron mientras
+  estaba sin señal (es la evidencia de lo que hizo). Para un servicio que nunca fue suyo o que no
+  existe: 404 y no se guarda nada.
+- Preguntas abiertas nuevas: cuatro en `QUESTIONS.md` (foto de soporte, quién resuelve una alerta,
+  cierre de sesión con eventos pendientes, fotos de un servicio que ya no es suyo).
+- Para la 1a-21 (despliegue): nginx limita el cuerpo a 1 MB por defecto; hay que subirlo
+  (`client_max_body_size 6m`) o las fotos de más de 1 MB no llegan a Django. Las fotos en
+  `MEDIA_ROOT` no se sirven todavía por ninguna URL: mostrarlas en el panel es de otra tarea.
+- Cómo probar (5 minutos): `uv run pytest -q` (1443 pruebas) y
+  `uv run python manage.py migrate`. Con Ana lista para la app (pasos de la 1a-09) y un servicio
+  asignado a ella desde el panel, `uv run python manage.py runserver` y en otra ventana de PowerShell:
+  `$base = "http://127.0.0.1:8000/api/v1"`
+  `$cuerpo = @{celular="300 000 0001"; pin="482913"; dispositivo_id="prueba-pc"} | ConvertTo-Json`
+  `$r = Invoke-RestMethod "$base/ingresar/" -Method Post -ContentType "application/json" -Body $cuerpo`
+  `$h = @{Authorization = "Bearer $($r.token)"}`
+  `$s = (Invoke-RestMethod "$base/asignaciones/" -Headers $h).servicios[0].id`
+  `function Evento($destino, $sec) { @{id=[guid]::NewGuid().ToString(); servicio_id=$s; destino=$destino; secuencia=$sec; hora_dispositivo=(Get-Date).ToUniversalTime().ToString("o")} }`
+  `function Enviar($e) { $lote = @{eventos=@($e)} | ConvertTo-Json -Depth 5; (Invoke-RestMethod "$base/eventos/" -Method Post -Headers $h -ContentType "application/json" -Body $lote).resultados | Format-List id, resultado, duplicado, motivo, detalle }`
+  `$a = Evento "en_camino" 1; Enviar $a` → `resultado: aplicado`, `duplicado: False`; el panel muestra
+  el servicio En camino. `Enviar $a` otra vez → `aplicado` con `duplicado: True` y el historial del
+  servicio en el admin sigue con un solo evento de En camino. `Enviar (Evento "entregado" 2)` →
+  `conflicto`, `salto_de_estado`; el servicio sigue En camino y en `/admin/` → Alertas → Alertas
+  aparece "Conflicto de sincronización" con el mensaje completo (se puede marcar como resuelta con
+  la acción de la lista). Para la foto (cualquier JPEG del computador):
+  `$b = Evento "recogido" 3; $foto = [guid]::NewGuid()`
+  `curl.exe -s -X PUT "$base/evidencias/$foto/" -H "Authorization: Bearer $($r.token)" -F "servicio_id=$s" -F "evento_id=$($b.id)" -F "tipo=recogida" -F "archivo=@C:\ruta\foto.jpg"`
+  → `"resultado":"guardada","enlazada":false` (el evento aún no llegó). `Enviar $b` → `aplicado`, y
+  repetir el `curl.exe` → `"resultado":"repetida","enlazada":true`. El archivo queda en
+  `backend\media\evidencias\<servicio>\<uuid>.jpg` y en `/admin/` → Solicitudes → Evidencias sale con
+  su evento. Lo que se cree en esta prueba queda en la base local.
+
 ## Escalamientos
 
 Ninguno todavía.

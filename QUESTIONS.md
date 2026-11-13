@@ -112,6 +112,26 @@ Formato: fecha, tarea, pregunta, qué se asumió mientras tanto (si se asumió a
 - **2026-11-13, 1a-09. ¿El conductor ve el nombre del cliente?** Asumido: no; la lista trae tipo,
   vehículo, direcciones, contactos de origen y destino y referencia externa, como pidió la tarea. Si
   debe verlo, se agrega un campo con el nombre del solicitante (nunca el pagador ni valores).
+- **2026-11-13, 1a-10. ¿Qué es una foto de "soporte", quién la sube y a qué acompaña?** El modelo
+  tiene los tipos recogida, entrega y soporte, pero solo están escritas las fotos de Recogido y
+  Entregado. Asumido: desde la app solo se suben `recogida` (acompaña a un Recogido) y `entrega`
+  (a un Entregado); `soporte` responde 400. Si el conductor debe subir soportes (por ejemplo, en
+  una novedad o un cargo adicional), se agrega a `nucleo/evidencia.py` a qué evento acompaña.
+- **2026-11-13, 1a-10. ¿Quién resuelve una alerta y cuándo se da por resuelta?** Asumido: una
+  persona la marca como resuelta a mano (por ahora en el admin; queda quién y cuándo) y no se
+  cierra sola al corregir el estado del servicio. Mientras siga abierta no se abre otra igual para
+  el mismo registro. Si deben cerrarse solas (por ejemplo, al marcar a mano el estado que el
+  conductor reportó) o solo ciertos roles pueden resolverlas, lo define la 1a-18.
+- **2026-11-13, 1a-10. ¿El conductor puede cerrar sesión con eventos o fotos sin enviar?** El
+  servidor toma como conductor del evento al del token. Si Ana toca botones sin señal, cierra sesión
+  y Beto ingresa en ese celular, los toques de Ana llegarían como de Beto (conflictos con alerta).
+  Asumido en el contrato: la app no deja cerrar sesión con pendientes (lo construye la 1a-12). Si
+  debe poder cerrarla, la app guarda el token junto a cada evento pendiente y los envía con él.
+- **2026-11-13, 1a-10. ¿Hasta cuándo puede un conductor subir fotos de un servicio que ya no es
+  suyo?** Asumido: siempre que lo tenga o lo haya tenido (hay un evento suyo en el historial),
+  también entregado, cancelado o reasignado, sin plazo; para uno que nunca fue suyo, no. Si debe
+  haber un plazo o debe abrir alerta la foto de un servicio reasignado, se agrega a
+  `solicitudes/evidencias.py` con su prueba.
 
 ## Resueltas
 
