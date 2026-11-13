@@ -7,7 +7,7 @@ Los escalamientos de nivel de agente se registran en la sección del final, con 
 
 | Punto | Contenido | Tareas | Estado |
 |---|---|---|---|
-| PC1 | Modelo de datos y reglas probadas contra PostgreSQL | 1a-01 (Flutter), 1a-02, 1a-03, 1a-04, 1a-16a | En curso |
+| PC1 | Modelo de datos y reglas probadas contra PostgreSQL | 1a-01 (Flutter), 1a-02, 1a-03, 1a-04, 1a-16a | Cerrado el 12 de noviembre de 2026 (748 pruebas; falta compilar el APK, pendiente del NDK) |
 | PC2 | Configuración, registro de solicitud y asignación | 1a-05, 1a-06, 1a-07, 1a-08 | Pendiente |
 | PC3 | API, app del conductor y push | 1a-09 a 1a-14 | Pendiente |
 | PC4 | Documentos, cobro, alertas y paneles | 1a-15, 1a-16b, 1a-17, 1a-18, 1a-19 | Pendiente |
