@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% block titulo %}Nueva solicitud{% endblock %}
+{% block contenido %}
+<h1 class="titulo-pagina">Nueva solicitud</h1>
+
+<form method="post" class="formulario" novalidate>
+  {% csrf_token %}
+  {% if formulario.errors %}
+  <p class="aviso aviso--error" role="alert">No se guardó: revise los campos marcados.</p>
+  {% for error in formulario.non_field_errors %}<p class="aviso aviso--error">{{ error }}</p>{% endfor %}
+  {% endif %}
+
+  <section aria-labelledby="t-cliente">
+    <h2 class="titulo-seccion" id="t-cliente">Quien llama</h2>
+    {% include "parciales/campo.html" with campo=formulario.telefono ayuda="Si ya es cliente, aparece al escribir el número." %}
+    <div id="resultado-solicitante" aria-live="polite">
+      {% include "solicitudes/parcial_cliente.html" with busqueda=solicitante %}
+    </div>
+  </section>
+
+  <section aria-labelledby="t-servicio">
+    <h2 class="titulo-seccion" id="t-servicio">Servicio</h2>
+    <div class="formulario">
+      {% include "parciales/campo.html" with campo=formulario.tipo %}
+      {% include "parciales/campo.html" with campo=formulario.origen %}
+      <div class="fila-campos">
+        {% include "parciales/campo.html" with campo=formulario.contacto_origen_nombre %}
+        {% include "parciales/campo.html" with campo=formulario.contacto_origen_telefono %}
+      </div>
+      {% include "parciales/campo.html" with campo=formulario.destino %}
+      <div class="fila-campos">
+        {% include "parciales/campo.html" with campo=formulario.contacto_destino_nombre %}
+        {% include "parciales/campo.html" with campo=formulario.contacto_destino_telefono %}
+      </div>
+    </div>
+  </section>
+
+  <section aria-labelledby="t-vehiculo">
+    <h2 class="titulo-seccion" id="t-vehiculo">Vehículo</h2>
+    <div class="formulario">
+      <div class="fila-campos">
+        {% include "parciales/campo.html" with campo=formulario.placa %}
+        {% include "parciales/campo.html" with campo=formulario.vin %}
+      </div>
+      <div class="fila-campos">
+        {% include "parciales/campo.html" with campo=formulario.marca %}
+        {% include "parciales/campo.html" with campo=formulario.linea %}
+        {% include "parciales/campo.html" with campo=formulario.color %}
+      </div>
+    </div>
+  </section>
+
+  <section aria-labelledby="t-cuando">
+    <h2 class="titulo-seccion" id="t-cuando">Cuándo y quién paga</h2>
+    <div class="formulario">
+      {% include "parciales/campo.html" with campo=formulario.programada_para %}
+      {% include "parciales/campo.html" with campo=formulario.pagador_telefono %}
+      <div id="resultado-pagador" aria-live="polite">
+        {% include "solicitudes/parcial_cliente.html" with busqueda=pagador %}
+      </div>
+    </div>
+  </section>
+
+  <div class="acciones">
+    <button type="submit" name="accion" value="guardar" class="boton boton--principal">Guardar</button>
+    <button type="submit" name="accion" value="borrador" class="boton boton--secundario">Guardar como borrador</button>
+  </div>
+  <p class="ayuda">Guardar deja la solicitud abierta si tiene solicitante, tipo, origen, destino (salvo en desvare) y vehículo; si falta algo, queda en borrador y se dice qué falta. Un evento queda en borrador hasta que se pueda responder si tiene regreso.</p>
+</form>
+{% endblock %}

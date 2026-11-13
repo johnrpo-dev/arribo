@@ -12,4 +12,5 @@ urlpatterns = [
     path("salud/", salud, name="salud"),
     path("admin/", admin.site.urls),
     path("", include("panel.urls")),
+    path("", include("solicitudes.urls")),
 ]

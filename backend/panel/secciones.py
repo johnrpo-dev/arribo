@@ -25,7 +25,13 @@ class Seccion:
 
 SECCIONES = (
     Seccion("tablero", "Tablero", "tablero/", (LOGISTICA, ADMINISTRADOR)),
-    Seccion("nueva_solicitud", "Nueva solicitud", "solicitudes/nueva/", (LOGISTICA, ADMINISTRADOR)),
+    Seccion(
+        "nueva_solicitud",
+        "Nueva solicitud",
+        "solicitudes/nueva/",
+        (LOGISTICA, ADMINISTRADOR),
+        vista="solicitudes.views.nueva",
+    ),
     Seccion("solicitudes", "Solicitudes", "solicitudes/", (LOGISTICA, ADMINISTRADOR)),
     Seccion("cobros", "Cobros", "cobros/", (FACTURACION, ADMINISTRADOR)),
     Seccion("flota", "Flota y documentos", "flota/", (ADMINISTRADOR,)),

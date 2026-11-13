@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% block titulo %}Solicitud {{ solicitud.pk }}{% endblock %}
+{% block contenido %}
+<h1 class="titulo-pagina">Solicitud {{ solicitud.pk }}</h1>
+
+{% if faltantes %}
+<p class="aviso aviso--advertencia">Borrador. Para abrirla falta {{ faltantes }}.</p>
+{% endif %}
+
+<div class="tabla-contenedor">
+  <table class="tabla">
+    <tbody>
+      <tr><th scope="row">Estado</th><td><strong>{{ solicitud.estado_etiqueta }}</strong></td></tr>
+      <tr><th scope="row">Tipo de servicio</th><td>{{ solicitud.get_tipo_display }}</td></tr>
+      <tr><th scope="row">Solicitante</th><td>{{ solicitud.solicitante }}</td></tr>
+      <tr><th scope="row">Pagador</th><td>{{ solicitud.pagador }}</td></tr>
+      <tr><th scope="row">Origen</th><td>{{ solicitud.origen|default:"—" }}</td></tr>
+      <tr><th scope="row">Contacto en el origen</th><td>{{ solicitud.contacto_origen|default:"—" }}</td></tr>
+      <tr><th scope="row">Destino</th><td>{{ solicitud.destino|default:"—" }}</td></tr>
+      <tr><th scope="row">Contacto en el destino</th><td>{{ solicitud.contacto_destino|default:"—" }}</td></tr>
+      <tr><th scope="row">Cuándo</th><td>{% if solicitud.programada_para %}Programada para <time datetime="{{ solicitud.programada_para|date:'c' }}">{{ solicitud.programada_para|date:"d/m/Y H:i" }}</time>{% else %}Inmediato{% endif %}</td></tr>
+      <tr><th scope="row">Registrada</th><td><time datetime="{{ solicitud.creada_en|date:'c' }}">{{ solicitud.creada_en|date:"d/m/Y H:i" }}</time>{% if solicitud.creada_por %} por {{ solicitud.creada_por.get_full_name|default:solicitud.creada_por.get_username }}{% endif %}</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<section class="bloque" aria-labelledby="t-servicios">
+  <h2 class="titulo-seccion" id="t-servicios">Servicios</h2>
+  {% if servicios %}
+  <div class="tabla-contenedor">
+    <table class="tabla">
+      <thead>
+        <tr>
+          <th scope="col">N.º</th>
+          <th scope="col">Vehículo</th>
+          <th scope="col">Conductor</th>
+          <th scope="col">Estado</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for servicio in servicios %}
+        <tr>
+          <td class="cifra">{{ servicio.pk }}</td>
+          <td>{{ servicio.vehiculo }}{% if servicio.vehiculo.color %} {{ servicio.vehiculo.color }}{% endif %}</td>
+          <td>{% if servicio.conductor %}{{ servicio.conductor }}{% if servicio.grua %} ({{ servicio.grua.placa }}){% endif %}{% else %}<span class="texto-secundario">Sin asignar</span>{% endif %}</td>
+          <td><span class="estado estado--{{ servicio.estado }}">{{ servicio.get_estado_display }}</span></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="vacio"><p>Sin vehículos todavía.</p></div>
+  {% endif %}
+</section>
+
+<div class="acciones">
+  <a class="boton boton--secundario" href="{% url 'nueva_solicitud' %}">Registrar otra solicitud</a>
+</div>
+{% endblock %}
