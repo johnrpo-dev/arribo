@@ -380,6 +380,72 @@ La tarea 1a-16 se partió en dos: 1a-16a (modelo de línea de cobro con sus rest
   necesita placa o VIN … La configuración exige placa o VIN al asignar." En un borrador no
   aparece "Asignar conductores". Angostar a 375 px: sin desplazamiento horizontal.
 
+### 1a-09 API: ingreso y asignaciones (13 de noviembre de 2026)
+- Hecho: el contrato de la API en `docs/api-conductor.md` (versión 1: autenticación, errores,
+  ejemplos JSON, ETag y el borrador de eventos y fotos para la 1a-10). En el núcleo,
+  `nucleo/ingreso.py` (PIN de 6 dígitos y límite de intentos) y `nucleo/trayecto.py` (el regreso va
+  del destino al origen y en la fecha de regreso). En `flota.Conductor`, el hash del PIN
+  (`pin_hash`, migración 0004) con `fijar_pin` y `verificar_pin`, y en el admin del conductor el
+  campo "Nuevo PIN de la app" (no hay pantalla del panel para esto) y la columna "PIN fijado". App
+  `api` bajo `/api/v1/`: `POST ingresar/`, `POST salir/`, `GET asignaciones/` y
+  `GET asignaciones/<id>/`; modelos Token de celular e Intentos de ingreso, autenticación
+  `Authorization: Bearer` propia y errores con la forma del contrato. En el admin, "Api del
+  conductor": tokens (acción "Revocar los tokens seleccionados") e intentos (solo consulta).
+- Decidido (PIN): exactamente 6 dígitos. El conductor lo digita una vez por celular, así que dos
+  dígitos más casi no le cuestan, y con el límite adivinar el de un conductor toma unos tres años
+  (siete meses probando los 10 a la vez); con 4 dígitos serían 10 días (2 días para alguno de los 10). Solo se guarda el hash de Django; la base
+  rechaza un PIN en claro (`conductor_pin_solo_hash`). Si Django cambia el algoritmo, el hash se
+  rehace en el siguiente ingreso.
+- Decidido (intentos): 5 PIN equivocados dentro de 15 minutos bloquean el celular 15 minutos; durante
+  el bloqueo ni el PIN correcto entra (429 con `reintentar_en`). Se guarda en la base, una fila por
+  celular normalizado, bloqueada en cada intento: ocho intentos simultáneos revisan el PIN solo
+  cinco veces (probado con hilos). Un celular que no es de nadie recibe la misma respuesta, cuenta
+  igual y gasta el mismo hash. No es configuración del cliente: depende de la fuerza del PIN. Un PIN
+  con otro formato responde 400 y no cuenta.
+- Decidido (token): uno por celular (`dispositivo_id` que genera la app), aleatorio de 256 bits, del
+  que se guarda solo el SHA-256 (la base lo exige con `token_solo_hash`). Como máximo uno vigente
+  por conductor y celular (restricción parcial en la base); volver a ingresar en el mismo celular
+  revoca el anterior. No vence. Se revoca, sin borrarse, al cerrar sesión o desde el admin. Cada
+  petición revisa que el conductor y su usuario estén activos y en el grupo conductor (si no, 401
+  `conductor_no_habilitado`; con el PIN correcto, el ingreso también responde eso). La API solo
+  acepta este token: la sesión del panel no sirve ahí.
+- Decidido (lista): los servicios no terminales del conductor en orden de ronda (la misma consulta
+  de `solicitudes.operaciones`, nueva `consulta_ronda`), con estado previo, `a_bordo`, vehículo,
+  origen y destino del servicio con sus contactos (en un regreso, ya invertidos), referencia, hora
+  programada, grúa guardada con su capacidad, y de la configuración el mínimo de fotos y el momento
+  de placa o VIN. Fechas en UTC con Z; textos vacíos como null. Para refrescos baratos, ETag sobre el
+  cuerpo completo y 304 si no cambió: cubre cualquier cambio (también subir o bajar en la ronda, que
+  no deja evento) sin campos nuevos en la base. Como mucho cuatro consultas por petición, tenga 2 u 8
+  servicios. Un servicio ajeno, terminado o inexistente da el mismo 404. Ninguna respuesta lleva
+  valor, tarifa, cobro, factura ni pagador (la prueba recorre todo el JSON y busca los números).
+- Pruebas: en `tests/api/` con hash MD5 para no alargar la suite (el de producción tarda casi un
+  segundo por ingreso); la prueba del hash del PIN corre con el de producción (PBKDF2).
+- Preguntas abiertas nuevas: cinco en `QUESTIONS.md` (quién fija el PIN, vencimiento del token,
+  cambiar el PIN cierra sesiones, conductor inactivo con servicios en curso, nombre del cliente).
+- Cómo probar (5 minutos): `uv run pytest -q` (1238 pruebas) y
+  `uv run python manage.py migrate`. En `/admin/` → Usuarios → Añadir usuario: "ana.app", con la
+  autenticación por contraseña desactivada; guardar y, en Grupos, elegir `conductor`. En Flota →
+  Conductores → Ana (la de la 1a-08): Usuario "ana.app", "Nuevo PIN de la app" 482913, Guardar; la
+  lista muestra "PIN fijado". `uv run python manage.py runserver` y, en otra ventana de PowerShell
+  (cambiar el celular por el de Ana):
+  `$base = "http://127.0.0.1:8000/api/v1"`
+  `$cuerpo = @{celular="300 000 0001"; pin="482913"; dispositivo_id="prueba-pc"; dispositivo_nombre="PowerShell"} | ConvertTo-Json`
+  `$r = Invoke-RestMethod "$base/ingresar/" -Method Post -ContentType "application/json" -Body $cuerpo; $r.conductor`
+  `$h = @{Authorization = "Bearer $($r.token)"}`
+  `Invoke-RestMethod "$base/asignaciones/" -Headers $h | ConvertTo-Json -Depth 6`
+  Se ven los servicios de Ana en el orden de su ronda, con contactos y grúa, y en ninguna parte
+  "valor", "tarifa" ni "pagador" (PowerShell 5.1 puede mostrar mal las tildes: es la consola). Con
+  un celular que no es de nadie y un PIN malo, seis veces:
+  `$malo = @{celular="3109999999"; pin="000000"; dispositivo_id="prueba-pc"} | ConvertTo-Json`
+  `1..6 | % { try { Invoke-RestMethod "$base/ingresar/" -Method Post -ContentType "application/json" -Body $malo } catch { $_.ErrorDetails.Message } }`
+  Las cinco primeras dicen "Celular o PIN incorrectos." (lo mismo que con el celular de Ana y un PIN
+  malo) y la sexta "Demasiados intentos fallidos. Intente de nuevo en 15 minutos.". Por último
+  `Invoke-RestMethod "$base/salir/" -Method Post -Headers $h` y otra vez
+  `try { Invoke-RestMethod "$base/asignaciones/" -Headers $h } catch { $_.ErrorDetails.Message }`:
+  `sesion_invalida`. En `/admin/` → Api del conductor → Tokens de celular, el de "PowerShell" sale
+  revocado, y en Intentos de ingreso, 3109999999 bloqueado. Lo que se cree en esta prueba queda en
+  la base local.
+
 ## Escalamientos
 
 Ninguno todavía.

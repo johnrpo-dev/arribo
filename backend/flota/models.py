@@ -5,6 +5,7 @@ de fin. Las reglas de traslape viven en la base de datos (restricciones de exclu
 las repite solo para que el admin muestre un mensaje entendible en vez de un error de base.
 """
 from django.conf import settings
+from django.contrib.auth.hashers import check_password, make_password
 from django.contrib.postgres.constraints import ExclusionConstraint
 from django.contrib.postgres.fields import DateTimeRangeField, RangeBoundary, RangeOperators
 from django.core.exceptions import ValidationError
@@ -14,6 +15,7 @@ from django.utils import timezone
 from django.utils.formats import date_format
 
 from nucleo.identificacion import TelefonoInvalido, normalizar_placa, normalizar_telefono
+from nucleo.ingreso import validar_pin
 
 ES_DEMO_AYUDA = "Dato ficticio de demostración; el comando de borrado de la demo lo quita."
 
@@ -78,9 +80,12 @@ class Conductor(models.Model):
         null=True,
         blank=True,
         related_name="conductor",
-        help_text="Opcional. Lo usará el ingreso del conductor a la app.",
+        help_text="Para entrar a la app: un usuario del grupo conductor.",
     )
     activo = models.BooleanField("activo", default=True)
+    # Solo el hash (make_password de Django), nunca el PIN: se fija con `fijar_pin` (en el admin,
+    # campo "Nuevo PIN de la app") y se revisa con `verificar_pin`.
+    pin_hash = models.CharField("hash del PIN", max_length=128, blank=True, editable=False)
     es_demo = models.BooleanField("dato de demostración", default=False, editable=False,
                                   help_text=ES_DEMO_AYUDA)
 
@@ -96,6 +101,13 @@ class Conductor(models.Model):
                 name="conductor_celular_solo_digitos",
                 violation_error_message="El celular va solo con dígitos.",
             ),
+            # Un hash de Django es "algoritmo$...": un PIN en claro (solo dígitos) nunca cabe aquí,
+            # aunque alguien lo guarde con update() o SQL.
+            models.CheckConstraint(
+                condition=Q(pin_hash="") | Q(pin_hash__contains="$"),
+                name="conductor_pin_solo_hash",
+                violation_error_message="El PIN se guarda solo con hash, nunca en claro.",
+            ),
         )
 
     def __str__(self):
@@ -110,6 +122,26 @@ class Conductor(models.Model):
     def save(self, *args, **kwargs):
         self.celular = normalizar_telefono(self.celular)
         super().save(*args, **kwargs)
+
+    @property
+    def tiene_pin(self) -> bool:
+        return bool(self.pin_hash)
+
+    def fijar_pin(self, pin: str) -> None:
+        """Guarda en el objeto el hash del PIN (6 dígitos; si no, PinInvalido). No guarda la fila."""
+        validar_pin(pin)
+        self.pin_hash = make_password(pin)
+
+    def verificar_pin(self, pin: str) -> bool:
+        """¿Es su PIN? Sin PIN fijado, nunca. Si Django cambió el algoritmo, rehace el hash."""
+        if not self.pin_hash:
+            return False
+
+        def rehacer_hash(pin_correcto):
+            self.pin_hash = make_password(pin_correcto)
+            Conductor.objects.filter(pk=self.pk).update(pin_hash=self.pin_hash)
+
+        return check_password(pin, self.pin_hash, setter=rehacer_hash)
 
 
 class TsTzRange(Func):

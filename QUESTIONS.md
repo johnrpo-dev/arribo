@@ -95,6 +95,23 @@ Formato: fecha, tarea, pregunta, qué se asumió mientras tanto (si se asumió a
 - **2026-11-13, 1a-08. ¿Se puede reasignar al mismo conductor?** Asumido: no (no tendría efecto
   y, desde En camino, lo devolvería a Asignado); `operaciones.reasignar` lo rechaza y la lista no
   ofrece al conductor actual.
+- **2026-11-13, 1a-09. ¿Quién fija el PIN del conductor?** Asumido: el administrador, en el admin
+  (Flota → Conductores → "Nuevo PIN de la app"); el conductor no lo cambia desde la app. Si debe
+  elegirlo o cambiarlo él, se agrega a la API "cambiar PIN" (pidiendo el actual) con su prueba.
+- **2026-11-13, 1a-09. ¿El token de la app vence?** Asumido: no; sirve hasta cerrar sesión, que lo
+  revoquen en el admin o que el conductor vuelva a ingresar en el mismo celular. Si debe vencer (por
+  ejemplo, tras 30 días sin uso), la regla usa el `ultimo_uso` que ya se guarda.
+- **2026-11-13, 1a-09. ¿Cambiar el PIN cierra las sesiones abiertas del conductor?** Asumido: no;
+  para cerrarlas se revocan sus tokens en el admin. Si sí, guardar un PIN nuevo en el admin revoca
+  los tokens del conductor (y se agrega la prueba).
+- **2026-11-13, 1a-09. ¿Desactivar a un conductor que tiene servicios en curso le corta la app?**
+  Aplicado lo que pidió la tarea: sí, todo responde 401, también el envío de eventos de la 1a-10; lo
+  que haga queda en la cola del celular hasta que lo reactiven, y logística resuelve esos servicios
+  desde el panel. Choca con "lo que ya lleva en curso no se interrumpe" (1a-08, 1a-15). Si debe poder
+  terminar lo que lleva, un conductor inactivo conservaría acceso solo a sus servicios en curso.
+- **2026-11-13, 1a-09. ¿El conductor ve el nombre del cliente?** Asumido: no; la lista trae tipo,
+  vehículo, direcciones, contactos de origen y destino y referencia externa, como pidió la tarea. Si
+  debe verlo, se agrega un campo con el nombre del solicitante (nunca el pagador ni valores).
 
 ## Resueltas
 
