@@ -35,7 +35,26 @@ def datos(**cambios):
         "accion": "guardar",
     }
     base.update(cambios)
-    return {k: v for k, v in base.items() if v is not None}
+    return formulario({k: v for k, v in base.items() if v is not None})
+
+
+CAMPOS_VEHICULO = ("servicio", "placa", "vin", "marca", "linea", "color", "referencia_externa", "quitar")
+
+
+def formulario(campos, vehiculos=None):
+    """Lo que manda el navegador: los campos del vehículo van en la fila 0 del conjunto de
+    vehículos (o en las filas de `vehiculos`), con su formulario de control."""
+    filas = vehiculos if vehiculos is not None else [
+        {c: campos.pop(c) for c in CAMPOS_VEHICULO if c in campos}
+    ]
+    for c in CAMPOS_VEHICULO:
+        campos.pop(c, None)
+    campos["vehiculos-TOTAL_FORMS"] = str(len(filas))
+    campos["vehiculos-INITIAL_FORMS"] = "0"
+    for i, fila in enumerate(filas):
+        for clave, valor in fila.items():
+            campos[f"vehiculos-{i}-{clave}"] = valor
+    return campos
 
 
 @pytest.fixture
@@ -263,7 +282,7 @@ def test_registrar_se_deshace_entero_si_falla_al_final(monkeypatch, usuario):
                 cliente_nuevo=nuevo,
                 origen="A",
                 destino="B",
-                vehiculo=DatosVehiculo("XYZ789", ""),
+                vehiculos=(DatosVehiculo("XYZ789", ""),),
             ),
             usuario=usuario,
         )

@@ -20,6 +20,7 @@ from dataclasses import dataclass
 
 from django.db import IntegrityError, transaction
 
+from configuracion.models import configuracion_vigente
 from flota.models import Conductor, Grua, grua_vigente
 from nucleo.capacidad import CapacidadExcedida, verificar_recogida
 from nucleo.estados import (
@@ -33,10 +34,22 @@ from nucleo.estados import (
 from nucleo.estados import Servicio as ServicioNucleo
 from nucleo.estados import reasignar as reasignar_en_nucleo
 from nucleo.estados import resolver_novedad as resolver_novedad_en_nucleo
-from nucleo.identificacion import IdentificacionIncompleta, validar_identificacion
+from nucleo.identificacion import (
+    IdentificacionIncompleta,
+    MomentoIdentificacion,
+    identificacion_exigida,
+    validar_identificacion,
+)
 from nucleo.sincronizacion import Evento, Resultado, aplicar_evento, ordenar
 
-from .models import EstadoRegistro, EventoEstado, OrigenEvento, ResultadoEvento, Servicio
+from .models import (
+    EstadoRegistro,
+    EventoEstado,
+    OrigenEvento,
+    ResultadoEvento,
+    Servicio,
+    Solicitud,
+)
 from .senales import servicio_entregado
 
 
@@ -49,12 +62,11 @@ class SolicitudNoAsignable(Exception):
 
 
 def identificacion_exigida_al_asignar() -> bool:
-    """¿Se exige placa o VIN también al asignar? Por ahora no: solo al recoger.
-
-    Punto de extensión: la opción "Momento en que se exige placa o VIN" (por defecto "Al
-    recoger", ver docs/arquitectura.md) la leerá de la configuración en otra tarea.
-    """
-    return False
+    """¿Se exige placa o VIN ya al asignar? Lo decide la opción "Momento en que se exige placa o
+    VIN" de la configuración (por defecto "Al recoger"); la regla es `identificacion_exigida`."""
+    return identificacion_exigida(
+        configuracion_vigente().momento_placa_vin, MomentoIdentificacion.AL_ASIGNAR
+    )
 
 
 # --- Panel -------------------------------------------------------------------------------------
@@ -297,7 +309,14 @@ def _refrescar(servicio):
 
 
 def _exigir_solicitud_asignable(servicio):
-    registro = servicio.solicitud.estado_registro
+    # Se lee de nuevo, ya con la fila del servicio bloqueada: si otra petición cerró la solicitud
+    # como no concretada mientras se esperaba el bloqueo, aquí se ve (cerrarla bloquea también
+    # las filas de sus servicios).
+    registro = (
+        Solicitud.objects.filter(pk=servicio.solicitud_id)
+        .values_list("estado_registro", flat=True)
+        .get()
+    )
     if registro == EstadoRegistro.BORRADOR:
         raise SolicitudNoAsignable(
             "La solicitud es un borrador: complete los datos obligatorios antes de asignar."

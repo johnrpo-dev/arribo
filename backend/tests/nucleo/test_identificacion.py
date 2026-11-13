@@ -6,8 +6,10 @@ import pytest
 from nucleo.identificacion import (
     PATRON_VIN,
     IdentificacionIncompleta,
+    MomentoIdentificacion,
     TelefonoInvalido,
     VinInvalido,
+    identificacion_exigida,
     normalizar_placa,
     normalizar_telefono,
     normalizar_vin,
@@ -177,3 +179,26 @@ def test_desvare_con_placa_es_suficiente():
 
 def test_identificacion_incompleta_es_un_value_error():
     assert issubclass(IdentificacionIncompleta, ValueError)
+
+
+# --- Momento en que se exige la placa o el VIN -------------------------------------------------
+
+M = MomentoIdentificacion
+
+
+def test_configurado_al_asignar_se_exige_al_asignar():
+    assert identificacion_exigida(M.AL_ASIGNAR, M.AL_ASIGNAR) is True
+
+
+def test_configurado_al_recoger_no_se_exige_al_asignar():
+    assert identificacion_exigida(M.AL_RECOGER, M.AL_ASIGNAR) is False
+
+
+@pytest.mark.parametrize("configurado", [M.AL_ASIGNAR, M.AL_RECOGER])
+def test_al_recoger_se_exige_siempre(configurado):
+    assert identificacion_exigida(configurado, M.AL_RECOGER) is True
+
+
+def test_el_momento_se_acepta_como_texto_guardado():
+    assert identificacion_exigida("asignar", "asignar") is True
+    assert identificacion_exigida("recoger", "asignar") is False

@@ -5,6 +5,7 @@ después de las demás pruebas con base de datos. Sea cual sea el orden en que s
 el resultado tiene que ser el mismo: un solo evento por id y un solo cambio de estado.
 """
 import threading
+import time
 import uuid
 
 import pytest
@@ -12,10 +13,13 @@ from django.db import connection
 
 from nucleo.capacidad import CapacidadExcedida
 from nucleo.estados import Estado
+from nucleo.registro import CierreNoPermitido
 from nucleo.sincronizacion import Resultado
-from solicitudes import operaciones
-from solicitudes.models import EventoEstado
-from solicitudes.operaciones import aplicar_evento_del_conductor
+from solicitudes import operaciones, registro
+from solicitudes.models import EstadoRegistro, EventoEstado
+from solicitudes.operaciones import SolicitudNoAsignable, aplicar_evento_del_conductor
+
+from ..conftest import crear_solicitud
 
 pytestmark = pytest.mark.django_db(transaction=True)
 
@@ -125,3 +129,55 @@ def test_dos_recogidas_a_la_vez_desde_la_app_se_aplican_y_solo_una_queda_marcada
     assert salidas == [Resultado.APLICADO, Resultado.APLICADO]
     marcas = sorted(EventoEstado.objects.values_list("capacidad_excedida", flat=True))
     assert marcas == [False, True]
+
+
+def test_cerrar_como_no_concretada_y_asignar_a_la_vez_deja_pasar_solo_uno(
+    cliente, crear_servicio, ana, usuario
+):
+    # Sea cual sea el orden, nunca queda una solicitud no concretada con un servicio asignado.
+    for ronda in range(5):
+        solicitud = crear_solicitud(cliente, origen=f"Ronda {ronda}")
+        servicio = crear_servicio(solicitud_de=solicitud)
+
+        salidas = en_paralelo(
+            lambda s=solicitud: registro.cerrar_no_concretada(s, motivo="precio"),
+            lambda s=servicio: operaciones.asignar(s, ana, actor=usuario),
+        )
+
+        errores = [s for s in salidas if isinstance(s, Exception)]
+        assert len(errores) == 1, salidas
+        assert isinstance(errores[0], CierreNoPermitido | SolicitudNoAsignable), salidas
+        solicitud.refresh_from_db()
+        servicio.refresh_from_db()
+        cerrada = solicitud.estado_registro == EstadoRegistro.NO_CONCRETADA
+        assert cerrada != (servicio.estado == E.ASIGNADO)
+
+
+def test_asignar_que_espera_al_cierre_ve_la_solicitud_ya_cerrada(
+    monkeypatch, solicitud, crear_servicio, ana, usuario
+):
+    # El cruce peligroso, forzado: el cierre ya bloqueó las filas cuando la asignación empieza;
+    # la asignación espera el bloqueo y, al seguir, debe ver la solicitud cerrada.
+    servicio = crear_servicio()
+    bloqueado = threading.Event()
+    verificar = registro._verificar_cierre
+
+    def verificar_y_demorar(*args, **kwargs):
+        verificar(*args, **kwargs)
+        bloqueado.set()
+        time.sleep(0.5)  # la asignación alcanza a quedar esperando el bloqueo
+
+    monkeypatch.setattr(registro, "_verificar_cierre", verificar_y_demorar)
+
+    def asignar_despues():
+        assert bloqueado.wait(timeout=10)
+        return operaciones.asignar(servicio, ana, actor=usuario)
+
+    salidas = en_paralelo(
+        lambda: registro.cerrar_no_concretada(solicitud, motivo="precio"), asignar_despues
+    )
+
+    assert isinstance(salidas[1], SolicitudNoAsignable), salidas
+    servicio.refresh_from_db()
+    assert (servicio.estado, servicio.conductor_id) == (E.PENDIENTE_ASIGNAR, None)
+    assert not EventoEstado.objects.exists()

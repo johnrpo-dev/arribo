@@ -270,6 +270,59 @@ La tarea 1a-16 se partió en dos: 1a-16a (modelo de línea de cobro con sus rest
   `/solicitudes/nueva/` da "Sin acceso a esta página". Angostar a 375 px: sin desplazamiento
   horizontal. Lo que se registre en esta prueba queda en la base local (nada se borra).
 
+### 1a-07 Registro de solicitud II (13 de noviembre de 2026)
+- Hecho: en el núcleo, `nucleo/registro.py` suma la referencia externa obligatoria si paga una
+  aseguradora (faltante nuevo), `crea_regreso` y `verificar_cierre_no_concretada`;
+  `nucleo/identificacion.py` suma `identificacion_exigida(momento_configurado, momento_actual)`.
+  En `solicitudes`: `registro.py` registra varios vehículos (un servicio por vehículo), completa
+  borradores (`completar_borrador`, solo borradores, con la fila bloqueada), crea los servicios de
+  regreso al abrir un evento con regreso, advierte duplicados (`duplicados_activos`) y cierra como
+  no concretada (`cerrar_no_concretada`). `operaciones.asignar` exige placa o VIN cuando la
+  configuración dice "Al asignar" (desvare exige placa; el resto, placa o VIN). Pantallas: el mismo
+  formulario sirve para nueva solicitud y para completar un borrador (`/solicitudes/<n>/completar/`,
+  enlazado desde el detalle); las filas de vehículo se agregan con HTMX
+  (`/solicitudes/nueva/vehiculo/`); el detalle muestra trayecto (ida o regreso del N.º) y
+  referencia de cada servicio, la respuesta de regreso y, si nunca se asignó, el cierre como no
+  concretada (`/solicitudes/<n>/no-concretada/`, solo POST).
+- Decidido: los regresos se crean una vez, al quedar abierta: mismo vehículo y referencia,
+  enlazados a su ida con `regreso_de`; como el servicio no tiene origen ni destino propios, el
+  regreso va del destino al origen de la solicitud (el detalle lo dice). La pregunta "¿Tiene
+  regreso?" solo se guarda en eventos; si la respuesta es sí, la fecha va junto (error junto al
+  campo). Duplicado: mismo vehículo con un servicio no terminal en otra solicitud no cerrada como
+  no concretada; el aviso enlaza a esa solicitud y no guarda hasta pulsar de nuevo Guardar (si
+  cambian los duplicados, vuelve a advertir). El mismo vehículo en dos filas es error. Quitar un
+  vehículo de un borrador cancela su servicio con motivo (nada se borra). No concretada: desde
+  borrador o abierta, con motivo, solo si ningún servicio se asignó nunca; los servicios no se
+  cancelan. Para que un cierre y una asignación simultáneos no dejen una solicitud no concretada
+  con un servicio asignado, el cierre bloquea también las filas de los servicios y `asignar`
+  vuelve a leer el estado de la solicitud después de bloquear el servicio (probado forzando el
+  cruce con dos hilos; sin la relectura, la prueba falla). La nota del formulario dice cuándo se
+  exigirá la placa o el VIN según la configuración. Sin CSS nuevo: las filas de vehículo usan
+  `grupo-opciones` (leyenda "Vehículo N") y los componentes existentes; sin migraciones (la
+  referencia externa ya estaba en el servicio).
+- Decidido tras la revisión (orquestador): al completar un borrador el pagador se conserva
+  aunque no tenga teléfono (el formulario dice "Paga hoy ..." y lleva su id oculto, validado
+  contra la solicitud); solo cambia si se escribe el teléfono de otro pagador o se marca "Que
+  pague quien llama". Nunca cambia por ausencia de un dato. Límite: un solicitante creado en el
+  admin sin teléfono obliga a escribir uno al completar el borrador.
+- Preguntas abiertas nuevas: cinco en `QUESTIONS.md` (referencia por vehículo, cuándo se cierra
+  como no concretada, fecha de regreso, quitar vehículo de un borrador, qué es duplicado).
+- Cómo probar (5 minutos): `uv run pytest -q` (1030 pruebas) y `uv run python manage.py runserver`.
+  Entrar con logística o administrador y abrir Nueva solicitud. Escribir un teléfono (cliente
+  nuevo: nombre y tipo), elegir "Evento o muestra de concesionario", origen y destino, placa
+  "abc123" en Vehículo 1, pulsar "Agregar otro vehículo" y poner "xyz789" en Vehículo 2. Sin
+  responder "¿Tiene regreso?", Guardar: queda borrador y dice que falta "la respuesta de si el
+  evento tiene regreso". En el detalle pulsar "Completar borrador", marcar Sí sin fecha y Guardar:
+  error junto a "Fecha y hora del regreso". Poner la fecha y Guardar: "Se crearon 2 servicios de
+  regreso" y la tabla muestra 4 servicios, dos "Ida" y dos "Regreso del N.º …" con las mismas
+  placas. Duplicado: en Nueva solicitud registrar otra con la placa "abc123": aparece "Posible
+  duplicado" con enlace a la primera; pulsar Guardar de nuevo y se guarda. Aseguradora: con un
+  pagador de tipo aseguradora y sin referencia, queda borrador ("falta la referencia externa").
+  No concretada: en un borrador, al final del detalle elegir el motivo y "Cerrar como no
+  concretada": estado "No concretada" con el motivo. En Configuración poner "Al asignar": la nota
+  de Vehículos dice "se exigirán al asignar". Angostar a 375 px: sin desplazamiento horizontal.
+  Lo que se registre queda en la base local.
+
 ## Escalamientos
 
 Ninguno todavía.

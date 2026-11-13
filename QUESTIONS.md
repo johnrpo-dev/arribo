@@ -53,6 +53,30 @@ Formato: fecha, tarea, pregunta, qué se asumió mientras tanto (si se asumió a
 - **2026-11-12, 1a-16a. Si el pagador de la solicitud cambia después de entregado el servicio, ¿la
   línea cambia de pagador?** Asumido: no; la línea guarda el pagador que tenía la solicitud al
   quedar Entregado. Cambiarlo sería una operación nueva (antes de facturar, con historial).
+- **2026-11-13, 1a-07. ¿La referencia externa de la aseguradora es una por vehículo o una por
+  solicitud?** El modelo la tiene en el servicio (un número de caso por vehículo). Asumido: si el
+  pagador (que por defecto es quien llama) es una aseguradora, cada vehículo necesita su referencia
+  para salir de borrador; el servicio de regreso copia la de su ida. Si es una por solicitud, se
+  pide una sola vez en el formulario y se copia a todos los servicios (cambia `faltantes_de`).
+- **2026-11-13, 1a-07. ¿Cuándo se puede cerrar una solicitud como no concretada?** Asumido (lo más
+  conservador): desde borrador o abierta, con motivo, solo si ningún servicio se asignó nunca (ni
+  ahora ni antes: un servicio que se asignó y volvió a la cola o se canceló ya movió una grúa; esos
+  se cancelan con motivo). Sus servicios no se cancelan, porque "no concretada" es distinto de
+  "Cancelado": quedan pendientes de asignar pero no se pueden asignar, y las listas y alertas
+  futuras deben ignorarlos. El detalle es opcional, también con el motivo "Otro". No se guarda
+  quién la cerró (la solicitud aún no tiene historial). No se puede deshacer.
+- **2026-11-13, 1a-07. ¿El regreso de un evento tiene una fecha por vehículo?** Asumido: no; la
+  fecha de regreso es de la solicitud y vale para todos sus vehículos. El servicio no tiene origen
+  ni destino propios: el de regreso va del destino al origen de la solicitud, y lo marca su enlace
+  al de ida (`regreso_de`). Los regresos se crean una sola vez, cuando la solicitud queda abierta.
+  Si cada vehículo vuelve en una fecha distinta, se agrega la fecha al servicio.
+- **2026-11-13, 1a-07. ¿Quitar un vehículo de un borrador lo cancela?** Asumido: sí, porque nada
+  se borra; el servicio queda Cancelado con el motivo "Se quitó el vehículo al completar el
+  borrador" y se sigue viendo en el detalle. Si se prefiere que un servicio de borrador se pueda
+  descartar sin dejar rastro, habría que permitir borrar solo en ese caso.
+- **2026-11-13, 1a-07. ¿Qué cuenta como duplicado?** Asumido: el mismo vehículo (por placa o VIN)
+  con un servicio no terminal en otra solicitud en borrador o abierta; las no concretadas no
+  cuentan. Es solo una advertencia: el operador la confirma pulsando de nuevo Guardar.
 
 ## Resueltas
 

@@ -40,7 +40,7 @@ Toda tarea termina con `uv run pytest -q` y `uv run ruff check .` en verde, más
   pagador; contactos; tipo; origen y destino en texto; un vehículo; inmediato o programado; guardar como Borrador.
   Verificar: pruebas de la vista; registrar a mano una solicitud completa en menos de 60 segundos.
 
-- [ ] **1a-07 Registro de solicitud II** (7 h). Depende de: 06.
+- [x] **1a-07 Registro de solicitud II** (7 h). Depende de: 06.
   Varios vehículos; referencia externa obligatoria si paga aseguradora; momento de placa o VIN según
   configuración; advertencia de duplicado por placa o VIN con servicio activo; pregunta de regreso
   obligatoria en eventos, que crea el servicio de regreso invertido; cierre como No concretada con motivo.
