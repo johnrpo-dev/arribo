@@ -82,7 +82,9 @@ def test_el_mismo_id_a_la_vez_en_dos_servicios_choca_en_la_llave_y_aplica_uno_so
         lambda: aplicar_evento_del_conductor(**evento_app(segundo, E.EN_CAMINO, id=id_repetido)),
     )
 
-    assert sorted(salidas) == sorted([Resultado.APLICADO, Resultado.DUPLICADO])
+    # Desde la 1a-10: el que pierde la carrera trae el mismo id sobre otro servicio, que no es un
+    # reenvío: responde "rechazado" (antes "duplicado"). Sigue entrando uno solo.
+    assert sorted(salidas) == sorted([Resultado.APLICADO, Resultado.RECHAZADO])
     assert EventoEstado.objects.count() == 1
     estados = []
     for servicio in (primero, segundo):

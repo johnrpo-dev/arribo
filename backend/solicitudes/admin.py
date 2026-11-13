@@ -101,6 +101,7 @@ class EventoEstadoInline(SoloLecturaInline):
         "destino",
         "origen",
         "resultado",
+        "motivo_conflicto",
         "capacidad_excedida",
         "actor",
         "conductor",
@@ -136,6 +137,7 @@ class EventoEstadoAdmin(SoloLecturaAdmin):
         "destino",
         "origen",
         "resultado",
+        "motivo_conflicto",
         "capacidad_excedida",
         "actor",
         "conductor",
@@ -147,6 +149,6 @@ class EventoEstadoAdmin(SoloLecturaAdmin):
 
 @admin.register(Evidencia)
 class EvidenciaAdmin(SoloLecturaAdmin):
-    list_display = ("creada_en", "servicio", "tipo", "evento", "archivo")
+    list_display = ("creada_en", "servicio", "tipo", "evento", "subida_por", "tamano", "archivo")
     list_filter = ("tipo",)
     search_fields = ("id", "servicio__vehiculo__placa")

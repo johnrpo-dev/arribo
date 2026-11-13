@@ -8,13 +8,17 @@ los datos, se llama al núcleo y se guarda lo que decide.
   orden en que el conductor atiende sus servicios; no es un cambio de estado). Si una regla no se cumple,
   lanzan la excepción del núcleo (TransicionInvalida, CapacidadExcedida, IdentificacionIncompleta)
   o una de este módulo, y no queda ni evento ni cambio.
-- App del conductor: `aplicar_evento_del_conductor` y `aplicar_lote_del_conductor`. Nunca rechazan
-  lo que el conductor hizo: si no encaja, el evento se guarda como conflicto y el servicio sigue
-  igual.
+- App del conductor: `aplicar_evento_del_conductor`, `aplicar_lote_del_conductor` y
+  `sincronizar_lote_del_conductor` (la que usa la API; las tres pasan por `_aplicar_evento`). Nunca
+  rechazan lo que el conductor hizo: si no encaja, el evento se guarda como conflicto con su
+  motivo, el servicio sigue igual y se avisa con `senales.evento_del_conductor_guardado` (`alertas`
+  abre la alerta a logística). Solo se rechaza lo que no se puede guardar: un id ya usado con
+  otro contenido o un servicio que no existe.
 
 Cuando un servicio queda Entregado (desde el panel o la app) se envía `senales.servicio_entregado`
 en la misma transacción; `cobros` la escucha para crear la línea de cobro sin que esta app lo importe.
 """
+import logging
 import uuid
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
@@ -36,6 +40,7 @@ from nucleo.estados import (
 from nucleo.estados import Servicio as ServicioNucleo
 from nucleo.estados import reasignar as reasignar_en_nucleo
 from nucleo.estados import resolver_novedad as resolver_novedad_en_nucleo
+from nucleo.evidencia import se_enlaza
 from nucleo.identificacion import (
     IdentificacionIncompleta,
     MomentoIdentificacion,
@@ -44,19 +49,26 @@ from nucleo.identificacion import (
 )
 from nucleo.ronda import MovimientoInvalido, numerar, siguiente_orden
 from nucleo.ronda import mover as mover_en_nucleo
-from nucleo.sincronizacion import Evento, Resultado, aplicar_evento, ordenar
+from nucleo.sincronizacion import Evento, Motivo, Resultado, decidir, es_reenvio, ordenar
 
 from .disponibilidad import motivos_de_bloqueo
 from .models import (
     VALORES_EN_RONDA,
     EstadoRegistro,
     EventoEstado,
+    Evidencia,
     OrigenEvento,
     ResultadoEvento,
     Servicio,
     Solicitud,
 )
-from .senales import servicio_entregado
+from .senales import (
+    evento_del_conductor_guardado,
+    evento_del_conductor_rechazado,
+    servicio_entregado,
+)
+
+registro = logging.getLogger(__name__)
 
 
 class ConductorBloqueado(Exception):
@@ -196,6 +208,28 @@ class EventoDelConductor(Evento):
     longitud: float | None = None
 
 
+@dataclass(frozen=True)
+class Aplicacion:
+    """Lo que pasó con un evento de la app.
+
+    `resultado` es el que tuvo el evento la primera vez que llegó (aplicado o conflicto), tal como
+    quedó guardado: un reenvío no se vuelve a evaluar, solo lleva `duplicado`. Rechazado y
+    reintentar son de eventos que no se guardaron. `motivo` explica todo lo que no es aplicado.
+    """
+
+    id: str
+    servicio_id: str
+    resultado: Resultado
+    motivo: Motivo | None = None
+    duplicado: bool = False
+    capacidad_excedida: bool = False
+
+    @property
+    def resumen(self) -> Resultado:
+        """Aplicado, duplicado, conflicto, rechazado o reintentar, en una sola palabra."""
+        return Resultado.DUPLICADO if self.duplicado else self.resultado
+
+
 def aplicar_evento_del_conductor(
     *,
     id,
@@ -209,10 +243,13 @@ def aplicar_evento_del_conductor(
     latitud=None,
     longitud=None,
 ) -> Resultado:
-    """Aplica un evento de la app una sola vez y devuelve aplicado, duplicado o conflicto.
+    """Aplica un evento de la app una sola vez y devuelve aplicado, duplicado, conflicto o
+    rechazado.
 
     `servicio` y `conductor` pueden ser instancias o llaves primarias. Un conflicto se guarda igual
-    (con resultado "conflicto") y no cambia el servicio; la alerta a logística sale de esos eventos.
+    (con resultado "conflicto" y su motivo), no cambia el servicio y abre una alerta a logística.
+    Si el evento no se puede guardar por una falla (por ejemplo, la línea de cobro), la excepción
+    sube y no queda nada: el celular lo reenvía.
     """
     return _aplicar_evento(
         _preparar(
@@ -227,15 +264,50 @@ def aplicar_evento_del_conductor(
             latitud=latitud,
             longitud=longitud,
         )
-    )
+    ).resumen
 
 
 def aplicar_lote_del_conductor(eventos: Iterable[Mapping]) -> list[tuple[str, Resultado]]:
     """Aplica un lote en el orden de la secuencia del dispositivo, no en el de llegada ni el de la
-    hora del celular. Cada evento va en su propia transacción. Devuelve (id, resultado) por evento.
+    hora del celular. Cada evento va en su propia transacción. Devuelve (id, resultado) por evento,
+    en el orden en que se aplicaron. Es `sincronizar_lote_del_conductor` sin el detalle.
     """
     preparados = [_preparar(**datos) for datos in eventos]
-    return [(evento.id, _aplicar_evento(evento)) for evento in ordenar(preparados)]
+    aplicaciones = dict(zip(map(id, preparados), _aplicar_en_orden(preparados), strict=True))
+    return [(e.id, aplicaciones[id(e)].resumen) for e in ordenar(preparados)]
+
+
+def sincronizar_lote_del_conductor(eventos: Iterable[Mapping]) -> list[Aplicacion]:
+    """Aplica un lote de la app y devuelve, en el mismo orden en que llegó, qué pasó con cada
+    evento (lo que usa la API).
+
+    - Se aplican por secuencia del dispositivo, no por orden de llegada ni por la hora del celular.
+    - Cada evento va en su propia transacción, con todos sus efectos (el cambio de estado, la
+      línea de cobro al quedar Entregado, la alerta, el enlace de sus fotos): o queda todo o nada.
+    - Una falla al guardar un evento no tumba el lote: ese evento responde "reintentar" (no se
+      guardó; el celular lo reenvía) y los demás siguen. Los eventos posteriores del mismo servicio
+      en el lote tampoco se evalúan (dependen del que falló): también responden "reintentar".
+    """
+    return _aplicar_en_orden([_preparar(**datos) for datos in eventos])
+
+
+def registrar_evento_rechazado(*, conductor, motivo, contenido, original=None) -> None:
+    """Un evento de la app que no se puede guardar (id reutilizado con otro contenido, servicio
+    que no existe, datos ilegibles): queda en el registro del servidor y se avisa con la señal
+    `evento_del_conductor_rechazado`, que abre la alerta a logística."""
+    if not isinstance(conductor, Conductor):
+        conductor = Conductor.objects.get(pk=conductor)
+    motivo = Motivo(motivo)
+    registro.warning(
+        "Evento de la app rechazado (%s), conductor %s: %s", motivo.value, conductor.pk, contenido
+    )
+    evento_del_conductor_rechazado.send(
+        sender=EventoEstado,
+        conductor=conductor,
+        motivo=motivo,
+        contenido=contenido,
+        original=original,
+    )
 
 
 def _preparar(
@@ -265,11 +337,39 @@ def _preparar(
     )
 
 
+def _aplicar_en_orden(preparados: list[EventoDelConductor]) -> list[Aplicacion]:
+    """Aplica por secuencia y devuelve los resultados en el orden de `preparados`."""
+    aplicaciones: dict[int, Aplicacion] = {}
+    detenidos: set[str] = set()  # servicios con un evento de este lote que no se pudo guardar
+    for evento in ordenar(preparados):
+        if evento.servicio_id in detenidos:
+            aplicaciones[id(evento)] = _sin_guardar(evento, Motivo.ESPERA_EVENTO_ANTERIOR)
+            continue
+        try:
+            aplicaciones[id(evento)] = _aplicar_evento(evento)
+        # La falla de un evento no tumba los demás del lote: su transacción ya se deshizo entera,
+        # queda en el registro del servidor y el celular lo reenvía.
+        except Exception:  # noqa: BLE001
+            registro.exception("No se pudo guardar el evento %s de la app", evento.id)
+            detenidos.add(evento.servicio_id)
+            aplicaciones[id(evento)] = _sin_guardar(evento, Motivo.ERROR_DEL_SERVIDOR)
+    return [aplicaciones[id(evento)] for evento in preparados]
+
+
+def _sin_guardar(evento: EventoDelConductor, motivo: Motivo) -> Aplicacion:
+    return Aplicacion(
+        id=evento.id,
+        servicio_id=evento.servicio_id,
+        resultado=Resultado.REINTENTAR,
+        motivo=motivo,
+    )
+
+
 def _ya_recibido(evento_id: uuid.UUID) -> bool:
     return EventoEstado.objects.filter(pk=evento_id).exists()
 
 
-def _aplicar_evento(evento: EventoDelConductor) -> Resultado:
+def _aplicar_evento(evento: EventoDelConductor) -> Aplicacion:
     """Idempotencia ante reenvíos y ante peticiones simultáneas con el mismo id:
 
     1. Si el id ya está guardado, es duplicado (el caso común: el celular reenvía el lote).
@@ -278,33 +378,45 @@ def _aplicar_evento(evento: EventoDelConductor) -> Resultado:
     3. La garantía final es la llave primaria del evento (el id del celular): si dos peticiones
        llegan a guardarlo a la vez, la base deja entrar una sola; la otra se deshace entera, sin
        evento ni cambio de estado, y responde duplicado.
+
+    Un duplicado responde lo que quedó guardado la primera vez (no se vuelve a evaluar). Si el id
+    ya guardado llega con otro contenido, no es un reenvío: se rechaza sin tocar nada.
+
+    El evento, el cambio de estado, la línea de cobro (al quedar Entregado), el enlace de las
+    fotos que lo esperaban y la alerta (conflicto o capacidad excedida) van en una sola
+    transacción.
     """
     evento_id = uuid.UUID(evento.id)
     if _ya_recibido(evento_id):
-        return Resultado.DUPLICADO
+        return _repetido(evento)
     conductor = Conductor.objects.get(pk=evento.conductor_id)
     try:
         with transaction.atomic():
-            servicio = _bloquear(evento.servicio_id)
+            try:
+                servicio = _bloquear(evento.servicio_id)
+            except Servicio.DoesNotExist:
+                return _rechazar(evento, Motivo.SERVICIO_DESCONOCIDO, conductor=conductor)
             recibidos = {evento.id} if _ya_recibido(evento_id) else set()
-            asignado = str(servicio.conductor_id) if servicio.conductor_id is not None else None
-            nuevo, resultado = aplicar_evento(servicio.como_nucleo(), asignado, evento, recibidos)
-            if resultado == Resultado.DUPLICADO:
-                return resultado
-            capacidad_excedida = False
+            asignado = _texto_o_nada(servicio.conductor_id)
+            decision = decidir(servicio.como_nucleo(), asignado, evento, recibidos)
+            if decision.resultado == Resultado.DUPLICADO:
+                return _repetido(evento)
+            resultado, motivo = decision.resultado, decision.motivo
+            capacidad_excedida, montados = False, []
             if resultado == Resultado.APLICADO and evento.destino == Estado.RECOGIDO:
                 try:
                     _exigir_identificacion(servicio)
                 except IdentificacionIncompleta:
-                    resultado = Resultado.CONFLICTO
+                    resultado, motivo = Resultado.CONFLICTO, Motivo.IDENTIFICACION_INCOMPLETA
                 else:
                     try:
                         _verificar_capacidad(servicio)
-                    except CapacidadExcedida:
+                    except CapacidadExcedida as excedida:
                         # El vehículo ya está montado: el hecho físico manda. La app lo bloquea
                         # antes; esto solo pasa con un celular desactualizado.
                         capacidad_excedida = True
-            EventoEstado.objects.create(
+                        montados = excedida.pendientes_de_entregar
+            guardado = EventoEstado.objects.create(
                 id=evento_id,
                 servicio=servicio,
                 destino=evento.destino.value,
@@ -317,18 +429,94 @@ def _aplicar_evento(evento: EventoDelConductor) -> Resultado:
                 motivo=(evento.motivo or "").strip(),
                 nombre_quien=(evento.nombre_quien or "").strip(),
                 resultado=ResultadoEvento(resultado.value),
+                motivo_conflicto=motivo.value if motivo else "",
                 capacidad_excedida=capacidad_excedida,
             )
             if resultado == Resultado.APLICADO:
-                _cambiar(servicio, nuevo)
+                _cambiar(servicio, decision.servicio)
+            _enlazar_evidencias_en_espera(guardado)
+            evento_del_conductor_guardado.send(
+                sender=EventoEstado, evento=guardado, montados=montados
+            )
     except IntegrityError:
         # Otra petición guardó el mismo id mientras esta trabajaba: esta transacción ya se
         # deshizo completa (ni evento ni cambio de estado). Se confirma en la base que el evento
         # existe; si el error fue otro, no se esconde.
         if EventoEstado.objects.filter(pk=evento_id).exists():
-            return Resultado.DUPLICADO
+            return _repetido(evento)
         raise
-    return resultado
+    return Aplicacion(
+        id=evento.id,
+        servicio_id=evento.servicio_id,
+        resultado=resultado,
+        motivo=motivo,
+        capacidad_excedida=capacidad_excedida,
+    )
+
+
+def _repetido(evento: EventoDelConductor) -> Aplicacion:
+    """El id ya está guardado. Si es el mismo toque (`nucleo.sincronizacion.es_reenvio`), es un
+    duplicado y se responde lo que quedó guardado la primera vez; si trae otro contenido, se
+    rechaza: ni se aplica ni pisa al guardado."""
+    guardado = EventoEstado.objects.get(pk=uuid.UUID(evento.id))
+    if not es_reenvio(_como_nucleo(guardado), evento):
+        return _rechazar(evento, Motivo.ID_REUTILIZADO, original=guardado)
+    return Aplicacion(
+        id=evento.id,
+        servicio_id=evento.servicio_id,
+        resultado=Resultado(guardado.resultado),
+        motivo=Motivo(guardado.motivo_conflicto) if guardado.motivo_conflicto else None,
+        duplicado=True,
+        capacidad_excedida=guardado.capacidad_excedida,
+    )
+
+
+def _como_nucleo(guardado: EventoEstado) -> Evento:
+    return Evento(
+        id=str(guardado.pk),
+        servicio_id=str(guardado.servicio_id),
+        conductor_id=_texto_o_nada(guardado.conductor_id),
+        destino=Estado(guardado.destino),
+        secuencia=guardado.secuencia,
+        hora_dispositivo=guardado.hora_dispositivo,
+        motivo=guardado.motivo,
+    )
+
+
+def _rechazar(evento: EventoDelConductor, motivo: Motivo, *, conductor=None, original=None):
+    registrar_evento_rechazado(
+        conductor=conductor or evento.conductor_id,
+        motivo=motivo,
+        contenido={
+            "id": evento.id,
+            "servicio_id": evento.servicio_id,
+            "destino": evento.destino.value,
+            "secuencia": evento.secuencia,
+            "hora_dispositivo": str(evento.hora_dispositivo),
+            "motivo": evento.motivo,
+            "nombre_quien": evento.nombre_quien,
+        },
+        original=original,
+    )
+    return Aplicacion(
+        id=evento.id, servicio_id=evento.servicio_id, resultado=Resultado.RECHAZADO, motivo=motivo
+    )
+
+
+def _enlazar_evidencias_en_espera(evento: EventoEstado) -> None:
+    """Las fotos que subieron antes que su evento quedan enlazadas a él en cuanto llega, si les
+    corresponde (`nucleo.evidencia.se_enlaza`). Va en la transacción del evento, con la fila del
+    servicio bloqueada: la subida de la foto bloquea la misma fila, así que no se cruzan."""
+    en_espera = Evidencia.objects.filter(evento_esperado=evento.pk, evento__isnull=True)
+    for evidencia in en_espera:
+        if se_enlaza(
+            evidencia.como_nucleo(),
+            servicio_del_evento=str(evento.servicio_id),
+            conductor_del_evento=_texto_o_nada(evento.conductor_id),
+            destino=Estado(evento.destino),
+        ):
+            evidencia.evento = evento
+            evidencia.save(update_fields=["evento"])
 
 
 # --- Apoyo -------------------------------------------------------------------------------------
@@ -336,6 +524,10 @@ def _aplicar_evento(evento: EventoDelConductor) -> Resultado:
 
 def _pk(objeto):
     return getattr(objeto, "pk", objeto)
+
+
+def _texto_o_nada(llave) -> str | None:
+    return None if llave is None else str(llave)
 
 
 def _bloquear(servicio) -> Servicio:

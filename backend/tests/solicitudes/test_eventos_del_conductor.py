@@ -18,6 +18,7 @@ pytestmark = pytest.mark.django_db
 
 E = Estado
 APLICADO, DUPLICADO, CONFLICTO = Resultado.APLICADO, Resultado.DUPLICADO, Resultado.CONFLICTO
+RECHAZADO = Resultado.RECHAZADO
 
 
 def estado_de(servicio):
@@ -188,7 +189,9 @@ def test_choque_de_llave_por_carrera_en_otro_servicio_no_aplica_nada_ni_lanza_er
     monkeypatch.setattr(operaciones, "_ya_recibido", lambda evento_id: False)
     resultado = aplicar_evento_del_conductor(**evento_app(segundo, E.EN_CAMINO, id=id_repetido))
 
-    assert resultado == DUPLICADO
+    # Desde la 1a-10: el mismo id sobre otro servicio no es un reenvío, así que ya no responde
+    # "duplicado" sino "rechazado". Lo demás no cambia: no se aplica nada ni se pisa el guardado.
+    assert resultado == RECHAZADO
     assert estado_de(segundo) == E.ASIGNADO  # su cambio de estado se deshizo con el choque
     assert estado_de(primero) == E.EN_CAMINO
     assert EventoEstado.objects.count() == 1
