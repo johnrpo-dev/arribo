@@ -5,7 +5,7 @@ from nucleo.estados import Estado
 from solicitudes import operaciones
 from solicitudes.models import EventoEstado, Servicio, Solicitud, Vehiculo
 
-from .conftest import VIN
+from ..conftest import VIN
 
 pytestmark = pytest.mark.django_db
 

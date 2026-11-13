@@ -16,7 +16,7 @@ from nucleo.tipos import TipoServicio
 from solicitudes import operaciones
 from solicitudes.models import EstadoRegistro, MotivoNoConcretada, Solicitud
 
-from .conftest import crear_solicitud
+from ..conftest import crear_solicitud
 
 pytestmark = pytest.mark.django_db
 

@@ -12,7 +12,7 @@ from solicitudes import operaciones
 from solicitudes.models import EventoEstado, OrigenEvento, Servicio
 from solicitudes.operaciones import aplicar_evento_del_conductor, aplicar_lote_del_conductor
 
-from .conftest import VIN, crear_solicitud, hora
+from ..conftest import VIN, crear_solicitud, hora
 
 pytestmark = pytest.mark.django_db
 
