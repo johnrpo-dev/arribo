@@ -11,6 +11,8 @@ from django.core.exceptions import PermissionDenied as PermisoDenegadoDeDjango
 from django.http import Http404
 from rest_framework import exceptions, status
 
+from nucleo.evidencia import TAMANO_MAXIMO_FOTO
+
 from .contrato import VERSION
 
 # Cabecera WWW-Authenticate de toda respuesta 401 (la exige HTTP).
@@ -56,6 +58,30 @@ class ServicioNoEncontrado(exceptions.NotFound):
     default_detail = "El servicio no existe o ya no está asignado a usted."
 
 
+class ServicioAjeno(exceptions.NotFound):
+    """Foto para un servicio que no existe o que nunca fue de este conductor."""
+
+    default_detail = "El servicio no existe o nunca estuvo asignado a usted."
+
+
+class FotoDemasiadoGrande(exceptions.APIException):
+    status_code = status.HTTP_413_REQUEST_ENTITY_TOO_LARGE
+    default_code = "foto_demasiado_grande"
+
+    def __init__(self):
+        self.maximo_bytes = TAMANO_MAXIMO_FOTO
+        megas = TAMANO_MAXIMO_FOTO // (1024 * 1024)
+        super().__init__(f"La foto pesa más de {megas} MB. Comprímala antes de subirla.")
+
+
+class EvidenciaDistinta(exceptions.APIException):
+    status_code = status.HTTP_409_CONFLICT
+    default_code = "evidencia_distinta"
+    default_detail = (
+        "Ya hay una foto guardada con ese id y no es esta. La guardada no se reemplaza."
+    )
+
+
 # Errores propios de DRF: código del contrato y texto en español.
 _DE_DRF = {
     "not_authenticated": (
@@ -66,7 +92,10 @@ _DE_DRF = {
     "not_found": ("no_encontrado", None),
     "method_not_allowed": ("metodo_no_permitido", None),
     "parse_error": ("json_invalido", "El cuerpo de la petición no es un JSON válido."),
-    "unsupported_media_type": ("tipo_no_soportado", "Envíe el cuerpo como application/json."),
+    "unsupported_media_type": (
+        "tipo_no_soportado",
+        "Esta ruta no acepta ese Content-Type (JSON en todas, multipart/form-data en las fotos).",
+    ),
     "not_acceptable": ("formato_no_aceptado", None),
     "permission_denied": ("sin_permiso", None),
     "throttled": ("demasiados_intentos", None),
@@ -98,5 +127,7 @@ def manejar_excepcion(exc, context):
         cuerpo = {"error": codigo, "detalle": detalle or str(exc.detail)}
         if getattr(exc, "wait", None):
             cuerpo["reintentar_en"] = math.ceil(exc.wait)
+        if getattr(exc, "maximo_bytes", None):
+            cuerpo["maximo_bytes"] = exc.maximo_bytes
     respuesta.data = {"version": VERSION, **cuerpo}
     return respuesta

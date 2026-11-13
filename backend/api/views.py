@@ -1,5 +1,6 @@
 """Vistas de la API del conductor (`/api/v1/`). Delgadas: validan la entrada, llaman a
-`api/ingreso.py` o a `api/asignaciones.py` y responden con la forma de `docs/api-conductor.md`.
+`api/ingreso.py`, `api/asignaciones.py`, `api/sincronizacion.py` o `solicitudes/evidencias.py` y
+responden con la forma de `docs/api-conductor.md`.
 """
 import hashlib
 
@@ -11,10 +12,12 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from configuracion.models import configuracion_vigente
+from solicitudes import evidencias
 
-from . import errores, ingreso
+from . import errores, ingreso, sincronizacion
 from .asignaciones import asignaciones_de
 from .contrato import VERSION
+from .evidencias import FotoEnMultipart, FotoSerializer
 from .serializadores import (
     IngresoSerializer,
     ServicioDelConductorSerializer,
@@ -77,6 +80,55 @@ class Asignacion(APIView):
             "configuracion": configuracion_para_la_app(configuracion_vigente()),
             "servicio": ServicioDelConductorSerializer(servicio).data,
         })
+
+
+class Eventos(APIView):
+    """POST: un lote de toques del conductor. Siempre 200 con un resultado por evento, en el orden
+    en que llegaron; un evento malo no tumba los demás."""
+
+    def post(self, request):
+        lote = sincronizacion.leer_lote(request.data)
+        return Response({
+            "version": VERSION,
+            "resultados": sincronizacion.sincronizar(request.auth.conductor, lote),
+        })
+
+
+class Evidencia(APIView):
+    """PUT: una foto de evidencia con el id que generó el celular. 201 si se guardó; 200 si ya
+    estaba (no se reemplaza). El archivo va a disco por partes (`api/evidencias.py`)."""
+
+    parser_classes = (FotoEnMultipart,)
+
+    def put(self, request, evidencia_id):
+        entrada = FotoSerializer(data=request.data)
+        entrada.is_valid(raise_exception=True)
+        datos = entrada.validated_data
+        archivo = datos["archivo"]
+        try:
+            subida = evidencias.guardar_foto(
+                id=evidencia_id,
+                servicio_id=datos["servicio_id"],
+                conductor=request.auth.conductor,
+                evento_id=datos["evento_id"],
+                tipo=datos["tipo"],
+                archivo=archivo,
+                sha256=archivo.sha256,
+                tamano=archivo.size,
+            )
+        except evidencias.ServicioAjeno as error:
+            raise errores.ServicioAjeno() from error
+        except evidencias.EvidenciaDistinta as error:
+            raise errores.EvidenciaDistinta() from error
+        return Response(
+            {
+                "version": VERSION,
+                "id": str(subida.evidencia.pk),
+                "resultado": "guardada" if subida.nueva else "repetida",
+                "enlazada": subida.evidencia.evento_id is not None,
+            },
+            status=status.HTTP_201_CREATED if subida.nueva else status.HTTP_200_OK,
+        )
 
 
 def _responder_con_etag(request, datos) -> Response:
