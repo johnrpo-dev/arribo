@@ -30,6 +30,7 @@ INSTALLED_APPS = [
     "cobros",
     "configuracion",
     "panel",
+    "api",
 ]
 
 MIDDLEWARE = [
@@ -72,6 +73,16 @@ LANGUAGE_CODE = "es-co"
 TIME_ZONE = "America/Bogota"
 USE_I18N = True
 USE_TZ = True
+
+# API de la app del conductor (`api/`, contrato en docs/api-conductor.md): solo JSON y solo el token
+# de celular, sin la sesión del panel. Toda vista exige un conductor habilitado salvo el ingreso.
+REST_FRAMEWORK = {
+    "DEFAULT_AUTHENTICATION_CLASSES": ["api.autenticacion.TokenDeCelular"],
+    "DEFAULT_PERMISSION_CLASSES": ["api.autenticacion.EsConductor"],
+    "DEFAULT_RENDERER_CLASSES": ["rest_framework.renderers.JSONRenderer"],
+    "DEFAULT_PARSER_CLASSES": ["rest_framework.parsers.JSONParser"],
+    "EXCEPTION_HANDLER": "api.errores.manejar_excepcion",
+}
 
 LOGIN_URL = "ingresar"
 LOGIN_REDIRECT_URL = "inicio"

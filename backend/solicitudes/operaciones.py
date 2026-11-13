@@ -141,6 +141,11 @@ def ronda_de(conductor) -> list[Servicio]:
     return list(_ronda(_pk(conductor)).select_related("vehiculo", "solicitud"))
 
 
+def consulta_ronda(conductor):
+    """Como `ronda_de`, pero sin evaluar: quien la usa agrega sus `select_related` (la API)."""
+    return _ronda(_pk(conductor))
+
+
 def cambiar_estado(servicio, destino, *, actor, motivo=None, nombre_quien=None) -> EventoEstado:
     """Cambio de estado hecho desde el panel: cancelar o abrir una novedad (con motivo), o marcar
     en camino, recogido o entregado en nombre del conductor.
