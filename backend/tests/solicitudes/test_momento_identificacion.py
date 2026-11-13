@@ -1,6 +1,6 @@
-﻿"""Momento en que se exige la placa o el VIN, leÃ­do de la configuraciÃ³n guardada en PostgreSQL.
+"""Momento en que se exige la placa o el VIN, leído de la configuración guardada en PostgreSQL.
 
-"Al asignar": `asignar` rechaza el servicio cuyo vehÃ­culo no cumple `validar_identificacion`
+"Al asignar": `asignar` rechaza el servicio cuyo vehículo no cumple `validar_identificacion`
 (desvare exige placa; el resto, placa o VIN). "Al recoger" (por defecto): asignar no lo exige.
 """
 import pytest
