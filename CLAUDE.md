@@ -135,6 +135,10 @@ no reimplementan la regla. Si una regla cambia, se cambia en `nucleo/` con su pr
 - Las vistas son delgadas: validan entrada, llaman al núcleo o a un servicio de la app y responden.
 - Carpetas nuevas solo cuando ya hay tres archivos que las piden.
 - Dependencias nuevas: agregar con `uv add` o `flutter pub add` (resuelven la versión vigente) y justificar en el informe.
+- Las secciones de la navegación del panel se registran solo en `backend/panel/secciones.py` (nombre,
+  ruta, roles y vista); una pantalla nueva se conecta ahí y el acceso por rol lo aplica `requiere_rol`.
+- Las pantallas del panel usan los componentes de `/estilos/` (`panel/static/panel/arribo.css`); CSS
+  nuevo solo con necesidad justificada en el informe.
 - Secretos solo en `.env`; nunca en el repositorio. Los datos de demo llevan marca propia para poder borrarlos sin tocar los reales.
 
 ## Fuera de alcance (no construir sin que el dueño lo pida)
