@@ -10,6 +10,9 @@ los datos, se llama al núcleo y se guarda lo que decide.
 - App del conductor: `aplicar_evento_del_conductor` y `aplicar_lote_del_conductor`. Nunca rechazan
   lo que el conductor hizo: si no encaja, el evento se guarda como conflicto y el servicio sigue
   igual.
+
+Cuando un servicio queda Entregado (desde el panel o la app) se envía `senales.servicio_entregado`
+en la misma transacción; `cobros` la escucha para crear la línea de cobro sin que esta app lo importe.
 """
 import uuid
 from collections.abc import Iterable, Mapping
@@ -34,6 +37,7 @@ from nucleo.identificacion import IdentificacionIncompleta, validar_identificaci
 from nucleo.sincronizacion import Evento, Resultado, aplicar_evento, ordenar
 
 from .models import EstadoRegistro, EventoEstado, OrigenEvento, ResultadoEvento, Servicio
+from .senales import servicio_entregado
 
 
 class SinGruaVigente(Exception):
@@ -336,19 +340,27 @@ def _verificar_capacidad(servicio):
     verificar_recogida(grua.capacidad, montados)
 
 
-def _cambiar(servicio: Servicio, nuevo: ServicioNucleo):
+def _cambiar(servicio: Servicio, nuevo: ServicioNucleo, *, actor=None):
+    """El punto único donde se guarda un cambio de estado (panel y app).
+
+    Al quedar Entregado avisa con `servicio_entregado` dentro de la misma transacción: si un
+    receptor falla (por ejemplo, la creación de la línea de cobro), todo se deshace.
+    """
+    queda_entregado = nuevo.estado == Estado.ENTREGADO and servicio.estado != Estado.ENTREGADO
     servicio.estado = nuevo.estado.value
     servicio.estado_previo = nuevo.estado_previo.value if nuevo.estado_previo else ""
     if nuevo.estado == Estado.PENDIENTE_ASIGNAR:
         servicio.conductor = None
         servicio.grua = None
     servicio._guardar_cambio_operativo()
+    if queda_entregado:
+        servicio_entregado.send(sender=Servicio, servicio=servicio, actor=actor)
 
 
 def _guardar_desde_el_panel(
     servicio: Servicio, nuevo: ServicioNucleo, *, actor, motivo=None, nombre_quien=None
 ) -> EventoEstado:
-    _cambiar(servicio, nuevo)
+    _cambiar(servicio, nuevo, actor=actor)
     return EventoEstado.objects.create(
         servicio=servicio,
         destino=nuevo.estado.value,
