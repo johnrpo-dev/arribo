@@ -323,6 +323,63 @@ La tarea 1a-16 se partió en dos: 1a-16a (modelo de línea de cobro con sus rest
   de Vehículos dice "se exigirán al asignar". Angostar a 375 px: sin desplazamiento horizontal.
   Lo que se registre queda en la base local.
 
+### 1a-08 Asignación (13 de noviembre de 2026)
+- Hecho: en el núcleo, `nucleo/disponibilidad.py` (`motivos_de_bloqueo`, `carga`: servicios no
+  terminales y vehículos montados con `a_bordo`) y `nucleo/ronda.py` (`siguiente_orden`, `mover`,
+  `numerar`). En `solicitudes`: `disponibilidad.py` con `motivos_de_bloqueo(conductor)` (el único
+  lugar que decide si un conductor recibe servicios nuevos) y `disponibilidad_de_conductores()`;
+  `operaciones.asignar` y `reasignar` bloquean la fila del conductor, rechazan a un conductor
+  bloqueado (`ConductorBloqueado`; `SinGruaVigente` es un caso de ella) y ponen el servicio al
+  final de su ronda; `reasignar` rechaza al mismo conductor (`MismoConductor`); nuevas
+  `mover_en_ronda` y `ronda_de`. Al volver a la cola, el servicio deja la ronda. En el detalle de
+  una solicitud abierta: "Asignar conductores" (un formulario por servicio pendiente, o de
+  reasignar con motivo opcional si está asignado o en camino), la tabla "Conductores" (grúa,
+  puestos, en ronda, montados, disponible o bloqueado con el motivo) y la "Ronda de ..." de cada
+  conductor de la solicitud, con Subir y Bajar (incluye servicios de otras solicitudes, con
+  enlace). Rutas `/solicitudes/<n>/servicios/<s>/asignar/` y `.../ronda/`, solo POST, logística y
+  administrador. Con HTMX el contenido se reemplaza sin recargar la página; sin JavaScript, el
+  mismo formulario recarga. Los errores de las operaciones (borrador, no concretada, placa o VIN
+  exigidos al asignar, conductor bloqueado, servicio que cambió mientras tanto) salen como aviso.
+- Decidido (bloqueos, lo más conservador): conductor inactivo, sin grúa vigente, o con grúa
+  inactiva o fuera de servicio no recibe servicios nuevos, ni al asignar ni al reasignar; lo que ya
+  tiene en curso sigue. La lista los muestra deshabilitados con su motivo y la operación los
+  rechaza aunque lleguen. Documento vencido: punto de extensión en
+  `solicitudes/disponibilidad.py` (`_datos_del_conductor`, campo `documentos_vencidos` del
+  núcleo), se llena en la 1a-15. La carga no bloquea: más vehículos que puestos se atienden en
+  rondas.
+- Decidido (orden de ronda): campo existente `orden_ronda`. Único por conductor entre servicios
+  no terminales (`servicio_orden_ronda_unico_por_conductor`, restricción en PostgreSQL); al
+  asignar o reasignar, el servicio entra al final; Subir o Bajar numera de nuevo 1, 2, 3. Los
+  huecos que dejan los terminados no se rellenan solos (el orden relativo se mantiene). Dos
+  asignaciones simultáneas al mismo conductor toman puestos distintos (bloqueo del conductor,
+  probado con dos hilos). La migración 0003 numeró los servicios activos ya guardados (no borra
+  nada). Mover no deja evento: no es un cambio de estado. La tabla de servicios del detalle va
+  por número, no por ronda.
+- Verificado: la grúa queda guardada en el servicio y no cambia si el conductor pasa a otra grúa
+  (contra la base); dos asignaciones del mismo servicio a la vez dejan una sola (contra la base,
+  con hilos). Sin CSS nuevo: formularios con `grupo-opciones` y `parciales/campo.html`, tablas
+  con `tabla-contenedor`. Revisado a 375 px sin desplazamiento horizontal de la página.
+- Preguntas abiertas nuevas: tres en `QUESTIONS.md` (cómo se fija la ronda, motivo de reasignar,
+  reasignar al mismo conductor); la de grúa inactiva (1a-02) queda aplicada de forma conservadora.
+- Cómo probar (5 minutos): `uv run pytest -q` (1097 pruebas) y `uv run python manage.py migrate`.
+  Antes, en `/admin/` → Flota (no hay pantalla de flota todavía): crear las grúas GRU001
+  (capacidad 1) y GRU002 (capacidad 2), los conductores Ana y Beto, y dos asignaciones
+  conductor–grúa (Ana en GRU001, Beto en GRU002) con inicio de ayer y sin fin. Crear también una
+  conductora Carla sin asignación. Luego `uv run python manage.py runserver`, entrar con
+  logística o administrador y registrar en Nueva solicitud un traslado con tres vehículos
+  (placas ABC123, XYZ789, JKL456) hasta que quede abierta. En el detalle, "Conductores" muestra a
+  Ana y Beto disponibles y a Carla bloqueada ("No tiene una grúa asignada"); en cada lista Carla
+  aparece gris. Asignar el primero a Ana y los otros dos a Beto: la página no se recarga, sale
+  "Servicio N.º … asignado a …", la tabla muestra "Ana (GRU001)" y "Beto (GRU002)", y aparecen
+  "Ronda de Ana" (1 servicio) y "Ronda de Beto" (2). En la ronda de Beto pulsar Bajar en el
+  primero: cambian de puesto. Reasignar el de Ana a Beto con un motivo: pasa al final de la ronda
+  de Beto. En `/admin/`, poner fin (ahora) a la asignación de Beto en GRU002, crear la grúa
+  GRU003 y asignársela a Beto desde ahora: el detalle sigue mostrando sus servicios con GRU002 y
+  la tabla "Conductores" ya muestra GRU003. Con
+  Configuración en "Al asignar" y un vehículo sin placa ni VIN, Asignar muestra "El vehículo
+  necesita placa o VIN … La configuración exige placa o VIN al asignar." En un borrador no
+  aparece "Asignar conductores". Angostar a 375 px: sin desplazamiento horizontal.
+
 ## Escalamientos
 
 Ninguno todavía.

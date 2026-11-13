@@ -46,7 +46,7 @@ Toda tarea termina con `uv run pytest -q` y `uv run ruff check .` en verde, más
   obligatoria en eventos, que crea el servicio de regreso invertido; cierre como No concretada con motivo.
   Verificar: una prueba por cada regla; registrar un evento con regreso y ver los dos servicios enlazados.
 
-- [ ] **1a-08 Asignación** (7 h). Depende de: 07.
+- [x] **1a-08 Asignación** (7 h). Depende de: 07.
   Asignar cada vehículo a un conductor (la grúa sale de su asignación vigente y queda guardada), orden de
   ronda, reasignar. Lista de conductores con disponibilidad y capacidad. Un Borrador no se puede asignar.
   Verificar: pruebas de disponibilidad y de que el servicio conserva la grúa aunque el conductor cambie después; repartir una solicitud de 3 vehículos entre 2 conductores.
