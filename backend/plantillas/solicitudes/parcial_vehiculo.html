@@ -1,0 +1,20 @@
+<fieldset class="grupo-opciones" id="vehiculo-{{ numero }}">
+  <legend>Vehículo {{ numero }}</legend>
+  {{ fila.servicio }}
+  {% for error in fila.non_field_errors %}<p class="campo-error">{{ error }}</p>{% endfor %}
+  <div class="formulario">
+    <div class="fila-campos">
+      {% include "parciales/campo.html" with campo=fila.placa %}
+      {% include "parciales/campo.html" with campo=fila.vin %}
+    </div>
+    <div class="fila-campos">
+      {% include "parciales/campo.html" with campo=fila.marca %}
+      {% include "parciales/campo.html" with campo=fila.linea %}
+      {% include "parciales/campo.html" with campo=fila.color %}
+    </div>
+    {% include "parciales/campo.html" with campo=fila.referencia_externa %}
+    {% if fila.servicio.value %}
+    <label class="opcion">{{ fila.quitar }} {{ fila.quitar.label }}</label>
+    {% endif %}
+  </div>
+</fieldset>

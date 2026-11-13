@@ -1,13 +1,18 @@
-"""Formulario de registro de solicitud: valida y normaliza lo digitado; no guarda nada.
+"""Formularios de solicitudes: validan y normalizan lo digitado; no guardan nada.
 
-El orden de los campos es el de una llamada en curso: quién llama, qué servicio, de dónde a dónde,
-qué vehículo, cuándo y quién paga. Lo que guarda es `solicitudes/registro.py`.
+- `FormularioSolicitud`: el orden de los campos es el de una llamada en curso: quién llama, qué
+  servicio, de dónde a dónde, cuándo, si un evento tiene regreso y quién paga.
+- `FormularioVehiculos`: una fila por vehículo (cada vehículo es un servicio); se agregan filas
+  con HTMX y, al completar un borrador, una fila de un servicio ya guardado se puede quitar.
+- `FormularioNoConcretada`: motivo y detalle para cerrar una solicitud que no se concretó.
+
+Lo que guarda es `solicitudes/registro.py`.
 """
-from dataclasses import astuple
 from datetime import datetime
 
 from django import forms
 from django.urls import reverse_lazy
+from django.utils import timezone
 
 from clientes.models import Cliente, TipoCliente, buscar_cliente_por_telefono
 from nucleo.identificacion import (
@@ -18,8 +23,9 @@ from nucleo.identificacion import (
     normalizar_vin,
     validar_vin,
 )
+from nucleo.tipos import TipoServicio
 
-from .models import OPCIONES_TIPO_SERVICIO, Vehiculo
+from .models import OPCIONES_TIPO_SERVICIO, MotivoNoConcretada, Servicio, Solicitud, Vehiculo
 from .registro import (
     ClienteNuevo,
     DatosContacto,
@@ -31,6 +37,9 @@ from .registro import (
 
 FORMATO_FECHA_HORA = "%Y-%m-%dT%H:%M"
 LARGO_PLACA = Vehiculo._meta.get_field("placa").max_length
+LARGO_REFERENCIA = Servicio._meta.get_field("referencia_externa").max_length
+PREFIJO_VEHICULOS = "vehiculos"
+SI, NO = "si", "no"
 
 
 def _busqueda_htmx(para):
@@ -48,6 +57,28 @@ def _busqueda_htmx(para):
 
 def _texto(etiqueta, largo, **otros):
     return forms.CharField(label=etiqueta, max_length=largo, required=False, **otros)
+
+
+def _fecha_hora(etiqueta, ayuda):
+    return forms.DateTimeField(
+        label=etiqueta,
+        required=False,
+        input_formats=[FORMATO_FECHA_HORA],
+        widget=forms.DateTimeInput(attrs={"type": "datetime-local"}, format=FORMATO_FECHA_HORA),
+        help_text=ayuda,
+        error_messages={"invalid": "Escriba la fecha y la hora completas."},
+    )
+
+
+def _exigir_hora(formulario, campo):
+    """Django también acepta solo la fecha (y la deja a medianoche): aquí se exige la hora."""
+    texto = (formulario.data.get(formulario.add_prefix(campo)) or "").strip()
+    if texto:
+        try:
+            datetime.strptime(texto, FORMATO_FECHA_HORA)
+        except ValueError as error:
+            raise forms.ValidationError("Escriba la fecha y la hora completas.") from error
+    return formulario.cleaned_data[campo]
 
 
 class FormularioSolicitud(forms.Form):
@@ -78,19 +109,16 @@ class FormularioSolicitud(forms.Form):
     contacto_destino_telefono = _texto(
         "Teléfono del contacto en el destino", 30, widget=forms.TextInput(attrs={"type": "tel"})
     )
-    placa = _texto("Placa", 20)
-    vin = _texto("VIN", 25)
-    marca = _texto("Marca", 60)
-    linea = _texto("Línea", 60)
-    color = _texto("Color", 40)
-    programada_para = forms.DateTimeField(
-        label="Programada para",
-        required=False,
-        input_formats=[FORMATO_FECHA_HORA],
-        widget=forms.DateTimeInput(attrs={"type": "datetime-local"}, format=FORMATO_FECHA_HORA),
-        help_text="Déjelo vacío si es inmediato. Hora de Colombia.",
-        error_messages={"invalid": "Escriba la fecha y la hora completas."},
+    programada_para = _fecha_hora(
+        "Programada para", "Déjelo vacío si es inmediato. Hora de Colombia."
     )
+    tiene_regreso = forms.ChoiceField(
+        label="¿Tiene regreso?",
+        required=False,
+        choices=[(SI, "Sí"), (NO, "No")],
+        widget=forms.RadioSelect,
+    )
+    fecha_regreso = _fecha_hora("Fecha y hora del regreso", "Hora de Colombia.")
     pagador_telefono = forms.CharField(
         label="Teléfono del pagador",
         max_length=30,
@@ -121,37 +149,16 @@ class FormularioSolicitud(forms.Form):
         return numero
 
     def clean_programada_para(self):
-        # Django también acepta solo la fecha (y la deja a medianoche): aquí se exige la hora.
-        texto = (self.data.get("programada_para") or "").strip()
-        if texto:
-            try:
-                datetime.strptime(texto, FORMATO_FECHA_HORA)
-            except ValueError as error:
-                raise forms.ValidationError("Escriba la fecha y la hora completas.") from error
-        return self.cleaned_data["programada_para"]
+        return _exigir_hora(self, "programada_para")
+
+    def clean_fecha_regreso(self):
+        return _exigir_hora(self, "fecha_regreso")
 
     def clean_tipo(self):
         tipo = self.cleaned_data["tipo"]
         if not tipo:
             raise forms.ValidationError("Elija el tipo de servicio.")
         return tipo
-
-    def clean_placa(self):
-        placa = normalizar_placa(self.cleaned_data["placa"])
-        if len(placa) > LARGO_PLACA:
-            raise forms.ValidationError(
-                f"La placa tiene como máximo {LARGO_PLACA} letras o dígitos."
-            )
-        return placa
-
-    def clean_vin(self):
-        vin = normalizar_vin(self.cleaned_data["vin"])
-        if vin:
-            try:
-                validar_vin(vin)
-            except VinInvalido as error:
-                raise forms.ValidationError(str(error)) from error
-        return vin
 
     # --- Conjunto ---------------------------------------------------------------------------
 
@@ -160,7 +167,7 @@ class FormularioSolicitud(forms.Form):
         self._solicitante(datos)
         for lugar in ("origen", "destino"):
             self._contacto(datos, lugar)
-        self._vehiculo(datos)
+        self._regreso(datos)
         return datos
 
     def _solicitante(self, datos):
@@ -191,23 +198,22 @@ class FormularioSolicitud(forms.Form):
             except TelefonoInvalido as error:
                 self.add_error(campo_telefono, _mensaje_telefono(error))
 
-    def _vehiculo(self, datos):
-        if "placa" in self.errors or "vin" in self.errors:
+    def _regreso(self, datos):
+        """En un evento con regreso, la fecha del regreso va con la respuesta (la base lo exige)."""
+        if datos.get("tipo") != TipoServicio.EVENTO or "fecha_regreso" in self.errors:
             return
-        try:
-            vehiculo_existente(datos.get("placa", ""), datos.get("vin", ""))
-        except VehiculoEnConflicto as error:
-            self.add_error(error.campo, str(error))
+        if datos.get("tiene_regreso") == SI and not datos.get("fecha_regreso"):
+            self.add_error("fecha_regreso", "Escriba la fecha y la hora del regreso.")
 
     # --- Salida -----------------------------------------------------------------------------
 
-    def datos_registro(self) -> DatosRegistro:
-        """Lo validado, listo para `registro.registrar_solicitud`."""
+    def datos_registro(self, vehiculos: tuple[DatosVehiculo, ...]) -> DatosRegistro:
+        """Lo validado, listo para `registro.registrar_solicitud` o `completar_borrador`."""
         d = self.cleaned_data
         cliente_nuevo = None
         if self.solicitante is None:
             cliente_nuevo = ClienteNuevo(d["nuevo_nombre"], d["nuevo_tipo"], d["telefono"])
-        vehiculo = DatosVehiculo(d["placa"], d["vin"], d["marca"], d["linea"], d["color"])
+        respuesta = {SI: True, NO: False}.get(d["tiene_regreso"])
         return DatosRegistro(
             tipo=d["tipo"],
             solicitante=self.solicitante,
@@ -217,8 +223,10 @@ class FormularioSolicitud(forms.Form):
             destino=d["destino"],
             contacto_origen=self._datos_contacto("origen"),
             contacto_destino=self._datos_contacto("destino"),
-            vehiculo=vehiculo if any(astuple(vehiculo)) else None,
+            vehiculos=vehiculos,
             programada_para=d["programada_para"],
+            tiene_regreso=respuesta,
+            fecha_regreso=d["fecha_regreso"] if respuesta else None,
         )
 
     def _datos_contacto(self, lugar):
@@ -226,6 +234,182 @@ class FormularioSolicitud(forms.Form):
         if not nombre:
             return None
         return DatosContacto(nombre, self.cleaned_data[f"contacto_{lugar}_telefono"])
+
+
+def inicial_de(solicitud: Solicitud) -> dict:
+    """Los datos de un borrador para mostrarlos en el formulario al completarlo."""
+    pagador_telefono = ""
+    if solicitud.pagador_id != solicitud.solicitante_id:
+        pagador_telefono = _primer_telefono(solicitud.pagador)
+    regreso = {True: SI, False: NO}.get(solicitud.tiene_regreso, "")
+    inicial = {
+        "telefono": _primer_telefono(solicitud.solicitante),
+        "tipo": solicitud.tipo,
+        "origen": solicitud.origen,
+        "destino": solicitud.destino,
+        "programada_para": _hora_local(solicitud.programada_para),
+        "tiene_regreso": regreso,
+        "fecha_regreso": _hora_local(solicitud.fecha_regreso),
+        "pagador_telefono": pagador_telefono,
+    }
+    for lugar in ("origen", "destino"):
+        contacto = getattr(solicitud, f"contacto_{lugar}")
+        if contacto is not None:
+            inicial[f"contacto_{lugar}_nombre"] = contacto.nombre
+            inicial[f"contacto_{lugar}_telefono"] = contacto.telefono
+    return inicial
+
+
+def _primer_telefono(cliente) -> str:
+    telefono = cliente.telefonos.order_by("pk").first()
+    return telefono.numero if telefono else ""
+
+
+def _hora_local(momento):
+    return timezone.localtime(momento) if momento else None
+
+
+# --- Vehículos ---------------------------------------------------------------------------------
+
+
+class FormularioVehiculo(forms.Form):
+    """Una fila: un vehículo, que será un servicio de la solicitud."""
+
+    servicio = forms.IntegerField(required=False, widget=forms.HiddenInput)
+    placa = _texto("Placa", 20)
+    vin = _texto("VIN", 25)
+    marca = _texto("Marca", 60)
+    linea = _texto("Línea", 60)
+    color = _texto("Color", 40)
+    referencia_externa = _texto(
+        "Referencia externa",
+        LARGO_REFERENCIA,
+        help_text="Número de caso. Obligatoria si paga una aseguradora.",
+    )
+    quitar = forms.BooleanField(label="Quitar este vehículo", required=False)
+
+    def clean_placa(self):
+        placa = normalizar_placa(self.cleaned_data["placa"])
+        if len(placa) > LARGO_PLACA:
+            raise forms.ValidationError(
+                f"La placa tiene como máximo {LARGO_PLACA} letras o dígitos."
+            )
+        return placa
+
+    def clean_vin(self):
+        vin = normalizar_vin(self.cleaned_data["vin"])
+        if vin:
+            try:
+                validar_vin(vin)
+            except VinInvalido as error:
+                raise forms.ValidationError(str(error)) from error
+        return vin
+
+    def clean(self):
+        datos = super().clean()
+        if self.errors:
+            return datos
+        fila = self.datos()
+        if fila.servicio_id is not None and not fila.quitar and not fila.tiene_datos:
+            self.add_error("placa", "Escriba los datos del vehículo o marque Quitar.")
+        elif fila.servicio_id is None and not fila.tiene_datos and fila.referencia_externa:
+            self.add_error("placa", "Escriba la placa, el VIN u otro dato del vehículo.")
+        if fila.quitar:
+            return datos
+        try:
+            vehiculo_existente(fila.placa, fila.vin)
+        except VehiculoEnConflicto as error:
+            self.add_error(error.campo, str(error))
+        return datos
+
+    def datos(self) -> DatosVehiculo:
+        d = self.cleaned_data
+        return DatosVehiculo(
+            placa=d.get("placa", ""),
+            vin=d.get("vin", ""),
+            marca=d.get("marca", ""),
+            linea=d.get("linea", ""),
+            color=d.get("color", ""),
+            referencia_externa=d.get("referencia_externa", "").strip(),
+            servicio_id=d.get("servicio"),
+            quitar=bool(d.get("servicio") is not None and d.get("quitar")),
+        )
+
+
+class BaseFormularioVehiculos(forms.BaseFormSet):
+    """Las filas de vehículos. `servicios` son los servicios del borrador que se pueden editar."""
+
+    def __init__(self, *args, servicios=frozenset(), **kwargs):
+        kwargs.setdefault("prefix", PREFIJO_VEHICULOS)
+        super().__init__(*args, **kwargs)
+        self.servicios = frozenset(servicios)
+
+    def clean(self):
+        if any(self.errors):
+            return
+        vistos = {}
+        for fila in self.forms:
+            datos = fila.datos()
+            if datos.servicio_id is not None and datos.servicio_id not in self.servicios:
+                raise forms.ValidationError("Un vehículo no es de esta solicitud. Recargue la página.")
+            if datos.quitar:
+                continue
+            for campo in ("placa", "vin"):
+                valor = getattr(datos, campo)
+                if not valor:
+                    continue
+                if (campo, valor) in vistos:
+                    fila.add_error(campo, "Este vehículo ya está en otra fila.")
+                vistos[(campo, valor)] = fila
+
+    def datos(self) -> tuple[DatosVehiculo, ...]:
+        """Las filas con algo digitado (o que quitan un servicio), en orden."""
+        filas = (fila.datos() for fila in self.forms)
+        return tuple(f for f in filas if f.tiene_datos or f.servicio_id is not None)
+
+
+FormularioVehiculos = forms.formset_factory(
+    FormularioVehiculo, formset=BaseFormularioVehiculos, extra=0
+)
+
+
+def inicial_vehiculos(servicios) -> list[dict]:
+    """Una fila por servicio del borrador; sin servicios, una fila vacía."""
+    filas = [
+        {
+            "servicio": s.pk,
+            "placa": s.vehiculo.placa,
+            "vin": s.vehiculo.vin,
+            "marca": s.vehiculo.marca,
+            "linea": s.vehiculo.linea,
+            "color": s.vehiculo.color,
+            "referencia_externa": s.referencia_externa,
+        }
+        for s in servicios
+    ]
+    return filas or [{}]
+
+
+def fila_vehiculo(indice: int) -> FormularioVehiculo:
+    """Una fila nueva y vacía para agregar con HTMX (la posición `indice` del conjunto)."""
+    return FormularioVehiculo(prefix=f"{PREFIJO_VEHICULOS}-{indice}")
+
+
+# --- No concretada -----------------------------------------------------------------------------
+
+
+class FormularioNoConcretada(forms.Form):
+    motivo = forms.ChoiceField(
+        label="Motivo",
+        choices=[("", "Elija el motivo")] + MotivoNoConcretada.choices,
+        error_messages={"required": "Elija el motivo por el que no se concretó."},
+    )
+    detalle = forms.CharField(
+        label="Detalle",
+        required=False,
+        max_length=500,
+        widget=forms.Textarea(attrs={"rows": 2}),
+    )
 
 
 def _mensaje_telefono(error: TelefonoInvalido) -> str:

@@ -4,39 +4,123 @@ la sección `nueva_solicitud` en `panel/urls.py` y las rutas de `solicitudes/url
 from django.contrib import messages
 from django.db import IntegrityError
 from django.shortcuts import get_object_or_404, redirect, render
+from django.views.decorators.http import require_POST
 
 from clientes.models import buscar_cliente_por_telefono
+from configuracion.models import MomentoPlacaVin, configuracion_vigente
 from nucleo.identificacion import TelefonoInvalido, normalizar_telefono
-from nucleo.registro import describir_faltantes
+from nucleo.registro import CierreNoPermitido, describir_faltantes
 
-from .formularios import FormularioSolicitud
+from .formularios import (
+    FormularioNoConcretada,
+    FormularioSolicitud,
+    FormularioVehiculos,
+    fila_vehiculo,
+    inicial_de,
+    inicial_vehiculos,
+)
 from .models import EstadoRegistro, Solicitud
-from .registro import faltantes_de, historial_reciente, registrar_solicitud
+from .registro import (
+    SolicitudNoEditable,
+    cerrar_no_concretada,
+    completar_borrador,
+    duplicados_activos,
+    faltantes_de,
+    historial_reciente,
+    puede_cerrarse_no_concretada,
+    registrar_solicitud,
+    servicios_de_ida,
+)
 
 BUSQUEDAS = (("solicitante", "telefono"), ("pagador", "pagador_telefono"))
+CAMPO_CONFIRMACION = "duplicados_confirmados"
 
 
 def nueva(request):
     """Formulario único de registro. "Guardar" la deja abierta si está completa; si no, borrador."""
-    formulario = FormularioSolicitud(request.POST or None)
-    if request.method == "POST" and formulario.is_valid():
-        abrir = request.POST.get("accion") != "borrador"
-        try:
-            solicitud, faltantes = registrar_solicitud(
-                formulario.datos_registro(), usuario=request.user, abrir=abrir
-            )
-        except IntegrityError:
-            # Otra persona guardó el mismo teléfono o vehículo mientras tanto; no quedó nada.
-            formulario.add_error(
-                None, "No se guardó: otra persona registró el mismo dato al tiempo. Intente de nuevo."
-            )
-        else:
-            _avisar_guardado(request, solicitud, faltantes)
-            return redirect("detalle_solicitud", pk=solicitud.pk)
-    contexto = {"formulario": formulario}
+    return _formulario(request, None)
+
+
+def completar(request, pk):
+    """El mismo formulario sobre un borrador. Una solicitud que ya no es borrador no se edita."""
+    solicitud = get_object_or_404(_con_relaciones(), pk=pk)
+    if solicitud.estado_registro != EstadoRegistro.BORRADOR:
+        messages.info(request, f"La solicitud {pk} ya no es un borrador: no se edita aquí.")
+        return redirect("detalle_solicitud", pk=pk)
+    return _formulario(request, solicitud)
+
+
+def _formulario(request, solicitud):
+    servicios = []
+    if solicitud is not None:
+        servicios = list(servicios_de_ida(solicitud).select_related("vehiculo"))
+    permitidos = {s.pk for s in servicios}
+    if request.method == "POST":
+        formulario = FormularioSolicitud(request.POST)
+        vehiculos = FormularioVehiculos(request.POST, servicios=permitidos)
+    else:
+        formulario = FormularioSolicitud(initial=inicial_de(solicitud) if solicitud else None)
+        vehiculos = FormularioVehiculos(initial=inicial_vehiculos(servicios), servicios=permitidos)
+
+    duplicados = []
+    validos = [formulario.is_valid(), vehiculos.is_valid()]  # los dos, para marcar todo error
+    if request.method == "POST" and all(validos):
+        datos = formulario.datos_registro(vehiculos.datos())
+        duplicados = duplicados_activos(
+            datos.vehiculos, excluir_solicitud=solicitud.pk if solicitud else None
+        )
+        if not duplicados or request.POST.get(CAMPO_CONFIRMACION) == _firma(duplicados):
+            guardada = _guardar(request, formulario, solicitud, datos)
+            if guardada is not None:
+                return redirect("detalle_solicitud", pk=guardada.pk)
+
+    contexto = {
+        "formulario": formulario,
+        "vehiculos": vehiculos,
+        "solicitud": solicitud,
+        "duplicados": duplicados,
+        "firma_duplicados": _firma(duplicados),
+        "momento_placa_vin": _momento_placa_vin(),
+    }
     for para, campo in BUSQUEDAS:
         contexto[para] = _busqueda(formulario[campo].value(), para)
     return render(request, "solicitudes/nueva.html", contexto)
+
+
+def _guardar(request, formulario, solicitud, datos):
+    """Registra o completa; devuelve la solicitud guardada o None si no se guardó."""
+    abrir = request.POST.get("accion") != "borrador"
+    try:
+        if solicitud is None:
+            guardada, faltantes = registrar_solicitud(datos, usuario=request.user, abrir=abrir)
+        else:
+            guardada, faltantes = completar_borrador(
+                solicitud, datos, usuario=request.user, abrir=abrir
+            )
+    except SolicitudNoEditable as error:
+        formulario.add_error(None, f"No se guardó: {error}")
+        return None
+    except IntegrityError:
+        # Otra persona guardó el mismo teléfono o vehículo mientras tanto; no quedó nada.
+        formulario.add_error(
+            None, "No se guardó: otra persona registró el mismo dato al tiempo. Intente de nuevo."
+        )
+        return None
+    _avisar_guardado(request, guardada, faltantes)
+    return guardada
+
+
+def fila_nueva_vehiculo(request):
+    """Fragmento HTMX: una fila de vehículo vacía, el total de filas y el botón actualizados."""
+    try:
+        indice = max(0, int(request.GET.get("indice", "0")))
+    except ValueError:
+        indice = 0
+    return render(
+        request,
+        "solicitudes/parcial_fila_vehiculo.html",
+        {"fila": fila_vehiculo(indice), "numero": indice + 1, "siguiente": indice + 1},
+    )
 
 
 def buscar_cliente(request):
@@ -54,14 +138,10 @@ def buscar_cliente(request):
     )
 
 
-def detalle(request, pk):
-    """Solo lectura: datos de la solicitud, estado derivado y servicios."""
-    solicitud = get_object_or_404(
-        Solicitud.objects.select_related(
-            "solicitante", "pagador", "contacto_origen", "contacto_destino", "creada_por"
-        ),
-        pk=pk,
-    )
+def detalle(request, pk, formulario_cierre=None):
+    """Datos de la solicitud, estado derivado y servicios. Un borrador se completa desde aquí; una
+    solicitud que nunca se asignó se puede cerrar como no concretada."""
+    solicitud = get_object_or_404(_con_relaciones(), pk=pk)
     servicios = solicitud.servicios.select_related("vehiculo", "conductor", "grua")
     faltantes = []
     if solicitud.estado_registro == EstadoRegistro.BORRADOR:
@@ -73,8 +153,46 @@ def detalle(request, pk):
             "solicitud": solicitud,
             "servicios": servicios,
             "faltantes": describir_faltantes(faltantes),
+            "puede_cerrar": puede_cerrarse_no_concretada(solicitud),
+            "formulario_cierre": formulario_cierre or FormularioNoConcretada(),
         },
     )
+
+
+@require_POST
+def no_concretada(request, pk):
+    """Cierra la solicitud como no concretada, con motivo. Los errores vuelven al detalle."""
+    solicitud = get_object_or_404(Solicitud, pk=pk)
+    formulario = FormularioNoConcretada(request.POST)
+    if not formulario.is_valid():
+        return detalle(request, pk, formulario_cierre=formulario)
+    try:
+        cerrar_no_concretada(
+            solicitud,
+            motivo=formulario.cleaned_data["motivo"],
+            detalle=formulario.cleaned_data["detalle"],
+        )
+    except CierreNoPermitido as error:
+        messages.error(request, f"No se cerró: {error}")
+    else:
+        messages.success(request, f"Solicitud {pk} cerrada como no concretada.")
+    return redirect("detalle_solicitud", pk=pk)
+
+
+def _con_relaciones():
+    return Solicitud.objects.select_related(
+        "solicitante", "pagador", "contacto_origen", "contacto_destino", "creada_por"
+    )
+
+
+def _firma(duplicados) -> str:
+    """Identifica las advertencias que el operador vio: si cambian, se vuelve a advertir."""
+    return ",".join(sorted(d.clave for d in duplicados))
+
+
+def _momento_placa_vin() -> str:
+    momento = configuracion_vigente().momento_placa_vin
+    return "al asignar" if momento == MomentoPlacaVin.AL_ASIGNAR else "al recoger"
 
 
 def _busqueda(texto, para) -> dict:
@@ -94,11 +212,16 @@ def _busqueda(texto, para) -> dict:
 
 def _avisar_guardado(request, solicitud, faltantes):
     if solicitud.estado_registro == EstadoRegistro.ABIERTA:
-        messages.success(
-            request,
-            f"Solicitud {solicitud.pk} registrada. Queda abierta y su servicio, pendiente de "
-            "asignar.",
+        regresos = solicitud.servicios.filter(regreso_de__isnull=False).count()
+        texto = (
+            f"Solicitud {solicitud.pk} registrada. Queda abierta con sus servicios pendientes "
+            "de asignar."
         )
+        if regresos == 1:
+            texto += " Se creó 1 servicio de regreso, enlazado al de ida."
+        elif regresos:
+            texto += f" Se crearon {regresos} servicios de regreso, enlazados a los de ida."
+        messages.success(request, texto)
     elif faltantes:
         messages.warning(
             request,

@@ -1,13 +1,21 @@
 {% extends "base.html" %}
-{% block titulo %}Nueva solicitud{% endblock %}
+{% block titulo %}{% if solicitud %}Completar borrador {{ solicitud.pk }}{% else %}Nueva solicitud{% endif %}{% endblock %}
 {% block contenido %}
-<h1 class="titulo-pagina">Nueva solicitud</h1>
+<h1 class="titulo-pagina">{% if solicitud %}Completar borrador {{ solicitud.pk }}{% else %}Nueva solicitud{% endif %}</h1>
 
 <form method="post" class="formulario" novalidate>
   {% csrf_token %}
-  {% if formulario.errors %}
+  {% if formulario.errors or vehiculos.total_error_count %}
   <p class="aviso aviso--error" role="alert">No se guardó: revise los campos marcados.</p>
   {% for error in formulario.non_field_errors %}<p class="aviso aviso--error">{{ error }}</p>{% endfor %}
+  {% for error in vehiculos.non_form_errors %}<p class="aviso aviso--error">{{ error }}</p>{% endfor %}
+  {% endif %}
+  {% if duplicados %}
+  <div class="aviso aviso--advertencia" role="alert">
+    <p><strong>Posible duplicado.</strong> {% for d in duplicados %}{{ d.identificacion }} ya tiene un servicio activo en la <a href="{% url 'detalle_solicitud' d.solicitud_id %}">solicitud {{ d.solicitud_id }}</a> ({{ d.estado }}){% if not forloop.last %}; {% else %}.{% endif %}{% endfor %}</p>
+    <p>Revise que no sea el mismo servicio. Si es otro, pulse de nuevo Guardar o Guardar como borrador.</p>
+  </div>
+  <input type="hidden" name="duplicados_confirmados" value="{{ firma_duplicados }}">
   {% endif %}
 
   <section aria-labelledby="t-cliente">
@@ -36,17 +44,16 @@
   </section>
 
   <section aria-labelledby="t-vehiculo">
-    <h2 class="titulo-seccion" id="t-vehiculo">Vehículo</h2>
-    <div class="formulario">
-      <div class="fila-campos">
-        {% include "parciales/campo.html" with campo=formulario.placa %}
-        {% include "parciales/campo.html" with campo=formulario.vin %}
-      </div>
-      <div class="fila-campos">
-        {% include "parciales/campo.html" with campo=formulario.marca %}
-        {% include "parciales/campo.html" with campo=formulario.linea %}
-        {% include "parciales/campo.html" with campo=formulario.color %}
-      </div>
+    <h2 class="titulo-seccion" id="t-vehiculo">Vehículos</h2>
+    <p class="ayuda">Cada vehículo es un servicio. La placa o el VIN se exigirán {{ momento_placa_vin }} (así está en la configuración); un desvare exige la placa.</p>
+    {{ vehiculos.management_form }}
+    <div class="formulario" id="vehiculos">
+      {% for fila in vehiculos %}
+      {% include "solicitudes/parcial_vehiculo.html" with numero=forloop.counter %}
+      {% endfor %}
+    </div>
+    <div class="acciones">
+      {% include "solicitudes/parcial_boton_vehiculo.html" with siguiente=vehiculos.total_form_count %}
     </div>
   </section>
 
@@ -54,6 +61,15 @@
     <h2 class="titulo-seccion" id="t-cuando">Cuándo y quién paga</h2>
     <div class="formulario">
       {% include "parciales/campo.html" with campo=formulario.programada_para %}
+      <fieldset class="grupo-opciones{% if formulario.tiene_regreso.errors %} campo--error{% endif %}">
+        <legend>{{ formulario.tiene_regreso.label }}</legend>
+        {% for opcion in formulario.tiene_regreso %}
+        <label class="opcion">{{ opcion.tag }} {{ opcion.choice_label }}</label>
+        {% endfor %}
+        <p class="ayuda">Solo en eventos o muestras de concesionario, y obligatorio para abrirlos. Si tiene regreso, cada vehículo recibe un servicio de regreso, del destino al origen.</p>
+        {% for error in formulario.tiene_regreso.errors %}<p class="campo-error">{{ error }}</p>{% endfor %}
+      </fieldset>
+      {% include "parciales/campo.html" with campo=formulario.fecha_regreso %}
       {% include "parciales/campo.html" with campo=formulario.pagador_telefono %}
       <div id="resultado-pagador" aria-live="polite">
         {% include "solicitudes/parcial_cliente.html" with busqueda=pagador %}
@@ -64,7 +80,8 @@
   <div class="acciones">
     <button type="submit" name="accion" value="guardar" class="boton boton--principal">Guardar</button>
     <button type="submit" name="accion" value="borrador" class="boton boton--secundario">Guardar como borrador</button>
+    {% if solicitud %}<a class="boton boton--secundario" href="{% url 'detalle_solicitud' solicitud.pk %}">Volver sin guardar</a>{% endif %}
   </div>
-  <p class="ayuda">Guardar deja la solicitud abierta si tiene solicitante, tipo, origen, destino (salvo en desvare) y vehículo; si falta algo, queda en borrador y se dice qué falta. Un evento queda en borrador hasta que se pueda responder si tiene regreso.</p>
+  <p class="ayuda">Guardar deja la solicitud abierta si tiene solicitante, tipo, origen, destino (salvo en desvare), al menos un vehículo, la referencia externa de cada vehículo si paga una aseguradora y, en un evento, la respuesta de si tiene regreso; si falta algo, queda en borrador y se dice qué falta.</p>
 </form>
 {% endblock %}

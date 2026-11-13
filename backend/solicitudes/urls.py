@@ -11,11 +11,26 @@ from . import views
 ROLES = next(s for s in SECCIONES if s.clave == "nueva_solicitud").roles
 
 
+def _con_rol(vista):
+    return requiere_rol(*ROLES)(vista)
+
+
 urlpatterns = [
+    path("solicitudes/nueva/cliente/", _con_rol(views.buscar_cliente), name="buscar_cliente"),
     path(
-        "solicitudes/nueva/cliente/",
-        requiere_rol(*ROLES)(views.buscar_cliente),
-        name="buscar_cliente",
+        "solicitudes/nueva/vehiculo/",
+        _con_rol(views.fila_nueva_vehiculo),
+        name="fila_nueva_vehiculo",
     ),
-    path("solicitudes/<int:pk>/", requiere_rol(*ROLES)(views.detalle), name="detalle_solicitud"),
+    path("solicitudes/<int:pk>/", _con_rol(views.detalle), name="detalle_solicitud"),
+    path(
+        "solicitudes/<int:pk>/completar/",
+        _con_rol(views.completar),
+        name="completar_solicitud",
+    ),
+    path(
+        "solicitudes/<int:pk>/no-concretada/",
+        _con_rol(views.no_concretada),
+        name="no_concretada_solicitud",
+    ),
 ]

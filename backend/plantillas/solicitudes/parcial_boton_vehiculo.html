@@ -1,0 +1,3 @@
+<button type="button" id="agregar-vehiculo" class="boton boton--secundario"{% if oob %} hx-swap-oob="true"{% endif %}
+  hx-get="{% url 'fila_nueva_vehiculo' %}" hx-vals='{"indice": {{ siguiente }}}'
+  hx-target="#vehiculos" hx-swap="beforeend">Agregar otro vehículo</button>
