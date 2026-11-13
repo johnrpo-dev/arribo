@@ -1,4 +1,4 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+﻿<manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <!-- La app habla con la API del servidor (también en release, no solo en desarrollo). -->
     <uses-permission android:name="android.permission.INTERNET"/>
 
@@ -8,7 +8,7 @@
          networkSecurityConfig: en release solo HTTPS; la variante de debug (src/debug/res/xml)
          permite HTTP en claro solo hacia 127.0.0.1 y localhost, para el backend por adb reverse. -->
     <application
-        android:label="arribo_conductor"
+        android:label="Arribo"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher"
         android:allowBackup="false"
