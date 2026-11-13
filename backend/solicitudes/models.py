@@ -53,6 +53,13 @@ VALORES_CON_CONDUCTOR_Y_GRUA = [
     Estado.ENTREGADO.value,
 ]
 OPCIONES_TIPO_SERVICIO = [(tipo.value, tipo.etiqueta) for tipo in TipoServicio]
+# Estados en los que el servicio sigue en la ronda de su conductor.
+VALORES_EN_RONDA = [
+    Estado.ASIGNADO.value,
+    Estado.EN_CAMINO.value,
+    Estado.RECOGIDO.value,
+    Estado.NOVEDAD.value,
+]
 
 
 # --- Vehículo ----------------------------------------------------------------------------------
@@ -461,6 +468,15 @@ class Servicio(models.Model):
                 violation_error_message="Un servicio asignado, en camino, recogido o entregado "
                 "tiene conductor y grúa.",
             ),
+            # Orden de ronda (nucleo/ronda.py): único por conductor entre sus servicios no
+            # terminales. Vacío no choca; los terminados guardan el suyo sin estorbar.
+            models.UniqueConstraint(
+                fields=("conductor", "orden_ronda"),
+                condition=Q(estado__in=VALORES_EN_RONDA),
+                name="servicio_orden_ronda_unico_por_conductor",
+                violation_error_message="Ese conductor ya tiene otro servicio en ese puesto de "
+                "la ronda.",
+            ),
         )
 
     _cambio_desde_operaciones = False
@@ -504,7 +520,9 @@ class Servicio(models.Model):
         """Lo usan solo las operaciones, dentro de su transacción y con la fila bloqueada."""
         self._cambio_desde_operaciones = True
         try:
-            self.save(update_fields=["estado", "estado_previo", "conductor", "grua"])
+            self.save(
+                update_fields=["estado", "estado_previo", "conductor", "grua", "orden_ronda"]
+            )
         finally:
             self._cambio_desde_operaciones = False
 

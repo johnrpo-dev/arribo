@@ -8,9 +8,6 @@ pero el orden relativo no cambia.
 """
 from collections.abc import Iterable, Sequence
 from enum import StrEnum
-from typing import TypeVar
-
-T = TypeVar("T")
 
 
 class Direccion(StrEnum):
@@ -27,7 +24,7 @@ def siguiente_orden(ordenes: Iterable[int | None]) -> int:
     return max((o for o in ordenes if o is not None), default=0) + 1
 
 
-def mover(ronda: Sequence[T], elemento: T, direccion: Direccion) -> list[T]:
+def mover[T](ronda: Sequence[T], elemento: T, direccion: Direccion) -> list[T]:
     """La ronda con `elemento` un puesto antes (subir) o después (bajar)."""
     direccion = Direccion(direccion)
     ronda = list(ronda)
@@ -43,6 +40,6 @@ def mover(ronda: Sequence[T], elemento: T, direccion: Direccion) -> list[T]:
     return ronda
 
 
-def numerar(ronda: Sequence[T]) -> dict[T, int]:
+def numerar[T](ronda: Sequence[T]) -> dict[T, int]:
     """Puesto de cada elemento, desde 1 y sin huecos."""
     return {elemento: puesto for puesto, elemento in enumerate(ronda, start=1)}
