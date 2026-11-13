@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block titulo %}Ingresar{% endblock %}
+{% block cuerpo %}
+<main id="contenido" class="ingreso" tabindex="-1">
+  <h1 class="ingreso-marca">Arribo</h1>
+  <form method="post" action="{% url 'ingresar' %}" class="ingreso-formulario" novalidate>
+    {% csrf_token %}
+    <h2 class="titulo-seccion">Ingresar al panel</h2>
+    {% include "parciales/mensajes.html" %}
+    {% if form.non_field_errors %}
+    <div class="aviso aviso--error" role="alert">
+      {% for error in form.non_field_errors %}<p>{{ error }}</p>{% endfor %}
+    </div>
+    {% endif %}
+    {% for campo in form %}
+    <div class="campo{% if campo.errors %} campo--error{% endif %}">
+      <label for="{{ campo.id_for_label }}">{{ campo.label }}</label>
+      {{ campo }}
+      {% for error in campo.errors %}<p class="campo-error">{{ error }}</p>{% endfor %}
+    </div>
+    {% endfor %}
+    <input type="hidden" name="next" value="{{ next }}">
+    <button type="submit" class="boton boton--principal boton--ancho">Ingresar</button>
+    <p class="ayuda">Los conductores usan la app del celular, no este panel.</p>
+  </form>
+</main>
+{% endblock %}

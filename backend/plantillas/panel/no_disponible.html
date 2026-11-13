@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block titulo %}{{ seccion.nombre }}{% endblock %}
+{% block contenido %}
+<h1 class="titulo-pagina">{{ seccion.nombre }}</h1>
+<div class="vacio">
+  <p>Aún no disponible. Esta sección llega en una próxima entrega.</p>
+  <p><a href="{% url 'inicio' %}">Volver al inicio</a></p>
+</div>
+{% endblock %}
