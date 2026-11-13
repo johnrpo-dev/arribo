@@ -26,6 +26,18 @@ Formato: fecha, tarea, pregunta, qué se asumió mientras tanto (si se asumió a
   vacíos (así se guarda un borrador incompleto); la base solo exige lo de los eventos (respuesta de
   regreso) y lo de no concretada. Los obligatorios del formulario los fijan las tareas 1a-06 y 1a-07;
   si un desvare no tiene destino, el formulario no lo pedirá en ese tipo.
+  **Aplicado en 1a-06** (`nucleo/registro.py`, `faltantes_para_abrir`): para quedar abierta, una
+  solicitud necesita solicitante, tipo, origen y al menos un vehículo; destino en traslado y evento,
+  no en desvare. Sin solicitante ni tipo no se guarda ni como borrador (la base los exige). Sigue
+  abierta hasta que el dueño la confirme; si cambia, se cambia esa función con su prueba.
+- **2026-11-12, 1a-06. ¿Qué cuenta como "un vehículo" para salir de borrador?** Asumido: cualquier
+  dato del vehículo (placa, VIN, marca, línea o color); la placa o el VIN no se exigen al registrar,
+  sino al recoger (y en 1a-07 según la configuración). Así, un desvare sin placa puede quedar
+  abierto y se bloquea al marcar Recogido. Si el desvare debe exigir placa ya al registrar, se agrega
+  a `faltantes_para_abrir` con su prueba.
+- **2026-11-12, 1a-06. ¿Un contacto nuevo queda ligado al cliente solicitante?** Asumido: no; el
+  contacto se guarda sin cliente y se reutiliza si ya existe uno con el mismo nombre y teléfono.
+  Si debe quedar ligado (por ejemplo, para sugerir los contactos del cliente), se asigna al crear.
 - **2026-11-12, 1a-16a. ¿Cuánto se cobra un servicio cancelado que se marca cobrable (la grúa se
   desplazó y el vehículo no estaba)?** Asumido: nace igual que al entregar, con la tarifa vigente del
   pagador para ese tipo de servicio (o sin valor si no hay) y se ajusta a mano antes de facturar. Si

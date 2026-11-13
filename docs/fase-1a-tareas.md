@@ -35,7 +35,7 @@ Toda tarea termina con `uv run pytest -q` y `uv run ruff check .` en verde, más
 
 ## Registro y asignación
 
-- [ ] **1a-06 Registro de solicitud I** (6 h). Depende de: 05.
+- [x] **1a-06 Registro de solicitud I** (6 h). Depende de: 05.
   Formulario único: buscar por teléfono, cargar cliente e historial o crearlo ahí mismo; solicitante y
   pagador; contactos; tipo; origen y destino en texto; un vehículo; inmediato o programado; guardar como Borrador.
   Verificar: pruebas de la vista; registrar a mano una solicitud completa en menos de 60 segundos.
