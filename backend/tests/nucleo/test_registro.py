@@ -1,11 +1,15 @@
 """Obligatorios para que una solicitud deje de ser borrador."""
 import pytest
 
+from nucleo.estados import Estado
 from nucleo.registro import (
+    CierreNoPermitido,
     Faltante,
+    crea_regreso,
     describir_faltantes,
     destino_obligatorio,
     faltantes_para_abrir,
+    verificar_cierre_no_concretada,
 )
 from nucleo.tipos import TipoServicio
 
@@ -101,3 +105,95 @@ def test_describir_faltantes_en_una_frase():
         describir_faltantes([Faltante.ORIGEN, Faltante.DESTINO, Faltante.VEHICULO])
         == "el origen, el destino y al menos un vehículo"
     )
+
+
+# --- Referencia externa (aseguradora) ----------------------------------------------------------
+
+
+def test_si_paga_una_aseguradora_cada_vehiculo_exige_referencia_externa():
+    assert completa(paga_aseguradora=True, vehiculos_sin_referencia=1) == [
+        Faltante.REFERENCIA_EXTERNA
+    ]
+
+
+def test_si_paga_una_aseguradora_con_todas_las_referencias_sale_de_borrador():
+    assert completa(paga_aseguradora=True, vehiculos_sin_referencia=0) == []
+
+
+def test_si_no_paga_una_aseguradora_la_referencia_no_se_exige():
+    assert completa(paga_aseguradora=False, vehiculos_sin_referencia=1) == []
+
+
+def test_la_referencia_sale_despues_del_vehiculo_y_antes_del_regreso():
+    assert completa(
+        tipo=TipoServicio.EVENTO, paga_aseguradora=True, vehiculos_sin_referencia=2
+    ) == [Faltante.REFERENCIA_EXTERNA, Faltante.RESPUESTA_REGRESO]
+
+
+# --- Regreso -----------------------------------------------------------------------------------
+
+
+def test_un_evento_con_regreso_crea_servicios_de_regreso():
+    assert crea_regreso(TipoServicio.EVENTO, True) is True
+
+
+@pytest.mark.parametrize("respuesta", [False, None])
+def test_un_evento_sin_regreso_o_sin_respuesta_no_crea_regreso(respuesta):
+    assert crea_regreso(TipoServicio.EVENTO, respuesta) is False
+
+
+@pytest.mark.parametrize("tipo", [TipoServicio.TRASLADO, TipoServicio.DESVARE])
+def test_fuera_de_eventos_nunca_se_crea_regreso(tipo):
+    assert crea_regreso(tipo, True) is False
+
+
+# --- No concretada -----------------------------------------------------------------------------
+
+
+E = Estado
+
+
+def cierre(**cambios):
+    datos = {
+        "ya_no_concretada": False,
+        "estados": [E.PENDIENTE_ASIGNAR],
+        "alguno_fue_asignado": False,
+        "motivo": "precio",
+    }
+    datos.update(cambios)
+    verificar_cierre_no_concretada(**datos)
+
+
+def test_se_cierra_como_no_concretada_sin_servicios_asignados():
+    cierre()
+    cierre(estados=[])
+    cierre(estados=[E.PENDIENTE_ASIGNAR, E.PENDIENTE_ASIGNAR])
+
+
+@pytest.mark.parametrize("motivo", [None, "", "   "])
+def test_cerrar_como_no_concretada_exige_motivo(motivo):
+    with pytest.raises(CierreNoPermitido, match="motivo"):
+        cierre(motivo=motivo)
+
+
+@pytest.mark.parametrize(
+    "estado", [E.ASIGNADO, E.EN_CAMINO, E.RECOGIDO, E.ENTREGADO, E.NOVEDAD]
+)
+def test_no_se_cierra_como_no_concretada_con_un_servicio_asignado_o_en_curso(estado):
+    with pytest.raises(CierreNoPermitido, match="asignado"):
+        cierre(estados=[E.PENDIENTE_ASIGNAR, estado])
+
+
+def test_no_se_cierra_si_algun_servicio_estuvo_asignado_aunque_ya_no_lo_este():
+    # Por ejemplo, se asignó y luego se canceló o volvió a la cola: la grúa ya se movió.
+    with pytest.raises(CierreNoPermitido, match="asignado"):
+        cierre(estados=[E.CANCELADO], alguno_fue_asignado=True)
+
+
+def test_un_servicio_cancelado_que_nunca_se_asigno_no_impide_cerrar():
+    cierre(estados=[E.CANCELADO, E.PENDIENTE_ASIGNAR])
+
+
+def test_una_solicitud_ya_no_concretada_no_se_vuelve_a_cerrar():
+    with pytest.raises(CierreNoPermitido, match="ya"):
+        cierre(ya_no_concretada=True)

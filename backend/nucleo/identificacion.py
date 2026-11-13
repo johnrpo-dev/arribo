@@ -5,6 +5,7 @@ antes de buscar, para que "abc-123" encuentre "ABC123" y "+57 300 123 4567" encu
 Python puro: lo usan los modelos y, más adelante, la app.
 """
 import re
+from enum import StrEnum
 
 from nucleo.tipos import TipoServicio
 
@@ -90,3 +91,28 @@ def validar_identificacion(
         raise IdentificacionIncompleta("Un desvare exige la placa del vehículo.")
     if not tiene_placa and not normalizar_vin(vin):
         raise IdentificacionIncompleta("El vehículo necesita placa o VIN (al menos uno).")
+
+
+class MomentoIdentificacion(StrEnum):
+    """Momentos en que se puede exigir la placa o el VIN, en el orden en que ocurren.
+
+    Los valores son los que guarda la configuración (`configuracion.MomentoPlacaVin`).
+    """
+
+    AL_ASIGNAR = "asignar"
+    AL_RECOGER = "recoger"
+
+
+_ORDEN_MOMENTOS = (MomentoIdentificacion.AL_ASIGNAR, MomentoIdentificacion.AL_RECOGER)
+
+
+def identificacion_exigida(
+    momento_configurado: MomentoIdentificacion | str, momento_actual: MomentoIdentificacion | str
+) -> bool:
+    """¿Se exige la placa o el VIN en `momento_actual`?
+
+    Desde el momento configurado en adelante: configurado "al asignar", se exige al asignar y al
+    recoger; configurado "al recoger", solo al recoger. Al recoger se exige siempre.
+    """
+    configurado = _ORDEN_MOMENTOS.index(MomentoIdentificacion(momento_configurado))
+    return _ORDEN_MOMENTOS.index(MomentoIdentificacion(momento_actual)) >= configurado
