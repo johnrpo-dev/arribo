@@ -93,6 +93,10 @@ Toda tarea termina con `uv run pytest -q` y `uv run ruff check .` en verde, más
   App `cobros`: la línea nace cuando el servicio queda Entregado, con `nucleo/cobro.py`. Valor digitado o
   propuesto por tarifa, historial de cambios, permisos según los roles que ven valores.
   Verificar: pruebas de historial y de que logística no ve valores con la configuración por defecto.
+  Nota: la tarea se partió en dos. **1a-16a (modelo) está hecha** (PC1): app `cobros` con la línea,
+  sus restricciones en PostgreSQL, el historial y las operaciones; la línea nace al quedar Entregado.
+  **Falta la 1a-16b** (PC4): las pantallas del panel, la propuesta de tarifa en pantalla y los
+  permisos por rol sobre los valores.
 
 - [ ] **1a-17 Relación de cobro y exportación** (3 h). Depende de: 16.
   Agrupar líneas por pagador y fechas, con número de caso. Exportador con una interfaz única y una

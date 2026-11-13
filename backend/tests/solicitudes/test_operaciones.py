@@ -20,7 +20,7 @@ from solicitudes import operaciones
 from solicitudes.models import EstadoRegistro, EventoEstado, MotivoNoConcretada, OrigenEvento
 from solicitudes.operaciones import SinGruaVigente, SolicitudNoAsignable
 
-from .conftest import VIN, crear_solicitud
+from ..conftest import VIN, crear_solicitud
 
 pytestmark = pytest.mark.django_db
 

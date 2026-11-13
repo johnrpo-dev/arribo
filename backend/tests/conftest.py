@@ -1,4 +1,4 @@
-"""Datos comunes de las pruebas de solicitudes, siempre contra PostgreSQL.
+"""Datos comunes de las pruebas de solicitudes y de cobros, siempre contra PostgreSQL.
 
 Ana maneja la grúa GRU001 (1 puesto) y Beto la GRU002 (2 puestos), ambas asignaciones vigentes
 desde ayer. `crear_servicio` deja un servicio en cualquier estado guardándolo directamente (sin

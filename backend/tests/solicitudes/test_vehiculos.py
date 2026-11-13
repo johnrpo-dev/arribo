@@ -10,7 +10,7 @@ from django.db.models import ProtectedError
 
 from solicitudes.models import Servicio, Vehiculo
 
-from .conftest import VIN, crear_solicitud
+from ..conftest import VIN, crear_solicitud
 
 pytestmark = pytest.mark.django_db
 
