@@ -53,6 +53,15 @@ dev_dependencies:
   flutter_lints: ^6.0.0
   sqflite_common_ffi: ^2.4.7
 
+# sqlite3 llega solo por sqflite_common_ffi (pruebas en el computador), pero su hook de compilación
+# metía libsqlite3.so en el APK para cada arquitectura. En el celular la base usa la SQLite de
+# Android a través de sqflite, así que en Android no se empaca la propia.
+hooks:
+  user_defines:
+    sqlite3:
+      source:
+        android: system
+
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
 
