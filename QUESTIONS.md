@@ -26,6 +26,21 @@ Formato: fecha, tarea, pregunta, qué se asumió mientras tanto (si se asumió a
   vacíos (así se guarda un borrador incompleto); la base solo exige lo de los eventos (respuesta de
   regreso) y lo de no concretada. Los obligatorios del formulario los fijan las tareas 1a-06 y 1a-07;
   si un desvare no tiene destino, el formulario no lo pedirá en ese tipo.
+- **2026-11-12, 1a-16a. ¿Cuánto se cobra un servicio cancelado que se marca cobrable (la grúa se
+  desplazó y el vehículo no estaba)?** Asumido: nace igual que al entregar, con la tarifa vigente del
+  pagador para ese tipo de servicio (o sin valor si no hay) y se ajusta a mano antes de facturar. Si
+  hay un valor propio de "desplazamiento en falso", se agrega a la tarifa y `marcar_cobrable` lo
+  propone en vez de la tarifa del servicio.
+- **2026-11-12, 1a-16a. ¿Se puede marcar cobrable un servicio cancelado antes de asignarlo?**
+  (ninguna grúa salió). Asumido: sí, el sistema no lo impide; quien lo marca decide. Si la respuesta
+  es "no", `marcar_cobrable` exige que el servicio haya tenido conductor y se agrega su prueba.
+- **2026-11-12, 1a-16a. ¿Quién deja una línea como "no cobrable" y desde qué estado** (por ejemplo,
+  una garantía o una cortesía)? El modelo y la base admiten el estado, pero ninguna operación lo
+  produce todavía. Asumido: nada hasta la 1a-16b. Según la respuesta, se agrega la operación (desde
+  sin valor o por facturar, con motivo en el historial) y sus pruebas.
+- **2026-11-12, 1a-16a. Si el pagador de la solicitud cambia después de entregado el servicio, ¿la
+  línea cambia de pagador?** Asumido: no; la línea guarda el pagador que tenía la solicitud al
+  quedar Entregado. Cambiarlo sería una operación nueva (antes de facturar, con historial).
 
 ## Resueltas
 

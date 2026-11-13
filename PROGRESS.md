@@ -117,6 +117,58 @@ La tarea 1a-16 se partió en dos: 1a-16a (modelo de línea de cobro con sus rest
   veces `op.aplicar_evento_del_conductor(**d)`: la primera da aplicado, la segunda duplicado. En el
   admin, el servicio muestra sus eventos y no deja modificarlos ni borrarlos.
 
+### 1a-16a Líneas de cobro (12 de noviembre de 2026)
+- Hecho: app `cobros` con Línea de cobro (servicio × pagador, posición 1 o 2, estado, valor,
+  número de factura) e Historial de cobro (solo agregar). `cobros/operaciones.py` es la única forma
+  de crear una línea o cambiar su estado, valor o factura: `crear_linea_al_entregar`,
+  `marcar_cobrable`, `fijar_valor`, `facturar`, `pagar` y `anular_factura`. Todas llaman a
+  `nucleo/cobro.py`, corren en una transacción con la fila bloqueada y dejan exactamente un registro
+  de historial (quién, cuándo, acción, valor anterior y nuevo, factura, motivo). Admin en español de
+  solo lectura, con el historial dentro de la línea. Sin pantallas: son de la 1a-16b.
+- Decidido (la base manda): ocho restricciones con nombre en PostgreSQL sobre la línea (y tres
+  sobre el historial: acción válida, anulación con motivo, cambio de valor con valor nuevo). Estado entre los cinco
+  válidos y posición 1 o 2; única por (servicio, posición) y por (servicio, pagador), así que un
+  servicio tiene como máximo dos líneas y no repite pagador; y la coherencia por estado: sin valor
+  ⇒ sin valor ni factura; por facturar ⇒ valor mayor que cero y sin factura; facturado y pagado ⇒
+  valor mayor que cero y número de factura que no sea solo espacios; no cobrable ⇒ sin factura.
+  Probado con `update()` directo para cada combinación inválida. `save()` no deja cambiar estado,
+  valor ni factura por fuera de las operaciones (`CambioDeCobroNoPermitido`); crear una línea con
+  `objects.create()` sí se puede (igual que un servicio), pero así no deja historial: el código del
+  sistema usa siempre las operaciones.
+- Decidido (cuándo nace): `solicitudes` envía la señal `servicio_entregado` desde el único punto
+  donde guarda un cambio de estado (`_cambiar` en `solicitudes/operaciones.py`), dentro de la misma
+  transacción, y `cobros` la escucha (conectada en `CobrosConfig.ready()`); `solicitudes` no importa
+  `cobros` (lo vigila una prueba). La línea nace con el pagador de la solicitud, posición 1 y la
+  tarifa vigente del pagador para el tipo de servicio: con tarifa, por facturar; sin tarifa, sin
+  valor. Si la línea no se puede crear, todo se deshace: el servicio no queda Entregado y, desde la
+  app, el evento no se guarda (el celular lo reenvía). Un evento duplicado o en conflicto no crea
+  línea. Es idempotente: si el servicio ya tiene línea, no se crea otra ni se toca la existente.
+- Decidido: un servicio cancelado no tiene línea; `marcar_cobrable` se la crea (misma línea inicial,
+  acción "marcada cobrable" en el historial), solo sobre servicios cancelados y una sola vez. El
+  valor se exige en `Decimal`: un `float` (o un entero o texto) se rechaza antes de llegar a la base.
+  La división entre dos pagadores no se construyó (el modelo ya admite la posición 2).
+- Cambios fuera de `cobros`: `solicitudes/senales.py` (la señal) y `_cambiar` la envía; las
+  utilidades de prueba pasaron de `tests/solicitudes/conftest.py` a `tests/conftest.py` para que
+  las usen también las pruebas de cobros. El núcleo no cambió.
+- Preguntas abiertas nuevas: cuatro en `QUESTIONS.md` (valor de un cancelado cobrable, cancelado
+  antes de asignar, quién deja una línea no cobrable, cambio de pagador después de entregar).
+- Cómo probar (5 minutos): `uv run pytest -q` (748 pruebas) y `uv run python manage.py migrate`.
+  En `/admin/` → Solicitudes, en una solicitud abierta de traslado agregar un servicio con un
+  vehículo que tenga placa. En `uv run python manage.py shell`:
+  `from decimal import Decimal; from solicitudes import operaciones as op; from cobros import operaciones as cobro`
+  `from solicitudes.models import Servicio; from flota.models import Conductor`
+  `s = Servicio.objects.last(); c = Conductor.objects.first()` (con grúa vigente), luego
+  `op.asignar(s, c, actor=None)` y `op.cambiar_estado(s, x, actor=None)` con x = `"en_camino"`,
+  `"recogido"` y `"entregado"`. En `/admin/` → Cobros → Líneas de cobro aparece la línea "Sin
+  valor" (o "Por facturar" con el valor de la tarifa, si el cliente tiene una vigente de traslado),
+  sin campos editables y sin botón de borrar. En el shell: `l = s.lineas_cobro.get()`,
+  `cobro.fijar_valor(l, Decimal("250000"), actor=None)`, `cobro.facturar(l, "FE-1", actor=None)` y
+  `cobro.fijar_valor(l, Decimal("1"), actor=None)` (falla: "No se cambia el valor de una línea en
+  facturado"). Por último `from cobros.models import LineaCobro;`
+  `LineaCobro.objects.filter(pk=l.pk).update(numero_factura="")` falla con
+  `linea_cobro_facturada_coherente`. En el admin, la línea muestra su historial: creada, cambio de
+  valor y facturada.
+
 ## Escalamientos
 
 Ninguno todavía.
