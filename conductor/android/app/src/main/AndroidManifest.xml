@@ -1,8 +1,20 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- La app habla con la API del servidor (también en release, no solo en desarrollo). -->
+    <uses-permission android:name="android.permission.INTERNET"/>
+
+    <!-- allowBackup="false": el token va cifrado con una llave del Keystore que no viaja en la copia
+         de Google; restaurarlo en otro celular haría fallar la lectura (flutter_secure_storage lo
+         recomienda). Tampoco se respaldan la base local ni la cola de pendientes.
+         networkSecurityConfig: en release solo HTTPS; la variante de debug (src/debug/res/xml)
+         permite HTTP en claro solo hacia 127.0.0.1 y localhost, para el backend por adb reverse. -->
     <application
         android:label="arribo_conductor"
         android:name="${applicationName}"
-        android:icon="@mipmap/ic_launcher">
+        android:icon="@mipmap/ic_launcher"
+        android:allowBackup="false"
+        android:fullBackupContent="false"
+        android:dataExtractionRules="@xml/reglas_de_extraccion"
+        android:networkSecurityConfig="@xml/network_security_config">
         <activity
             android:name=".MainActivity"
             android:exported="true"
@@ -35,11 +47,25 @@
          https://developer.android.com/training/package-visibility and
          https://developer.android.com/reference/android/content/Intent#ACTION_PROCESS_TEXT.
 
-         In particular, this is used by the Flutter engine in io.flutter.plugin.text.ProcessTextPlugin. -->
+         In particular, this is used by the Flutter engine in io.flutter.plugin.text.ProcessTextPlugin.
+         Además: el marcador del teléfono (tel:) y los enlaces de Google Maps y Waze (https), que la
+         app abre con url_launcher (Android 11 o superior exige declararlos). -->
     <queries>
         <intent>
             <action android:name="android.intent.action.PROCESS_TEXT"/>
             <data android:mimeType="text/plain"/>
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.DIAL"/>
+            <data android:scheme="tel"/>
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW"/>
+            <data android:scheme="tel"/>
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW"/>
+            <data android:scheme="https"/>
         </intent>
     </queries>
 </manifest>
