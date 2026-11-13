@@ -53,7 +53,7 @@ Toda tarea termina con `uv run pytest -q` y `uv run ruff check .` en verde, más
 
 ## Conductor
 
-- [ ] **1a-09 API: ingreso y asignaciones** (2 h). Depende de: 08.
+- [x] **1a-09 API: ingreso y asignaciones** (2 h). Depende de: 08.
   App `api`: ingreso con celular y PIN, token revocable por dispositivo, lista de asignaciones del conductor.
   Verificar: prueba de que la respuesta no contiene ningún valor de cobro y de que un conductor no ve servicios de otro.
 
