@@ -548,3 +548,37 @@ time {
     position: static;
   }
 }
+
+/* ---------- Opciones (radios y casillas) ----------
+   Grupo de opciones con su leyenda; cada opción es un label que envuelve su control. */
+
+.grupo-opciones {
+  display: flex;
+  flex-direction: column;
+  gap: var(--e1);
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.grupo-opciones legend {
+  padding: 0;
+  margin-bottom: var(--e1);
+  font-weight: 600;
+}
+.opcion {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--e1) var(--e2);
+  min-height: var(--alto-control);
+}
+.opcion input {
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  accent-color: var(--acento);
+}
+.opcion:has(input:disabled) {
+  color: var(--texto-secundario);
+}

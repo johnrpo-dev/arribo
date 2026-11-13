@@ -30,7 +30,13 @@ SECCIONES = (
     Seccion("cobros", "Cobros", "cobros/", (FACTURACION, ADMINISTRADOR)),
     Seccion("flota", "Flota y documentos", "flota/", (ADMINISTRADOR,)),
     Seccion("panel_dueno", "Panel del dueño", "dueno/", (ADMINISTRADOR,)),
-    Seccion("configuracion", "Configuración", "configuracion/", (ADMINISTRADOR,)),
+    Seccion(
+        "configuracion",
+        "Configuración",
+        "configuracion/",
+        (ADMINISTRADOR,),
+        vista="configuracion.views.configuracion",
+    ),
 )
 
 
