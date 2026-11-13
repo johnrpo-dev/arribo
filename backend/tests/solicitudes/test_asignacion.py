@@ -354,6 +354,11 @@ def test_repartir_tres_vehiculos_entre_dos_conductores_desde_la_pantalla(
     assert conductores == ["Ana", "Beto", "Beto"]
     html = client.get(f"/solicitudes/{solicitud.pk}/").content.decode()
     assert "Ronda de Ana" in html and "Ronda de Beto" in html
+    # La tabla de la solicitud sigue por número aunque la ronda de Beto cambie de orden.
+    client.post(url_mover(solicitud, servicios[2]), {"direccion": "subir"})
+    html = client.get(f"/solicitudes/{solicitud.pk}/").content.decode()
+    posiciones = [html.index(f"N.º {s.pk} · ") for s in servicios]
+    assert posiciones == sorted(posiciones)
 
 
 def test_un_borrador_no_se_asigna_desde_la_vista(client, logistica, cliente, crear_servicio, ana):

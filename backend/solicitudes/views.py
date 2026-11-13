@@ -155,7 +155,11 @@ def detalle(request, pk, formulario_cierre=None):
     solicitud que nunca se asignó se puede cerrar como no concretada; en una abierta se asigna y
     se reasigna cada servicio y se ordena la ronda de sus conductores."""
     solicitud = get_object_or_404(_con_relaciones(), pk=pk)
-    servicios = list(solicitud.servicios.select_related("vehiculo", "conductor", "grua"))
+    # Por número: el orden de ronda (orden por defecto del modelo) es de cada conductor, no de la
+    # solicitud.
+    servicios = list(
+        solicitud.servicios.select_related("vehiculo", "conductor", "grua").order_by("pk")
+    )
     faltantes = []
     if solicitud.estado_registro == EstadoRegistro.BORRADOR:
         faltantes = faltantes_de(solicitud)
