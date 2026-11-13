@@ -542,6 +542,93 @@ La tarea 1a-16 se partió en dos: 1a-16a (modelo de línea de cobro con sus rest
   `backend\media\evidencias\<servicio>\<uuid>.jpg` y en `/admin/` → Solicitudes → Evidencias sale con
   su evento. Lo que se cree en esta prueba queda en la base local.
 
+### 1a-11 App: ingreso y lista (13 de noviembre de 2026)
+- Hecho: la app del conductor ya ingresa con celular y PIN, guarda el token en el Keystore, baja la
+  lista de asignaciones en orden de ronda a una base SQLite local y la muestra aunque no haya señal,
+  con la hora de la última actualización y un aviso discreto de "Sin conexión". Cada servicio muestra
+  estado, tipo, vehículo (placa, VIN, marca, línea, color), hora (o "Inmediato"), dónde recoger y
+  dónde entregar con su contacto, y botones de un toque: Llamar (abre el marcador con el número),
+  Maps y Waze (enlaces universales: abren la app si está instalada y si no, el navegador). Tocar la
+  tarjeta abre el detalle de solo lectura (referencia, solicitud, grúa, ubicación escrita por
+  logística, si va montado). Refresca al abrir, al volver a primer plano, al deslizar hacia abajo y
+  con el botón Actualizar. Menú con el nombre del conductor y "Cerrar sesión" (con confirmación).
+  Arquitectura y esquema documentados en `conductor/README.md`. Sin cambios en el backend.
+- Decidido (material_ui): Flutter 3.47 marcó obsoleto `package:flutter/material.dart` y `flutter
+  create` ya había agregado `material_ui`; se migró ahora (el analizador lo marcaba) porque la app
+  apenas empieza y ninguna dependencia usa widgets de Material, así que no hace falta el puente de
+  compatibilidad.
+- Decidido (estado): `ChangeNotifier` propios (`Sesion` y `ListaAsignaciones`) escuchados con
+  `ListenableBuilder` y pasados por constructor. Sin provider ni otros paquetes: son dos piezas.
+- Decidido (base local): `sqflite` con SQL escrito a mano y migraciones versionadas (una lista; la
+  versión es su largo; cada una en la transacción de apertura). Descartado drift: genera código con
+  build_runner y suma un paso de compilación para cuatro tablas. En pruebas, la misma SQLite por
+  `sqflite_common_ffi` en archivos temporales. La versión 1 crea `estado_local`, `servicios` y,
+  vacías, `eventos_pendientes` (1a-12) y `fotos_pendientes` (1a-13, solo la ruta del JPEG; nunca
+  los bytes). La lista, su ETag y la hora se guardan en una sola transacción. Ninguna columna se
+  llama como un valor de cobro (por eso la de `estado_local` es `dato` y no `valor`).
+- Decidido (sesión): toda respuesta 401 a una petición con token borra el token y vuelve al ingreso
+  con el `detalle` del servidor (también `conductor_no_habilitado`: al reactivarlo, el conductor
+  vuelve a ingresar). Nada local se borra. Si ingresa otro conductor en el mismo celular se borra la
+  lista del anterior, nunca lo pendiente. No se cierra sesión con eventos o fotos pendientes. Cerrar
+  sesión sin señal borra el token del celular; en el servidor queda vigente hasta que se vuelva a
+  ingresar en ese celular o se revoque en el admin. Una respuesta que llega después de cerrarse la
+  sesión no se guarda.
+- Decidido (red): tiempo máximo de 8 s para conectar y 15 s por petición. Servidor configurable con
+  `--dart-define=ARRIBO_API=...` (por defecto `http://127.0.0.1:8000`); HTTP en claro solo en el APK
+  de depuración y solo hacia 127.0.0.1 y localhost; release solo HTTPS. Permiso de internet en el
+  manifiesto principal (antes estaba solo en debug). Sin respaldo de Android (`allowBackup=false` y
+  reglas de extracción): el token cifrado no sirve en otro celular y la cola es de este.
+- Decidido (ingreso): el PIN se valida en el celular (exactamente 6 dígitos, teclado numérico,
+  solo dígitos) antes de enviarlo; los errores son el `detalle` del servidor sin agregar nada. En el
+  bloqueo por intentos el botón queda apagado hasta la hora que informa el servidor ("Espere hasta
+  las 3:45 p. m."). El celular del último conductor queda escrito. Fechas en hora de Colombia
+  (UTC−5) sin depender de la zona del celular.
+- Dependencias nuevas (con `flutter pub add`): `http` (API y servidor falso de pruebas), `sqflite`
+  (base local), `flutter_secure_storage` (token en el Keystore), `url_launcher` (marcador, Maps,
+  Waze), `uuid` (identificador del celular; ids de eventos y fotos en la 1a-12 y 1a-13) y, solo
+  para pruebas, `sqflite_common_ffi`. Descartados: `connectivity_plus` (que haya red no dice que
+  llegue al servidor; la lista sabe que no hay conexión porque la petición falla) y
+  `device_info_plus` (el nombre del celular sale de 15 líneas en `MainActivity.kt`). El paquete
+  `sqlite3` (llega por `sqflite_common_ffi`, solo de pruebas) metía `libsqlite3.so` en el APK para
+  cada arquitectura; `pubspec.yaml` le indica que en Android no la empaque (la app usa la SQLite de
+  Android por `sqflite`). Verificado: el APK ya no la trae.
+- Verificado: `flutter analyze` sin problemas, `flutter test` 110 pruebas (cliente con servidor
+  falso: ingreso correcto, PIN malo, bloqueo, datos inválidos, 401 → sesión cerrada, 304 no
+  reescribe, sin señal y tiempo agotado; base local: migraciones, orden de ronda, transacción;
+  la lista se ve desde la base cuando la red falla; el modelo y la base no tienen campos de cobro;
+  pantalla de ingreso con validación de 6 dígitos; texto del sistema al 200 % sin romperse) y
+  `flutter build apk --debug` compila. No se probó en el celular (no había uno conectado).
+- Fuera de esta tarea: botones de estado y cola (1a-12), fotos y capacidad (1a-13), push (1a-14). El
+  nombre bajo el ícono sigue siendo "arribo_conductor" (el de la plantilla).
+- Preguntas abiertas nuevas: dos en `QUESTIONS.md` (ciudad de las direcciones; toques pendientes si
+  ingresa otro conductor después de un 401).
+- Cómo probar (10 minutos, con el Motorola por USB y la depuración USB activada):
+  1. En el admin, tener a Ana lista para la app (pasos de la 1a-09: usuario del grupo `conductor`,
+     PIN 482913, grúa vigente) y uno o dos servicios asignados a ella desde el panel (pasos de la
+     1a-08), con un contacto con teléfono en el origen.
+  2. Desde `backend/`: `uv run python manage.py runserver`.
+  3. En otra ventana de PowerShell:
+     `& "$env:LOCALAPPDATA\Android\sdk\platform-tools\adb.exe" reverse tcp:8000 tcp:8000`
+     y desde `conductor/`: `flutter run`.
+  4. En el celular: el ingreso muestra abajo "Servidor: http://127.0.0.1:8000". Escribir un PIN de
+     5 dígitos e Ingresar: "El PIN tiene 6 dígitos." sin llamar al servidor. Escribir el celular de
+     Ana y un PIN equivocado: "Celular o PIN incorrectos.". Con el PIN correcto: "Mis servicios" con
+     sus servicios en el orden de la ronda y "Actualizado hoy, …".
+  5. Tocar Llamar: se abre el marcador con el número (no llama). Tocar Maps y Waze: se abre la app (o
+     el navegador si no está instalada) con la dirección. Tocar la tarjeta: el detalle.
+  6. En el panel, subir o bajar un servicio en la ronda de Ana; en el celular, deslizar la lista
+     hacia abajo: cambia el orden.
+  7. Sin señal: activar el modo avión **y** quitar el túnel USB (sigue andando en modo avión):
+     `& "$env:LOCALAPPDATA\Android\sdk\platform-tools\adb.exe" reverse --remove-all`. Cerrar la app
+     del todo (deslizarla en recientes) y abrirla desde el ícono: la lista aparece igual, con
+     teléfonos y direcciones, y el aviso "Sin conexión. Se muestra lo guardado en el celular.
+     Actualizado hoy, …". Deslizar hacia abajo: sigue el aviso, nada se borra.
+  8. Volver: quitar el modo avión, repetir el `adb reverse tcp:8000 tcp:8000` y deslizar: desaparece
+     el aviso.
+  9. En `/admin/` → Api del conductor → Tokens de celular, revocar el del Motorola; en el celular,
+     deslizar la lista: vuelve al ingreso con el aviso del servidor y el celular de Ana ya escrito.
+     Ingresar de nuevo: la lista sigue ahí.
+
 ## Escalamientos
 
 Ninguno todavía.

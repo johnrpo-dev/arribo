@@ -1,19 +1,31 @@
-import 'package:flutter/material.dart';
+// Arranque de la app del conductor: abre la base local, arma las piezas y lee la sesión guardada.
 
-void main() {
-  runApp(const ArriboConductorApp());
-}
+import 'package:material_ui/material_ui.dart';
+import 'package:sqflite/sqflite.dart';
 
-class ArriboConductorApp extends StatelessWidget {
-  const ArriboConductorApp({super.key});
+import 'api.dart';
+import 'app.dart';
+import 'asignaciones/almacen_asignaciones.dart';
+import 'asignaciones/lista_asignaciones.dart';
+import 'base_local.dart';
+import 'dispositivo.dart';
+import 'ingreso/almacen_token.dart';
+import 'ingreso/sesion.dart';
 
-  @override
-  Widget build(BuildContext context) {
-    return const MaterialApp(
-      title: 'Arribo conductor',
-      home: Scaffold(
-        body: Center(child: Text('Arribo conductor')),
-      ),
-    );
-  }
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  final base = await BaseLocal.abrir(
+    databaseFactory,
+    '${await getDatabasesPath()}/$nombreArchivoBase',
+  );
+  final api = ClienteApi();
+  final sesion = Sesion(
+    api: api,
+    base: base,
+    almacenToken: AlmacenTokenSeguro(),
+    nombreDispositivo: nombreDelDispositivo,
+  );
+  final lista = ListaAsignaciones(almacen: AlmacenAsignaciones(base), api: api, sesion: sesion);
+  runApp(ArriboApp(sesion: sesion, lista: lista));
+  await sesion.iniciar();
 }

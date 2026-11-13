@@ -132,6 +132,18 @@ Formato: fecha, tarea, pregunta, qué se asumió mientras tanto (si se asumió a
   también entregado, cancelado o reasignado, sin plazo; para uno que nunca fue suyo, no. Si debe
   haber un plazo o debe abrir alerta la foto de un servicio reasignado, se agrega a
   `solicitudes/evidencias.py` con su prueba.
+- **2026-11-13, 1a-11. ¿En qué ciudad se buscan las direcciones en Google Maps y Waze?** La API
+  manda la dirección como texto ("Calle 10 # 43-20, El Poblado"), sin ciudad. Asumido: la app la
+  busca tal cual; si logística escribió un enlace o coordenadas en la ubicación, se usan esos. Una
+  dirección sin ciudad puede llevar a otra ciudad con la misma nomenclatura. Si se quiere, la ciudad
+  por defecto sería configuración de la empresa (nunca una constante del código): un campo nuevo en
+  `configuracion` de la API que la app agregue a la búsqueda.
+- **2026-11-13, 1a-11. ¿Qué pasa con los toques sin enviar si otro conductor ingresa en el celular
+  después de un 401?** Un 401 (token revocado o conductor inhabilitado) lleva al ingreso y conserva
+  lo pendiente; la app no impide que ingrese otro conductor. Asumido para la 1a-12: cada evento
+  guarda el `conductor_id` de quien lo tocó y solo se envía con el token de ese conductor; si ingresa
+  otro, los del anterior esperan a que él vuelva a ingresar. Si se prefiere bloquear el ingreso de
+  otro conductor mientras haya pendientes de alguien, se agrega en la pantalla de ingreso.
 
 ## Resueltas
 

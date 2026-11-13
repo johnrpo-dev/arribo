@@ -62,7 +62,7 @@ Toda tarea termina con `uv run pytest -q` y `uv run ruff check .` en verde, más
   conflicto, revalidar capacidad. Subida de fotos con reintento.
   Verificar: pruebas de lote repetido, evento sobre servicio cancelado y foto subida dos veces.
 
-- [ ] **1a-11 App: ingreso y lista** (5 h). Depende de: 10.
+- [x] **1a-11 App: ingreso y lista** (5 h). Depende de: 10.
   Ingreso, base local, lista de asignaciones por orden de ronda, llamar al contacto con un toque, abrir
   la dirección en Google Maps o Waze. La lista se ve sin señal.
   Verificar: `flutter test`; en el celular, abrir la lista en modo avión.
