@@ -28,6 +28,7 @@ INSTALLED_APPS = [
     "clientes",
     "solicitudes",
     "cobros",
+    "configuracion",
     "panel",
 ]
 

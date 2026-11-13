@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+{% block titulo %}Configuración{% endblock %}
+{% block contenido %}
+<h1 class="titulo-pagina">Configuración</h1>
+
+<form method="post" class="formulario" novalidate>
+  {% csrf_token %}
+  {% if formulario.errors %}
+  <p class="aviso aviso--error" role="alert">No se guardó: revise los campos marcados.</p>
+  {% for error in formulario.non_field_errors %}<p class="aviso aviso--error">{{ error }}</p>{% endfor %}
+  {% endif %}
+
+  <section class="bloque" aria-labelledby="t-registro">
+    <h2 class="titulo-seccion" id="t-registro">Registro de vehículos</h2>
+    <fieldset class="grupo-opciones{% if formulario.momento_placa_vin.errors %} campo--error{% endif %}">
+      <legend>Momento en que se exige placa o VIN</legend>
+      {% for opcion in formulario.momento_placa_vin %}
+      <label class="opcion">{{ opcion.tag }} {{ opcion.choice_label }}</label>
+      {% endfor %}
+      {% for error in formulario.momento_placa_vin.errors %}<p class="campo-error">{{ error }}</p>{% endfor %}
+    </fieldset>
+  </section>
+
+  <section class="bloque" aria-labelledby="t-fotos">
+    <h2 class="titulo-seccion" id="t-fotos">Fotos</h2>
+    {% include "parciales/campo.html" with campo=formulario.minimo_fotos %}
+  </section>
+
+  <section class="bloque" aria-labelledby="t-valores">
+    <h2 class="titulo-seccion" id="t-valores">Valores</h2>
+    <fieldset class="grupo-opciones">
+      <legend>Roles que ven los valores de cobro</legend>
+      <label class="opcion">{{ formulario.ven_valores_administrador }} {{ formulario.ven_valores_administrador.label }}</label>
+      <label class="opcion">{{ formulario.ven_valores_logistica }} {{ formulario.ven_valores_logistica.label }}</label>
+      <label class="opcion">{{ formulario.ven_valores_facturacion }} {{ formulario.ven_valores_facturacion.label }}</label>
+      <p class="ayuda">El administrador siempre ve los valores. El conductor nunca los ve.</p>
+    </fieldset>
+  </section>
+
+  <section class="bloque" aria-labelledby="t-retencion">
+    <h2 class="titulo-seccion" id="t-retencion">Retención de fotos</h2>
+    <fieldset class="grupo-opciones{% if formulario.retencion_fotos.errors %} campo--error{% endif %}">
+      <legend>Tiempo que se guardan las fotos</legend>
+      {% for opcion, costo in formulario.opciones_retencion %}
+      <label class="opcion">{{ opcion.tag }} {{ opcion.choice_label }} <span class="texto-secundario">· {{ costo }}</span></label>
+      {% endfor %}
+      <p class="ayuda">Costo mensual estimado del almacenamiento en el pico (50 servicios al día).</p>
+      {% for error in formulario.retencion_fotos.errors %}<p class="campo-error">{{ error }}</p>{% endfor %}
+    </fieldset>
+  </section>
+
+  <section class="bloque" aria-labelledby="t-alertas">
+    <h2 class="titulo-seccion" id="t-alertas">Alertas</h2>
+    <p class="ayuda">Tiempo que debe pasar para avisar a logística.</p>
+    {% with umbrales=formulario.campos_umbral %}
+    <div class="fila-campos">
+      {% for campo in umbrales|slice:":3" %}{% include "parciales/campo.html" %}{% endfor %}
+    </div>
+    <div class="fila-campos">
+      {% for campo in umbrales|slice:"3:" %}{% include "parciales/campo.html" %}{% endfor %}
+    </div>
+    {% endwith %}
+  </section>
+
+  <section class="bloque" aria-labelledby="t-nocturno">
+    <h2 class="titulo-seccion" id="t-nocturno">Horario nocturno</h2>
+    <div class="fila-campos">
+      {% include "parciales/campo.html" with campo=formulario.nocturno_inicio %}
+      {% include "parciales/campo.html" with campo=formulario.nocturno_fin %}
+    </div>
+    <p class="ayuda">Puede terminar al día siguiente. Por ahora solo se guarda: todavía no cambia a quién llegan las alertas.</p>
+  </section>
+
+  <section class="bloque" aria-labelledby="t-exportacion">
+    <h2 class="titulo-seccion" id="t-exportacion">Exportación</h2>
+    {% include "parciales/campo.html" with campo=formulario.formato_exportacion ayuda="Por ahora es el único formato disponible." %}
+  </section>
+
+  <div class="acciones">
+    <button type="submit" class="boton boton--principal">Guardar configuración</button>
+  </div>
+</form>
+{% endblock %}
