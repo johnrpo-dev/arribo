@@ -1,0 +1,130 @@
+{% extends "base.html" %}
+{% block titulo %}Componentes{% endblock %}
+{% block contenido %}
+<h1 class="titulo-pagina">Componentes del panel</h1>
+<p class="texto-secundario">Muestra con datos de ejemplo. Las pantallas nuevas usan estas clases; los datos no son reales y no se guardan.</p>
+
+<section class="bloque" aria-labelledby="t-estados">
+  <h2 class="titulo-seccion" id="t-estados">Etiquetas de estado</h2>
+  <p class="fila-etiquetas">
+    <span class="estado estado--pendiente_asignar">Pendiente de asignar</span>
+    <span class="estado estado--asignado">Asignado</span>
+    <span class="estado estado--en_camino">En camino</span>
+    <span class="estado estado--recogido">Recogido</span>
+    <span class="estado estado--entregado">Entregado</span>
+    <span class="estado estado--novedad">Novedad</span>
+    <span class="estado estado--cancelado">Cancelado</span>
+  </p>
+</section>
+
+<section class="bloque" aria-labelledby="t-tabla">
+  <h2 class="titulo-seccion" id="t-tabla">Tabla</h2>
+  <div class="tabla-contenedor">
+    <table class="tabla">
+      <thead>
+        <tr>
+          <th scope="col">N.º</th>
+          <th scope="col">Vehículo</th>
+          <th scope="col">Origen</th>
+          <th scope="col">Destino</th>
+          <th scope="col">Conductor</th>
+          <th scope="col">Hora</th>
+          <th scope="col">Estado</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="cifra">1042</td>
+          <td>ABC123 · Mazda 3 gris</td>
+          <td>Calle 10 # 43-20, El Poblado</td>
+          <td>Carrera 70 # 1-50, Belén</td>
+          <td>Ana (GRU001)</td>
+          <td class="cifra">08:15</td>
+          <td><span class="estado estado--en_camino">En camino</span></td>
+        </tr>
+        <tr>
+          <td class="cifra">1043</td>
+          <td>1HGCM82633A004352 · Renault Duster</td>
+          <td>Autos del Valle, Itagüí</td>
+          <td>Calle 30 # 65-12, Laureles</td>
+          <td>Beto (GRU002)</td>
+          <td class="cifra">09:40</td>
+          <td><span class="estado estado--recogido">Recogido</span></td>
+        </tr>
+        <tr>
+          <td class="cifra">1044</td>
+          <td>XYZ789 · Chevrolet Spark blanco</td>
+          <td>Autopista Sur km 4, Envigado</td>
+          <td>Taller El Rápido, Guayabal</td>
+          <td class="texto-secundario">Sin asignar</td>
+          <td class="cifra">10:05</td>
+          <td><span class="estado estado--novedad">Novedad</span></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="bloque" aria-labelledby="t-formulario">
+  <h2 class="titulo-seccion" id="t-formulario">Formulario</h2>
+  <form class="formulario" novalidate>
+    <div class="fila-campos">
+      <div class="campo">
+        <label for="m-telefono">Teléfono del solicitante</label>
+        <input id="m-telefono" type="tel" value="300 123 4567" aria-describedby="m-telefono-ayuda">
+        <p class="ayuda" id="m-telefono-ayuda">Se busca el cliente por este número.</p>
+      </div>
+      <div class="campo">
+        <label for="m-cliente">Cliente</label>
+        <input id="m-cliente" type="text" value="Autos del Valle">
+      </div>
+    </div>
+    <div class="fila-campos">
+      <div class="campo">
+        <label for="m-placa">Placa</label>
+        <input id="m-placa" type="text" value="">
+      </div>
+      <div class="campo campo--error">
+        <label for="m-vin">VIN</label>
+        <input id="m-vin" type="text" value="1HGCM82633A0O4352" aria-invalid="true" aria-describedby="m-vin-error">
+        <p class="campo-error" id="m-vin-error">El VIN no lleva las letras I, O ni Q.</p>
+      </div>
+    </div>
+    <div class="campo">
+      <label for="m-tipo">Tipo de servicio</label>
+      <select id="m-tipo">
+        <option>Traslado</option>
+        <option>Evento de concesionario</option>
+        <option>Desvare</option>
+      </select>
+    </div>
+    <div class="campo">
+      <label for="m-notas">Observaciones</label>
+      <textarea id="m-notas" rows="3">Recoger en el sótano 2.</textarea>
+    </div>
+    <div class="acciones">
+      <button type="button" class="boton boton--principal">Guardar solicitud</button>
+      <button type="button" class="boton boton--secundario">Guardar como borrador</button>
+      <button type="button" class="boton boton--peligro">Cancelar servicio</button>
+    </div>
+  </form>
+</section>
+
+<section class="bloque" aria-labelledby="t-mensajes">
+  <h2 class="titulo-seccion" id="t-mensajes">Mensajes</h2>
+  <div class="mensajes">
+    <p class="aviso">La solicitud quedó en borrador: falta el destino.</p>
+    <p class="aviso aviso--exito">Servicio 1042 asignado a Ana (GRU001).</p>
+    <p class="aviso aviso--advertencia">El SOAT de GRU002 vence en 12 días.</p>
+    <p class="aviso aviso--error">No se pudo asignar: la licencia de Beto está vencida.</p>
+  </div>
+</section>
+
+<section class="bloque" aria-labelledby="t-vacio">
+  <h2 class="titulo-seccion" id="t-vacio">Estado vacío</h2>
+  <div class="vacio">
+    <p>No hay servicios pendientes de asignar.</p>
+    <p><a href="#">Registrar una solicitud</a></p>
+  </div>
+</section>
+{% endblock %}

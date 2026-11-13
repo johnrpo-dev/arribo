@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block titulo %}Sin acceso{% endblock %}
+{% block cuerpo %}
+<main id="contenido" class="ingreso" tabindex="-1">
+  <h1 class="ingreso-marca">Arribo</h1>
+  <div class="ingreso-formulario">
+    <h2 class="titulo-seccion">Sin acceso a esta página</h2>
+    <p>Su usuario no tiene permiso para abrir esta sección del panel.</p>
+    <p class="texto-secundario">Si es conductor, use la app del celular. Si cree que es un error, pida al administrador que revise su rol.</p>
+    {% if user.is_authenticated %}
+    <div class="acciones">
+      {% if secciones_visibles %}<a class="boton boton--secundario" href="{% url 'inicio' %}">Volver al inicio</a>{% endif %}
+      <form method="post" action="{% url 'salir' %}">
+        {% csrf_token %}
+        <button type="submit" class="boton boton--secundario">Salir</button>
+      </form>
+    </div>
+    {% endif %}
+  </div>
+</main>
+{% endblock %}

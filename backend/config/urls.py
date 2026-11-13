@@ -1,6 +1,6 @@
 from django.contrib import admin
 from django.http import JsonResponse
-from django.urls import path
+from django.urls import include, path
 
 
 def salud(request):
@@ -11,4 +11,5 @@ def salud(request):
 urlpatterns = [
     path("salud/", salud, name="salud"),
     path("admin/", admin.site.urls),
+    path("", include("panel.urls")),
 ]

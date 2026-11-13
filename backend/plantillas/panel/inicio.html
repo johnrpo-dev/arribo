@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block titulo %}Inicio{% endblock %}
+{% block contenido %}
+<h1 class="titulo-pagina">Hola, {{ user.get_short_name|default:user.get_username }}</h1>
+<h2 class="titulo-seccion">Sus secciones</h2>
+{% if secciones %}
+<ul class="lista-secciones">
+  {% for seccion in secciones %}
+  <li>
+    <a href="{% url seccion.clave %}">{{ seccion.nombre }}</a>
+    {% if not seccion.disponible %}<span class="texto-secundario">Aún no disponible</span>{% endif %}
+  </li>
+  {% endfor %}
+</ul>
+{% else %}
+<div class="vacio">
+  <p>Su usuario no tiene secciones asignadas.</p>
+  <p>Pida al administrador que le asigne un rol.</p>
+</div>
+{% endif %}
+{% endblock %}

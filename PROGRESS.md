@@ -169,6 +169,33 @@ La tarea 1a-16 se partió en dos: 1a-16a (modelo de línea de cobro con sus rest
   `linea_cobro_facturada_coherente`. En el admin, la línea muestra su historial: creada, cambio de
   valor y facturada.
 
+### Base del panel (12 de noviembre de 2026)
+- Hecho: app `panel` con ingreso en `/ingresar/` y salida en `/salir/` (vistas de Django; la salida
+  solo por POST), inicio en `/` que saluda por nombre y lista las secciones del rol, y la página de
+  componentes `/estilos/` (solo administrador). `panel/roles.py` trae el decorador
+  `requiere_rol(...)`; `panel/secciones.py` es la única lista de secciones de la navegación (nombre,
+  ruta, roles y vista). Plantilla `plantillas/base.html` con bloques `titulo`, `contenido` (y
+  `cuerpo` para páginas sin barra lateral), parcial de mensajes, página 403 en español y hoja de
+  estilos escrita a mano `panel/static/panel/arribo.css`. HTMX 2.0.11 guardado en los estáticos
+  (sin CDN), con el token CSRF en `hx-headers` del `<body>`. `/salud/` no cambió.
+- Decidido: el superusuario entra a todo. Un usuario del grupo `conductor` no entra al panel aunque
+  tenga otro rol (403). Sin sesión, cualquier página del panel lleva al ingreso y vuelve a la página
+  pedida; con sesión y sin el rol, 403 con opción de volver al inicio o salir. Las secciones sin
+  pantalla (hoy todas) muestran "Aún no disponible"; cada tarea futura conecta su vista en
+  `panel/secciones.py` cambiando `vista=None` por la ruta de su vista. La etiqueta de estado usa como
+  modificador el valor del estado (`estado estado--en_camino`), para escribir
+  `estado--{{ servicio.estado }}` en las plantillas. El fondo de "Entregado" quedó en `#eef8f2`
+  (más claro que el resto) para que el verde pase AA. HTMX 2.0.11 y no 4.0.1: htmx.org y npm aún
+  marcan la línea 2 como la estable por defecto; la 4 se publica aparte.
+- Cómo probar (5 minutos): `uv run pytest -q` (809 pruebas) y, desde `backend/`,
+  `uv run python manage.py createsuperuser`, luego `uv run python manage.py runserver`. Abrir
+  `http://127.0.0.1:8000/`: lleva al ingreso. Entrar con una clave equivocada y ver "Usuario o
+  contraseña incorrectos"; entrar bien y ver "Hola" con las siete secciones, todas "Aún no
+  disponible". Abrir `/estilos/` y revisar tabla, etiquetas, formulario con error, botones y
+  mensajes; angostar la ventana por debajo de 800 px y ver la barra superior con la navegación
+  desplazable. En `/admin/`, crear un usuario en el grupo `facturacion`, entrar con él en otra
+  ventana privada: solo ve Cobros, y `/tablero/` da "Sin acceso a esta página". Pulsar Salir.
+
 ## Escalamientos
 
 Ninguno todavía.

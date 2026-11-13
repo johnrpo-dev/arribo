@@ -1,0 +1,39 @@
+{% load static %}<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block titulo %}Arribo{% endblock %} · Arribo</title>
+  <link rel="stylesheet" href="{% static 'panel/arribo.css' %}">
+  <script src="{% static 'panel/htmx-2.0.11.min.js' %}" defer></script>
+</head>
+<body hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'>
+  <a class="saltar" href="#contenido">Saltar al contenido</a>
+  {% block cuerpo %}
+  <div class="marco">
+    <header class="lateral">
+      <a class="marca" href="{% url 'inicio' %}">Arribo</a>
+      <nav class="navegacion" aria-label="Secciones">
+        <ul>
+          {% for seccion in secciones_visibles %}
+          <li><a href="{% url seccion.clave %}"{% if seccion.clave == seccion_actual %} aria-current="page"{% endif %}>{{ seccion.nombre }}</a></li>
+          {% endfor %}
+        </ul>
+      </nav>
+      <div class="sesion">
+        <p class="sesion-nombre">{{ user.get_full_name|default:user.get_username }}</p>
+        <p class="sesion-rol">{{ rol_usuario }}</p>
+        <form method="post" action="{% url 'salir' %}">
+          {% csrf_token %}
+          <button type="submit" class="boton boton--secundario">Salir</button>
+        </form>
+      </div>
+    </header>
+    <main id="contenido" class="contenido" tabindex="-1">
+      {% include "parciales/mensajes.html" %}
+      {% block contenido %}{% endblock %}
+    </main>
+  </div>
+  {% endblock %}
+</body>
+</html>
