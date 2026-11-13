@@ -9,6 +9,7 @@ Documentos de referencia:
 - `docs/arquitectura.md`: decisión aprobada, modelo de datos, máquinas de estado, opciones configurables.
 - `docs/fase-1a-tareas.md`: tareas de la fase 1a en orden de dependencia. **Trabaja una tarea por sesión.**
 - `docs/prueba-sin-senal.md`: checklist manual del modo sin señal en celular real.
+- `docs/api-conductor.md`: contrato de la API de la app del conductor. Si cambia la API, cambia aquí primero.
 
 ## Arquitectura
 
