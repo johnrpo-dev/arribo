@@ -29,6 +29,7 @@ INSTALLED_APPS = [
     "solicitudes",
     "cobros",
     "configuracion",
+    "alertas",
     "panel",
     "api",
 ]

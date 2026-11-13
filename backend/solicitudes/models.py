@@ -7,7 +7,6 @@ concretada. Las reglas viven en la base de datos (restricciones con nombre); `cl
 solo para que el admin muestre el mensaje en español en vez de un error de base.
 """
 import uuid
-from pathlib import Path
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
@@ -17,6 +16,7 @@ from django.db.models import Q
 from flota.models import ES_DEMO_AYUDA
 from nucleo.estados import NOVEDAD_DESDE, Estado, estado_solicitud
 from nucleo.estados import Servicio as ServicioNucleo
+from nucleo.evidencia import Foto
 from nucleo.identificacion import (
     PATRON_VIN,
     VinInvalido,
@@ -24,7 +24,7 @@ from nucleo.identificacion import (
     normalizar_vin,
     validar_vin,
 )
-from nucleo.sincronizacion import Resultado
+from nucleo.sincronizacion import MOTIVOS_DE_CONFLICTO, Resultado
 from nucleo.tipos import TipoServicio
 
 PLACA_NORMALIZADA = r"^[A-Z0-9]+$"
@@ -60,6 +60,8 @@ VALORES_EN_RONDA = [
     Estado.RECOGIDO.value,
     Estado.NOVEDAD.value,
 ]
+# Por qué un evento de la app quedó en conflicto (`nucleo.sincronizacion.Motivo`).
+VALORES_MOTIVO_CONFLICTO = sorted(motivo.value for motivo in MOTIVOS_DE_CONFLICTO)
 
 
 # --- Vehículo ----------------------------------------------------------------------------------
@@ -616,6 +618,12 @@ class EventoEstado(models.Model):
     motivo = models.TextField("motivo", blank=True)
     nombre_quien = models.TextField("nombre de quien entrega o recibe", blank=True)
     resultado = models.CharField("resultado", max_length=10, choices=ResultadoEvento.choices)
+    motivo_conflicto = models.CharField(
+        "motivo del conflicto",
+        max_length=40,
+        blank=True,
+        help_text="Por qué un evento de la app no se aplicó (solo en los conflictos).",
+    )
     capacidad_excedida = models.BooleanField(
         "capacidad excedida",
         default=False,
@@ -644,6 +652,16 @@ class EventoEstado(models.Model):
                 name="evento_resultado_valido",
                 violation_error_message="Resultado de evento desconocido.",
             ),
+            models.CheckConstraint(
+                condition=Q(motivo_conflicto="")
+                | Q(
+                    resultado=ResultadoEvento.CONFLICTO.value,
+                    motivo_conflicto__in=VALORES_MOTIVO_CONFLICTO,
+                ),
+                name="evento_motivo_solo_en_conflicto",
+                violation_error_message="El motivo del conflicto va solo en un evento en "
+                "conflicto y es uno de los conocidos.",
+            ),
         )
 
     def __str__(self):
@@ -670,13 +688,20 @@ class TipoEvidencia(models.TextChoices):
 
 
 def ruta_evidencia(instancia, nombre_original):
-    """evidencias/<servicio>/<id de la evidencia>.<extensión>, dentro de MEDIA_ROOT."""
-    extension = Path(nombre_original).suffix.lower()
-    return f"evidencias/{instancia.servicio_id}/{instancia.pk}{extension}"
+    """evidencias/<servicio>/<id de la evidencia>.jpg, dentro de MEDIA_ROOT.
+
+    El nombre lo pone el servidor: del que manda el celular no se usa nada, ni la extensión.
+    """
+    return f"evidencias/{instancia.servicio_id}/{instancia.pk}.jpg"
 
 
 class Evidencia(models.Model):
-    """Foto de recogida, entrega o soporte. Solo el modelo: la subida es de otra tarea."""
+    """Foto de recogida, entrega o soporte. La sube la app con `solicitudes/evidencias.py`.
+
+    La foto puede llegar antes que su evento (la app sube las fotos en su propia cola): entonces
+    queda sin `evento`, con el id que el celular anunció en `evento_esperado`, y se enlaza cuando
+    el evento llega (`solicitudes/operaciones.py`). Las reglas están en `nucleo/evidencia.py`.
+    """
 
     Tipo = TipoEvidencia
 
@@ -691,10 +716,38 @@ class Evidencia(models.Model):
         Servicio, verbose_name="servicio", on_delete=models.PROTECT, related_name="evidencias"
     )
     evento = models.ForeignKey(
-        EventoEstado, verbose_name="evento", on_delete=models.PROTECT, related_name="evidencias"
+        EventoEstado,
+        verbose_name="evento",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="evidencias",
+        help_text="Vacío mientras el evento que acompaña no haya llegado al servidor.",
+    )
+    evento_esperado = models.UUIDField(
+        "evento que acompaña",
+        null=True,
+        blank=True,
+        db_index=True,
+        help_text="Id del evento que el celular dijo que acompaña; con él se enlaza al llegar.",
     )
     tipo = models.CharField("tipo", max_length=10, choices=TipoEvidencia.choices)
     archivo = models.FileField("archivo", upload_to=ruta_evidencia)
+    sha256 = models.CharField(
+        "huella del contenido",
+        max_length=64,
+        blank=True,
+        help_text="SHA-256 del archivo: la misma foto subida otra vez se reconoce por él.",
+    )
+    tamano = models.PositiveIntegerField("tamaño en bytes", null=True, blank=True)
+    subida_por = models.ForeignKey(
+        "flota.Conductor",
+        verbose_name="subida por",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="evidencias_subidas",
+    )
     creada_en = models.DateTimeField("creada en", auto_now_add=True)
 
     class Meta:
@@ -707,7 +760,29 @@ class Evidencia(models.Model):
                 name="evidencia_tipo_valido",
                 violation_error_message="Tipo de evidencia desconocido.",
             ),
+            models.CheckConstraint(
+                condition=Q(evento__isnull=False) | Q(evento_esperado__isnull=False),
+                name="evidencia_con_evento_o_en_espera",
+                violation_error_message="La evidencia acompaña a un evento, ya guardado o por "
+                "llegar.",
+            ),
+            models.CheckConstraint(
+                condition=Q(sha256="") | Q(sha256__regex=r"^[0-9a-f]{64}$"),
+                name="evidencia_sha256_valido",
+                violation_error_message="La huella es un SHA-256 en hexadecimal.",
+            ),
         )
 
     def __str__(self):
         return f"{TipoEvidencia(self.tipo).label} · servicio {self.servicio_id}"
+
+    def como_nucleo(self) -> Foto:
+        """La evidencia como la entiende nucleo/evidencia.py."""
+        acompana = self.evento_esperado or self.evento_id
+        return Foto(
+            servicio_id=str(self.servicio_id),
+            conductor_id=None if self.subida_por_id is None else str(self.subida_por_id),
+            evento_id=str(acompana) if acompana else "",
+            tipo=self.tipo,
+            sha256=self.sha256,
+        )

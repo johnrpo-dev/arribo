@@ -57,7 +57,7 @@ Toda tarea termina con `uv run pytest -q` y `uv run ruff check .` en verde, más
   App `api`: ingreso con celular y PIN, token revocable por dispositivo, lista de asignaciones del conductor.
   Verificar: prueba de que la respuesta no contiene ningún valor de cobro y de que un conductor no ve servicios de otro.
 
-- [ ] **1a-10 API: sincronización** (3 h). Depende de: 09.
+- [x] **1a-10 API: sincronización** (3 h). Depende de: 09.
   Recibir lotes de eventos con `nucleo/sincronizacion.py`, guardar hora de sincronización, abrir alerta en
   conflicto, revalidar capacidad. Subida de fotos con reintento.
   Verificar: pruebas de lote repetido, evento sobre servicio cancelado y foto subida dos veces.
@@ -108,6 +108,9 @@ Toda tarea termina con `uv run pytest -q` y `uv run ruff check .` en verde, más
   vencer, conflicto de sincronización) con los umbrales configurados. La pantalla principal muestra lo
   que requiere acción. Búsqueda por cliente, teléfono, placa, VIN, conductor, grúa, caso, factura y fecha.
   Verificar: una prueba por alerta con el reloj controlado; cambiar un umbral y ver aparecer la alerta.
+  Nota: la app `alertas` ya existe desde la 1a-10 con lo mínimo (modelo Alerta, `abrir_alerta`,
+  `resolver_alerta` y el admin); la sincronización ya abre las alertas de conflicto, de capacidad
+  excedida y de evento rechazado. Faltan el comando con los umbrales, las otras tres alertas y el tablero.
 
 - [ ] **1a-19 Panel del dueño mínimo** (3 h). Depende de: 18.
   Servicios del día por estado, no concretadas por motivo, cobros pendientes por pagador, documentos por vencer.

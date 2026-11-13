@@ -5,9 +5,15 @@ import pytest
 from nucleo.estados import Estado, Servicio, transicionar
 from nucleo.sincronizacion import (
     DESTINOS_DESDE_LA_APP,
+    DETALLE,
+    MOTIVOS_DE_CONFLICTO,
+    MOTIVOS_DE_RECHAZO,
     Evento,
+    Motivo,
     Resultado,
     aplicar_evento,
+    decidir,
+    es_reenvio,
     ordenar,
 )
 
@@ -136,3 +142,101 @@ def test_el_orden_lo_da_la_secuencia_y_no_el_reloj_del_celular():
     reloj_atrasado = evento(Estado.RECOGIDO, id="b", secuencia=2, hora=datetime(2020, 1, 1))
     primero = evento(Estado.EN_CAMINO, id="a", secuencia=1, hora=datetime(2026, 11, 12))
     assert [e.id for e in ordenar([reloj_atrasado, primero])] == ["a", "b"]
+
+
+# --- Motivo del conflicto: lo que se le dice al conductor y a logística ------------------------
+
+
+@pytest.mark.parametrize(
+    ("servicio", "asignado", "destino", "motivo_del_evento", "esperado"),
+    [
+        (Servicio(Estado.ASIGNADO), CONDUCTOR, Estado.CANCELADO, "x", Motivo.DESTINO_NO_PERMITIDO),
+        (Servicio(Estado.ASIGNADO), "conductor-2", Estado.EN_CAMINO, None,
+         Motivo.SERVICIO_NO_ASIGNADO),
+        (Servicio(Estado.PENDIENTE_ASIGNAR), None, Estado.EN_CAMINO, None,
+         Motivo.SERVICIO_NO_ASIGNADO),
+        (Servicio(Estado.CANCELADO), CONDUCTOR, Estado.EN_CAMINO, None, Motivo.SERVICIO_CANCELADO),
+        (Servicio(Estado.ENTREGADO), CONDUCTOR, Estado.ENTREGADO, None, Motivo.SERVICIO_ENTREGADO),
+        (Servicio(Estado.NOVEDAD, Estado.EN_CAMINO), CONDUCTOR, Estado.RECOGIDO, None,
+         Motivo.NOVEDAD_ABIERTA),
+        (Servicio(Estado.ASIGNADO), CONDUCTOR, Estado.RECOGIDO, None, Motivo.SALTO_DE_ESTADO),
+        (Servicio(Estado.RECOGIDO), CONDUCTOR, Estado.EN_CAMINO, None, Motivo.SALTO_DE_ESTADO),
+        (Servicio(Estado.EN_CAMINO), CONDUCTOR, Estado.NOVEDAD, "  ", Motivo.NOVEDAD_SIN_MOTIVO),
+    ],
+)
+def test_cada_conflicto_dice_por_que_no_encajo(
+    servicio, asignado, destino, motivo_del_evento, esperado
+):
+    decision = decidir(servicio, asignado, evento(destino, motivo=motivo_del_evento), set())
+    assert (decision.resultado, decision.motivo) == (Resultado.CONFLICTO, esperado)
+    assert decision.servicio == servicio  # un conflicto nunca cambia el servicio
+
+
+def test_un_evento_aplicado_o_duplicado_no_lleva_motivo():
+    ev = evento(Estado.EN_CAMINO)
+    aplicado = decidir(Servicio(Estado.ASIGNADO), CONDUCTOR, ev, set())
+    duplicado = decidir(Servicio(Estado.EN_CAMINO), CONDUCTOR, ev, {ev.id})
+    assert (aplicado.resultado, aplicado.motivo) == (Resultado.APLICADO, None)
+    assert aplicado.servicio == Servicio(Estado.EN_CAMINO)
+    assert (duplicado.resultado, duplicado.motivo) == (Resultado.DUPLICADO, None)
+
+
+def test_el_servicio_reasignado_y_luego_cancelado_se_explica_por_la_reasignacion():
+    # El conductor ya no era el del servicio cuando lo cancelaron: lo suyo es que se lo quitaron.
+    decision = decidir(Servicio(Estado.CANCELADO), "conductor-2", evento(Estado.EN_CAMINO), set())
+    assert decision.motivo == Motivo.SERVICIO_NO_ASIGNADO
+
+
+def test_aplicar_evento_y_decidir_dan_siempre_lo_mismo():
+    casos = [
+        (Servicio(Estado.ASIGNADO), CONDUCTOR, evento(Estado.EN_CAMINO)),
+        (Servicio(Estado.ASIGNADO), CONDUCTOR, evento(Estado.ENTREGADO)),
+        (Servicio(Estado.CANCELADO), CONDUCTOR, evento(Estado.EN_CAMINO)),
+    ]
+    for servicio, asignado, ev in casos:
+        decision = decidir(servicio, asignado, ev, set())
+        assert aplicar_evento(servicio, asignado, ev, set()) == (
+            decision.servicio,
+            decision.resultado,
+        )
+
+
+def test_todo_motivo_tiene_un_texto_legible_en_espanol():
+    for motivo in Motivo:
+        assert DETALLE[motivo].strip().endswith(".")
+
+
+def test_los_motivos_de_conflicto_y_los_de_rechazo_no_se_mezclan():
+    assert MOTIVOS_DE_CONFLICTO.isdisjoint(MOTIVOS_DE_RECHAZO)
+    assert Motivo.ID_REUTILIZADO in MOTIVOS_DE_RECHAZO
+    assert Motivo.SERVICIO_CANCELADO in MOTIVOS_DE_CONFLICTO
+
+
+# --- Mismo id con otro contenido ---------------------------------------------------------------
+
+
+def test_un_reenvio_es_el_mismo_id_con_el_mismo_contenido():
+    guardado = evento(Estado.EN_CAMINO, secuencia=7)
+    # La hora y el motivo no cuentan: el celular reenvía lo mismo, y el reloj no es de fiar.
+    reenviado = evento(Estado.EN_CAMINO, secuencia=7, hora=datetime(2031, 1, 1), motivo="x")
+    assert es_reenvio(guardado, reenviado)
+
+
+@pytest.mark.parametrize(
+    "otro",
+    [
+        evento(Estado.RECOGIDO, secuencia=7),  # otro destino
+        evento(Estado.EN_CAMINO, secuencia=8),  # otra secuencia
+        evento(Estado.EN_CAMINO, secuencia=7, conductor="conductor-2"),  # otro conductor
+        Evento(id="ev-1", servicio_id="s-2", conductor_id=CONDUCTOR, destino=Estado.EN_CAMINO,
+               secuencia=7, hora_dispositivo=datetime(2026, 11, 12, 8, 0)),  # otro servicio
+    ],
+)
+def test_el_mismo_id_con_otro_contenido_no_es_un_reenvio(otro):
+    assert not es_reenvio(evento(Estado.EN_CAMINO, secuencia=7), otro)
+
+
+def test_el_orden_conserva_el_de_llegada_cuando_la_secuencia_se_repite():
+    primero = evento(Estado.EN_CAMINO, id="a", secuencia=5)
+    segundo = evento(Estado.RECOGIDO, id="b", secuencia=5)
+    assert [e.id for e in ordenar([primero, segundo])] == ["a", "b"]

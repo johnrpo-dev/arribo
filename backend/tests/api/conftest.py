@@ -6,10 +6,12 @@ vueltas) tarda casi un segundo, así que aquí se usa MD5 para no alargar la sui
 depende del algoritmo, salvo `test_el_pin_se_guarda_con_el_hash_de_django_nunca_en_claro`, que
 vuelve a poner el de producción.
 """
+import uuid
 from datetime import datetime, timedelta
 
 import pytest
 from django.contrib.auth.models import Group
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.utils import timezone
 from rest_framework.test import APIClient
 
@@ -98,3 +100,66 @@ def reloj(monkeypatch):
     reloj = Reloj(timezone.now().replace(microsecond=0))
     monkeypatch.setattr(timezone, "now", lambda: reloj.ahora)
     return reloj
+
+
+# --- Sincronización (1a-10) ----------------------------------------------------------------------
+
+URL_EVENTOS = "/api/v1/eventos/"
+JPEG = b"\xff\xd8\xff\xe0\x00\x10JFIF\x00" + b"foto de prueba " * 40 + b"\xff\xd9"
+
+
+def evento_json(servicio, destino, *, secuencia=1, **otros) -> dict:
+    """Un evento como lo manda el celular (id nuevo en cada llamada, salvo que se pase)."""
+    base = {
+        "id": str(uuid.uuid4()),
+        "servicio_id": getattr(servicio, "pk", servicio),
+        "destino": getattr(destino, "value", destino),
+        "secuencia": secuencia,
+        "hora_dispositivo": f"2026-11-20T13:{secuencia % 60:02d}:00Z",
+    }
+    base.update(otros)
+    return base
+
+
+def enviar(cliente, *eventos):
+    """POST del lote; devuelve la lista de resultados (uno por evento, en el orden enviado)."""
+    respuesta = cliente.post(URL_EVENTOS, {"eventos": list(eventos)}, format="json")
+    assert respuesta.status_code == 200, respuesta.content
+    cuerpo = respuesta.json()
+    assert cuerpo["version"] == 1
+    assert len(cuerpo["resultados"]) == len(eventos)
+    return cuerpo["resultados"]
+
+
+def url_evidencia(evidencia_id) -> str:
+    return f"/api/v1/evidencias/{evidencia_id}/"
+
+
+def subir(cliente, servicio, evento_id, *, evidencia_id=None, tipo="recogida", contenido=JPEG,
+          nombre="IMG_0001.jpg", **otros):
+    """PUT de una foto en multipart; devuelve (respuesta, id de la evidencia)."""
+    evidencia_id = evidencia_id or uuid.uuid4()
+    datos = {
+        "servicio_id": getattr(servicio, "pk", servicio),
+        "evento_id": str(evento_id),
+        "tipo": tipo,
+        "archivo": SimpleUploadedFile(nombre, contenido, content_type="image/jpeg"),
+    }
+    datos.update(otros)
+    datos = {clave: valor for clave, valor in datos.items() if valor is not None}
+    return cliente.put(url_evidencia(evidencia_id), datos, format="multipart"), evidencia_id
+
+
+@pytest.fixture
+def sesion_beto(beto_app):
+    token, clave = TokenDispositivo.emitir(beto_app, "celular-de-beto", "Moto G de Beto")
+    cliente = cliente_con(clave)
+    cliente.token, cliente.clave = token, clave
+    return cliente
+
+
+@pytest.fixture
+def media_temporal(settings, tmp_path):
+    """Las fotos de la prueba van a una carpeta temporal, no a `backend/media/`."""
+    settings.MEDIA_ROOT = tmp_path
+    return tmp_path
