@@ -291,8 +291,8 @@ devuelto a la cola o reasignado). El 404 es idéntico en los tres casos.
   los 100 más antiguos y sigue con el resto en otro lote.
 - **Datos secundarios ilegibles no tumban el evento.** Si `hora_dispositivo`, `latitud`, `longitud`,
   `motivo`, `nombre_quien`, `placa` o `vin` vienen con un valor que no se puede leer (por ejemplo, un
-  número en vez de texto), el evento se guarda con ese dato vacío. Solo `id`, `servicio_id`,
-  `destino` y `secuencia` son indispensables.
+  objeto o una lista en vez de texto), el evento se guarda con ese dato vacío; un número en un campo
+  de texto se lee como texto. Solo `id`, `servicio_id`, `destino` y `secuencia` son indispensables.
 
 ### Placa o VIN digitados al recoger
 
