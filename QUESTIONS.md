@@ -145,6 +145,26 @@ Formato: fecha, tarea, pregunta, qué se asumió mientras tanto (si se asumió a
   otro, los del anterior esperan a que él vuelva a ingresar. Si se prefiere bloquear el ingreso de
   otro conductor mientras haya pendientes de alguien, se agrega en la pantalla de ingreso.
 
+- **2026-11-13, 1a-15. ¿Un documento obligatorio que falta bloquea igual que uno vencido?** La
+  regla escrita solo dice "documento vencido". Asumido: no; solo bloquea el vencido. Una grúa o un
+  conductor sin SOAT, tecnomecánica o licencia registrados sale en Flota y documentos con la
+  etiqueta "Falta" y sigue recibiendo servicios. Si debe bloquear, se cambia `bloquea` en
+  `nucleo/documentos.py` (incluir `FALTA`) y sus pruebas; ojo: al instalar, toda la flota quedaría
+  bloqueada hasta registrar sus documentos.
+- **2026-11-13, 1a-15. ¿Qué pasa cuando llega la fecha de un documento que "aún no aplica"?**
+  Asumido: ese día ya se exige, así que si no se registró el documento real cuenta como vencido
+  (bloquea) y se avisa desde los días de anticipación de su tipo antes de esa fecha, igual que un
+  vencimiento. Si debe contar como "falta" (no bloquear), se cambia `estado_documento` en
+  `nucleo/documentos.py` con su prueba.
+- **2026-11-13, 1a-15. ¿Se avisa de documentos por vencer de grúas o conductores inactivos?**
+  Asumido: no; `documentos_por_vencer` (la usará la alerta de la 1a-18) solo trae grúas y
+  conductores activos. La pantalla sí los muestra, marcados como inactivos.
+- **2026-11-13, 1a-15. ¿Qué archivos se adjuntan a un documento?** Asumido: foto JPEG o PNG, o PDF
+  (el SOAT electrónico llega en PDF), de hasta 10 MB; se reconoce por el contenido, no por el
+  nombre. Es un límite técnico del servidor, no una opción del cliente. Se pueden ver desde el
+  historial (solo administrador). Si hace falta otro formato o más tamaño, cambia
+  `TIPOS_DE_ARCHIVO` o `TAMANO_MAXIMO_ARCHIVO` en `nucleo/documentos.py`.
+
 ## Resueltas
 
 - **2026-11-12, 1a-04 → resuelta en 1a-04. ¿El conductor puede cancelar un servicio desde la app?**

@@ -290,6 +290,7 @@ def test_un_tipo_con_documentos_no_cambia_de_lado_desde_la_pantalla(
     registrar(soat, grua1, vence_en=10)
     html = client.get(f"/flota/tipos/{soat.pk}/").content.decode()
     assert "no cambia de lado" in html
+    assert "---------" not in html
 
     client.post(
         f"/flota/tipos/{soat.pk}/",

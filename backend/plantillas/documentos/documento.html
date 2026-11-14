@@ -65,7 +65,7 @@
           <td><time datetime="{{ d.registrado_en|date:'c' }}">{{ d.registrado_en|date:"d/m/Y H:i" }}</time> por {{ d.registrado_por.get_full_name|default:d.registrado_por.get_username }}{% if forloop.first %}<br><strong>Vigente</strong>{% else %}<br><span class="texto-secundario">Reemplazado</span>{% endif %}</td>
           <td>{% if d.aun_no_aplica %}Aún no aplica; aplica desde {{ d.aplica_desde|date:"d/m/Y" }}{% else %}Vence {{ d.vence|date:"d/m/Y" }}{% endif %}</td>
           <td>{{ d.numero|default:"—" }}</td>
-          <td>{% if d.archivo %}<a href="{% url 'archivo_documento' d.pk %}" target="_blank" rel="noopener">Ver {{ d.get_tipo_archivo_display }}</a>{% else %}—{% endif %}</td>
+          <td>{% if d.archivo %}<a href="{% url 'archivo_documento' d.pk %}" target="_blank" rel="noopener">Ver archivo ({{ d.get_tipo_archivo_display }})</a>{% else %}—{% endif %}</td>
         </tr>
         {% endfor %}
       </tbody>

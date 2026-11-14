@@ -6,8 +6,9 @@ import pytest
 from django.db import IntegrityError, transaction
 from django.db.models.deletion import ProtectedError
 
-from documentos.models import AplicaA, Documento, DocumentoInmutable, TipoDocumento
+from documentos.models import AplicaA, Documento, DocumentoInmutable, TipoArchivo, TipoDocumento
 from documentos.operaciones import DocumentoInvalido, historial, registrar_documento
+from nucleo.documentos import TIPOS_DE_ARCHIVO
 
 pytestmark = pytest.mark.django_db
 
@@ -161,3 +162,7 @@ def test_un_documento_nuevo_reemplaza_al_anterior_y_el_anterior_queda_en_el_hist
 def test_registrar_documento_requiere_quien_lo_registra(soat, grua1):
     with pytest.raises((IntegrityError, ValueError)), transaction.atomic():
         registrar_documento(tipo=soat, sujeto=grua1, por=None, vence=HOY)
+
+
+def test_los_tipos_de_archivo_del_modelo_son_los_que_acepta_el_nucleo():
+    assert set(TipoArchivo.values) == set(TIPOS_DE_ARCHIVO)

@@ -5,7 +5,7 @@ from django import forms
 
 from nucleo import documentos as regla
 
-from .models import Documento, TipoDocumento
+from .models import AplicaA, Documento, TipoDocumento
 
 MEGAS_MAXIMOS = regla.TAMANO_MAXIMO_ARCHIVO // (1024 * 1024)
 
@@ -93,6 +93,7 @@ class FormularioTipo(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.fields["aplica_a"].choices = AplicaA.choices  # sin la opción vacía "---------"
         self.tiene_documentos = bool(self.instance.pk) and self.instance.documentos.exists()
         if self.tiene_documentos:
             # La base tampoco lo deja: sus documentos son de ese lado.
