@@ -188,6 +188,35 @@ Formato: fecha, tarea, pregunta, qué se asumió mientras tanto (si se asumió a
   nombre. Es un límite técnico del servidor, no una opción del cliente. Se pueden ver desde el
   historial (solo administrador). Si hace falta otro formato o más tamaño, cambia
   `TIPOS_DE_ARCHIVO` o `TAMANO_MAXIMO_ARCHIVO` en `nucleo/documentos.py`.
+- **2026-11-14, 1a-13. ¿El conductor digita la placa o el VIN cuando el vehículo llegó sin
+  ellos?** El contrato no tiene dónde enviarlos (el evento no lleva esos campos) y el servidor
+  deja en conflicto un Recogido sin identificación. Asumido: la app bloquea "Marcar Recogido",
+  dice qué falta y que llame a logística para que lo registren; después actualiza la lista y ya
+  deja. Sin señal, ese vehículo no se puede marcar Recogido. Si debe digitarlo él, se agregan
+  `placa` y `vin` al evento de Recogido en el contrato y el servidor los valida con
+  `nucleo/identificacion.py`; la app ya tiene la misma regla copiada (`identificacion.dart`).
+- **2026-11-14, 1a-13. ¿El servidor debe exigir también el mínimo de fotos y el nombre de quien
+  entrega o recibe?** Hoy solo los exige la app: el servidor guarda el Recogido o el Entregado con
+  lo que llegue (las fotos llegan después, por su propia cola). Asumido: nada más. Si se quiere
+  vigilar, la 1a-18 podría abrir una alerta "Recogido o Entregado sin evidencia completa" cuando
+  pase cierto tiempo sin las fotos.
+- **2026-11-14, 1a-13. ¿Qué hace el conductor con una foto que el servidor rechazó?** (pesa más de
+  lo que el servidor recibe, o ya había otra con ese identificador). Asumido: la app la deja a la
+  vista con el motivo y "Avise a logística", conserva el archivo en el celular y no la reintenta;
+  no hay botón para reintentar ni forma de sacarla del celular. Si hace falta, se agrega un
+  "Reintentar" en el aviso (sirve cuando el rechazo fue por la configuración del servidor).
+- **2026-11-14, 1a-13. ¿Qué se hace con las fotos de un paso que el conductor empezó y nunca
+  marcó?** (por ejemplo, tomó dos fotos y logística canceló o reasignó el servicio). Asumido:
+  quedan guardadas en el celular, sin subir, y no se borran solas (ocupan unos cientos de KB cada
+  una). Si deben borrarse cuando el servicio sale de su lista, o subirse igual como evidencia, se
+  agrega a `fotos/almacen_fotos.dart` con su prueba.
+- **2026-11-14, 1a-13. ¿El conductor puede quitar una foto y hay un máximo por paso?** Asumido:
+  puede quitar una foto (salió movida) mientras no haya marcado el paso; después no. No hay
+  máximo: puede tomar más del mínimo. Si debe haber un tope, sería configuración de la empresa.
+- **2026-11-14, 1a-13. ¿El nombre de quien entrega o recibe se propone con el contacto del
+  servicio?** Asumido: no; el conductor lo escribe siempre (quien está en el sitio puede no ser el
+  contacto registrado). Si se quiere ahorrar el tecleo, la pantalla puede proponer el nombre del
+  contacto de origen o de destino y dejarlo corregir.
 
 ## Resueltas
 

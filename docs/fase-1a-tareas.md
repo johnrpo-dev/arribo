@@ -72,7 +72,7 @@ Toda tarea termina con `uv run pytest -q` y `uv run ruff check .` en verde, más
   se envía al abrir la app o al recuperar señal. Indicador "pendiente por enviar".
   Verificar: pruebas de la cola (no pierde eventos, no los duplica, respeta la secuencia); puntos 1 a 4 de `docs/prueba-sin-senal.md`.
 
-- [ ] **1a-13 App: fotos y capacidad** (8 h). Depende de: 12.
+- [x] **1a-13 App: fotos y capacidad** (8 h). Depende de: 12.
   Recogido y Entregado exigen el mínimo de fotos configurado y el nombre de quien entrega o recibe. Fotos
   comprimidas en el celular, subida en cola. Bloqueo por capacidad mostrando qué falta entregar.
   Verificar: pruebas del bloqueo y del mínimo de fotos; puntos 5 a 9 de `docs/prueba-sin-senal.md`.

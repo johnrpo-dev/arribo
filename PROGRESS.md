@@ -786,6 +786,119 @@ La tarea 1a-16 se partió en dos: 1a-16a (modelo de línea de cobro con sus rest
   7. Con un usuario de logística, `/flota/` da "Sin acceso a esta página". Angostar a 375 px: sin
      desplazamiento horizontal.
 
+### 1a-13 App: fotos y capacidad (14 de noviembre de 2026)
+- Hecho: en la app, "Marcar Recogido" y "Marcar Entregado" ya no se confirman con un toque: abren
+  una pantalla donde el conductor toma las fotos con la cámara del celular y escribe el nombre de
+  quien entrega (Recogido) o recibe (Entregado). Solo con el mínimo de fotos de Configuración y el
+  nombre se guarda el evento; si falta algo, dice qué ("Falta 1 foto: lleva 3 de 4."). Las fotos
+  suben solas, en su propia cola, después del evento; la lista dice cuántas faltan ("Hay 4 fotos
+  pendientes por subir") y cada servicio lleva la marca "4 fotos por subir". Un Recogido se bloquea
+  antes de abrir la pantalla si la grúa va llena (muestra qué vehículo falta marcar como Entregado)
+  o si al vehículo le falta la placa o el VIN. Sin cambios en el comportamiento del backend ni en
+  el contrato; en el backend solo se agregó una prueba.
+- Decidido (cámara): la del sistema, con `image_picker`, y no una vista de cámara dentro de la app
+  (`camera`). La cámara corre en otro proceso: la app no retiene en memoria la vista previa ni la
+  foto, y no necesita el permiso de cámara. El costo es que Android puede matar la app mientras la
+  cámara está abierta, y por eso todo lo de la pantalla vive en la base (ver abajo).
+- Decidido (compresión): la hace el mismo plugin en código nativo, en un hilo aparte y
+  decodificando ya reducida (`inSampleSize`): lado máximo de 1600 píxeles y JPEG de calidad 80,
+  unos cientos de KB por foto (el servidor acepta 5 MB). A Dart solo llega la ruta del archivo;
+  nunca se leen los bytes de una foto (solo los tres primeros, para comprobar que es un JPEG) y
+  una que pese más de 5 MB no se acepta. El original de la cámara se borra de la caché. Cada foto
+  recibe su UUID y se mueve a una carpeta `fotos/` junto a la base local (almacenamiento privado
+  que Android no vacía, a diferencia de la caché). Sin dependencia nueva para la ruta
+  (`path_provider`): sale de la ruta de la base. Las miniaturas usan `cacheWidth`.
+- Decidido (la pantalla sobrevive a que Android mate la app): migración 3 de la base local. El
+  paso se guarda al abrir la pantalla (`pasos_en_curso`, con el UUID que llevará el evento), cada
+  foto al tomarla (fila en borrador atada a ese UUID) y el nombre en cada cambio. La pantalla es
+  una ruta restaurable. Antes de abrir la cámara se anota en el paso; si la app muere, al volver se
+  le pide al plugin la foto que quedó sin entregar y se agrega a ese paso. Salir de la pantalla sin
+  marcar conserva lo que llevaba.
+- Decidido (un solo paso para guardar): al marcar, en la misma transacción que inserta el evento,
+  se comprueban el mínimo de fotos y el nombre, las fotos dejan de ser borrador y el paso se
+  borra. O queda todo o no queda nada (ni se gasta la secuencia).
+- Decidido (cola de fotos): una foto a la vez, en orden, solo con el token de quien la tomó y solo
+  después de que su evento tuvo respuesta definitiva. El contrato admite la foto antes que el
+  evento, pero así se evita un 404 falso (el servidor solo recibe fotos de quien tiene o tuvo el
+  servicio, y "lo tuvo" se sabe por sus eventos). El `PUT` es idempotente por UUID: si se corta o
+  la respuesta se pierde, se sube completa otra vez y el servidor responde 200 sin duplicarla. El
+  archivo se lee del disco por partes al enviarlo, con un tiempo máximo de 2 minutos por foto.
+  Reintento con la misma espera creciente de los eventos (5, 10, 20 y 30 s; hasta 5 minutos en
+  segundo plano). El archivo se borra solo después de confirmada la subida; si la app muere entre
+  las dos cosas, se borra al abrir. Sobrevive a reinicios. Con fotos propias pendientes no se
+  cierra sesión; las de otro conductor esperan a que él vuelva a ingresar.
+- Decidido (foto rechazada): un 413, 409, 400, 404 o 415 no se reintenta. La foto queda marcada
+  con el texto del servidor, conserva su archivo y se ve en la lista como aviso rojo ("ABC123: una
+  foto de la recogida no se pudo subir… Avise a logística") hasta que el conductor toca
+  "Entendido". No impide cerrar sesión. Un 413 sin la forma del contrato (un nginx con el tope por
+  defecto de 1 MB) se trata igual.
+- Decidido (capacidad): la misma regla de `nucleo/capacidad.py`, con "montado" calculado sobre lo
+  que ve el conductor (lo confirmado más sus toques sin enviar), así que funciona sin señal y se
+  libera en cuanto marca Entregado. Se revisa al tocar "Marcar Recogido" y otra vez al guardar.
+  Cuentan los servicios de la misma grúa que estén en su lista.
+- Decidido (copias de reglas): `docs/casos-reglas.json` tiene los casos de estados (los 49 pares
+  de estado y destino), a bordo, capacidad, placa, VIN, identificación y límites de las fotos. Lo
+  recorren `backend/tests/nucleo/test_casos_compartidos.py` (118 pruebas) y
+  `conductor/test/casos_compartidos_test.dart`. Comprobado cambiando a propósito la capacidad y la
+  novedad en la copia de la app: la prueba falla.
+- Defectos del contrato (anotados, sin tocar el backend): (1) el conductor no puede enviar la
+  placa o el VIN de un vehículo que llegó sin ellos; el evento no tiene esos campos, así que la
+  app bloquea el Recogido y le dice que llame a logística (el servidor igual lo dejaría en
+  conflicto `identificacion_incompleta`). (2) El servidor no revisa ni el mínimo de fotos ni el
+  nombre: esa regla solo la cumple la app. (3) Para un 413 el contrato dice "comprimir más y subir
+  de nuevo"; la app no recomprime (ya comprime a menos de 1 MB), la deja como problema.
+- Dependencia nueva (con `flutter pub add`): `image_picker` (cámara del sistema, compresión nativa
+  y recuperación de la foto tras la muerte de la app). En el manifiesto de Android se declaró la
+  consulta de la cámara (`IMAGE_CAPTURE`); no se agregó ningún permiso.
+- Cambios en pruebas anteriores: la prueba de la 1a-12 "Recogido y Entregado se confirman…" ahora
+  pasa por la pantalla de fotos y nombre (ya no existe la confirmación de un toque para esos dos
+  pasos); la de tablas de la base incluye `pasos_en_curso`.
+- Verificado: `flutter analyze` sin problemas; `flutter test`, 391 pruebas (mínimo de
+  fotos y nombre exigidos; placa o VIN al recoger; bloqueo de capacidad con el vehículo que falta
+  entregar; capacidad 2 permite dos montados; la pantalla sobrevive a reabrir y recibe la foto
+  tomada con la app muerta; la cola de fotos no pierde, no duplica, deja el 413 visible sin
+  reintentos infinitos y borra el archivo solo tras confirmar; casos compartidos);
+  `flutter build apk --debug` compila; en `backend/`, `uv run pytest -q` (1647
+  pruebas) y `uv run ruff check .` en verde. **No se probó en el celular** (no había uno
+  conectado): la cámara real, la compresión y la muerte de la app al abrir la cámara solo están
+  probadas con una cámara de mentira.
+- Fuera de esta tarea: subir fotos con la app cerrada (fase 1b); que el conductor digite la placa
+  o el VIN (el contrato no lo permite); reintentar a mano o exportar una foto rechazada; borrar las
+  fotos de un paso que nunca se marcó; mostrar las fotos en el panel. `ListaAsignaciones.marcar` y
+  `ColaEventos.encolar` siguen aceptando un Recogido sin fotos: la exigencia está en el camino que
+  usan las pantallas (`confirmarPaso`).
+- Preguntas abiertas nuevas: seis en `QUESTIONS.md`.
+- Cómo probar (15 minutos, con el Motorola por USB; son los puntos 5 a 9 de
+  `docs/prueba-sin-senal.md`):
+  1. Ana lista para la app, con grúa de capacidad 1 y dos servicios asignados con placa (pasos de
+     la 1a-11). Desde `backend/`: `uv run python manage.py runserver`. En otra ventana:
+     `& "$env:LOCALAPPDATA\Android\sdk\platform-tools\adb.exe" reverse tcp:8000 tcp:8000` y, desde
+     `conductor/`, `flutter run`. Ingresar.
+  2. Primer servicio: "Marcar En camino" y confirmar. "Marcar Recogido": se abre la pantalla de
+     fotos. "Tomar foto" tres veces (se abre la cámara del Motorola; aceptar cada foto): aparecen
+     tres miniaturas y "Lleva 3 de 4 fotos.". Escribir un nombre y "Marcar Recogido": no deja y
+     dice "Falta 1 foto: lleva 3 de 4." (punto 5).
+  3. Quitar la señal (modo avión **y** `... adb.exe reverse --remove-all`). Tomar la cuarta foto y
+     "Marcar Recogido": vuelve al detalle con Recogido, "Pendiente por enviar" y "4 fotos por
+     subir". En la lista: "Hay 4 fotos pendientes por subir. Se suben solas cuando haya señal."
+     (punto 6).
+  4. Forzar el cierre de la app (o reiniciar el celular) y abrirla: sigue igual, y "Cerrar sesión"
+     no deja (punto 7).
+  5. Segundo servicio, todavía sin señal: "Marcar En camino", confirmar, "Marcar Recogido": no abre
+     la pantalla; dice "La grúa va llena" y la placa del primero bajo "Falta marcar como
+     Entregado:" (punto 9).
+  6. Devolver la señal (quitar el modo avión y repetir `adb.exe reverse tcp:8000 tcp:8000`) y
+     deslizar la lista: el aviso de fotos baja hasta desaparecer. En el panel el servicio queda
+     Recogido y en `/admin/` → Solicitudes → Evidencias están las 4 fotos con su evento; en
+     Eventos de estado, el Recogido tiene el nombre de quien entregó (punto 8). Los archivos quedan
+     en `backend\media\evidencias\<servicio>\`.
+  7. La cámara mata la app: en Ajustes → Opciones de desarrollador, activar "No conservar
+     actividades". En el primer servicio, "Marcar Entregado", tomar una foto, escribir medio nombre
+     y tomar otra: al aceptar la foto, la app vuelve a la misma pantalla con las dos fotos y el
+     nombre (punto 9b). Desactivar la opción.
+  8. Opcional, tamaño real de una foto: después del paso 6, mirar cuánto pesa un archivo de
+     `backend\media\evidencias\`: debe estar muy por debajo de 5 MB (se esperan unos cientos de KB).
+
 ## Escalamientos
 
 Ninguno todavía.
