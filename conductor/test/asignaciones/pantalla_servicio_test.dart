@@ -40,6 +40,7 @@ void main() {
             },
       ], etag: '"${eventos.estados}"'),
       '/api/v1/salir/' => http.Response('', 204),
+      '/api/v1/ingresar/' => ingresoCorrecto(token: 'token-ana-2'),
       _ => http.Response('', 404),
     };
   }
@@ -492,6 +493,41 @@ void main() {
           findsOneWidget,
         );
         expect((await cola(tester)).single['estado_envio'], 'pendiente');
+      },
+    );
+
+    testWidgets(
+      'al volver a ingresar el mismo conductor, lo pendiente se envía solo con su token nuevo',
+      (tester) async {
+        await abrirDetalle(tester);
+        await tocar(tester, find.text('Marcar En camino'));
+        await tocar(tester, find.byKey(const Key('confirmar')));
+        final evento = (await cola(tester)).single;
+        servidor.responder = (_) async => errorDelContrato(
+          401,
+          'sesion_invalida',
+          'Su sesión ya no es válida. Ingrese de nuevo.',
+        );
+        await lista.actualizar();
+        await tester.pumpAndSettle();
+        expect(find.text('Ingresar'), findsOneWidget);
+        servidor.responder = responder;
+        conSenal = true;
+        servidor.peticiones.clear();
+
+        await tester.enterText(find.byKey(const Key('pin')), '482913');
+        await tester.ensureVisible(find.byKey(const Key('ingresar')));
+        await tester.pumpAndSettle();
+        await tocar(tester, find.byKey(const Key('ingresar')));
+
+        expect(find.text('Mis servicios'), findsOneWidget);
+        final lote = servidor.peticiones.firstWhere((p) => p.url.path == '/api/v1/eventos/');
+        expect(lote.cabeceras['Authorization'], 'Bearer token-ana-2');
+        expect(eventosDe(lote).single['id'], evento['id']);
+        expect(eventos.aplicados, 1);
+        expect(find.text('Pendiente por enviar'), findsNothing);
+        expect(find.byKey(const Key('pendientes')), findsNothing);
+        expect(find.text('En camino'), findsOneWidget);
       },
     );
 
