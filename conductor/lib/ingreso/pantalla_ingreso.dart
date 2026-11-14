@@ -7,6 +7,8 @@ import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../api.dart';
+import '../cola/evento.dart';
+import '../cola/sincronizador.dart';
 import '../comunes.dart';
 import '../formato.dart';
 import '../tema.dart';
@@ -21,15 +23,30 @@ String? validarPin(String? pin) =>
 String? validarCelular(String? celular) =>
     celular == null || celular.trim().isEmpty ? 'Escriba su número de celular.' : null;
 
+/// "Hay 2 cambios sin enviar de Ana Gómez. Se envían cuando Ana Gómez ingrese de nuevo en este
+/// celular."
+String textoPendientesAlIngresar(PendientesDeConductor pendientes) {
+  final quien = pendientes.nombre ?? 'otro conductor';
+  return pendientes.cantidad == 1
+      ? 'Hay 1 cambio sin enviar de $quien. Se envía cuando $quien ingrese de nuevo en este celular.'
+      : 'Hay ${pendientes.cantidad} cambios sin enviar de $quien. '
+            'Se envían cuando $quien ingrese de nuevo en este celular.';
+}
+
 class PantallaIngreso extends StatefulWidget {
   const PantallaIngreso({
     super.key,
     required this.sesion,
+    this.sincronizador,
     this.servidor = servidorConfigurado,
     this.reloj = DateTime.now,
   });
 
   final Sesion sesion;
+
+  /// Para avisar de los cambios que quedaron sin enviar en este celular (por ejemplo, tras un 401):
+  /// salen cuando quien los hizo vuelva a ingresar.
+  final Sincronizador? sincronizador;
 
   /// Se muestra pequeño al final, para confirmar a qué servidor apunta la app.
   final String servidor;
@@ -53,6 +70,12 @@ class _PantallaIngresoState extends State<PantallaIngreso> {
   Timer? _finDelBloqueo;
 
   bool get _bloqueado => _bloqueadoHasta != null;
+
+  @override
+  void initState() {
+    super.initState();
+    widget.sincronizador?.cargar();
+  }
 
   @override
   void dispose() {
@@ -136,6 +159,23 @@ class _PantallaIngresoState extends State<PantallaIngreso> {
                         Recuadro(aviso, tipo: TipoRecuadro.info),
                         const SizedBox(height: 16),
                       ],
+                      if (widget.sincronizador case final sincronizador?)
+                        ListenableBuilder(
+                          listenable: sincronizador,
+                          builder: (context, _) => Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              for (final pendientes in sincronizador.pendientesPorConductor) ...[
+                                Recuadro(
+                                  textoPendientesAlIngresar(pendientes),
+                                  tipo: TipoRecuadro.aviso,
+                                  icono: Icons.cloud_upload_outlined,
+                                ),
+                                const SizedBox(height: 16),
+                              ],
+                            ],
+                          ),
+                        ),
                       TextFormField(
                         key: const Key('celular'),
                         controller: _celular,

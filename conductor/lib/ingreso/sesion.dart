@@ -16,8 +16,8 @@ enum EstadoSesion { iniciando, sinSesion, activa }
 enum ResultadoSalida {
   cerrada,
 
-  /// Hay eventos o fotos sin enviar: no se cierra la sesión (el servidor toma como conductor del
-  /// evento al dueño del token con que llega).
+  /// El conductor tiene eventos o fotos sin enviar: no se cierra la sesión (el servidor toma como
+  /// conductor del evento al dueño del token con que llega).
   hayPendientes,
 }
 
@@ -100,11 +100,16 @@ class Sesion extends ChangeNotifier {
     await almacenToken.borrar();
   }
 
-  /// Cerrar sesión a pedido del conductor. No se permite con eventos o fotos pendientes. Sin señal,
-  /// el token se borra del celular igual; en el servidor queda revocado cuando se vuelva a ingresar
-  /// en este celular (o desde el admin).
+  /// Cerrar sesión a pedido del conductor. No se permite mientras él tenga eventos o fotos
+  /// pendientes: se envían con su token, y sin él no llegarían a su nombre. Lo pendiente de otro
+  /// conductor no lo impide (no se envía con esta sesión; espera a que su dueño vuelva a ingresar).
+  /// Sin señal, el token se borra del celular igual; en el servidor queda revocado cuando se vuelva
+  /// a ingresar en este celular (o desde el admin).
   Future<ResultadoSalida> salir() async {
-    if (await base.pendientesPorEnviar() > 0) return ResultadoSalida.hayPendientes;
+    // Sin conductor conocido se cuenta todo lo pendiente: ante la duda, no se cierra.
+    if (await base.pendientesPorEnviar(conductorId: _conductor?.id) > 0) {
+      return ResultadoSalida.hayPendientes;
+    }
     final token = _token;
     if (token != null) {
       try {

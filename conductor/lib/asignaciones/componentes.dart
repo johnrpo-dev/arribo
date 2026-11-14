@@ -2,6 +2,9 @@
 
 import 'package:material_ui/material_ui.dart';
 
+import '../api.dart';
+import '../cola/evento.dart';
+import '../comunes.dart';
 import '../formato.dart';
 import '../tema.dart';
 import 'enlaces.dart';
@@ -33,6 +36,92 @@ class EtiquetaEstado extends StatelessWidget {
         nombreEstado(estado),
         style: Theme.of(context).textTheme.labelMedium?.copyWith(color: colores.texto),
       ),
+    );
+  }
+}
+
+/// Marca de un servicio con toques que aún no han llegado al servidor.
+class EtiquetaPendiente extends StatelessWidget {
+  const EtiquetaPendiente({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: Colores.avisoFondo,
+        border: Border.all(color: Colores.aviso),
+        borderRadius: const BorderRadius.all(Radius.circular(6)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.cloud_upload_outlined, size: 18, color: Colores.aviso),
+          const SizedBox(width: 6),
+          Flexible(
+            child: Text(
+              'Pendiente por enviar',
+              style: Theme.of(context).textTheme.labelMedium?.copyWith(color: Colores.aviso),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// "Hay 2 cambios pendientes por enviar. Se envían solos cuando haya señal."
+String textoPendientes(int cantidad, {ErrorApi? problema}) {
+  final cuantos = cantidad == 1
+      ? 'Hay 1 cambio pendiente por enviar.'
+      : 'Hay $cantidad cambios pendientes por enviar.';
+  if (problema != null && problema is! ErrorDeRed) {
+    return '$cuantos El servidor no los recibió; la app lo intenta de nuevo sola.';
+  }
+  return cantidad == 1
+      ? '$cuantos Se envía solo cuando haya señal.'
+      : '$cuantos Se envían solos cuando haya señal.';
+}
+
+/// Los cambios de otro conductor que siguen en este celular: no se envían con la sesión actual.
+String textoPendientesAjenos(PendientesDeConductor ajenos) {
+  final quien = ajenos.nombre ?? 'otro conductor';
+  final cuantos = ajenos.cantidad == 1 ? '1 cambio' : '${ajenos.cantidad} cambios';
+  return 'En este celular hay $cuantos sin enviar de $quien. No se envían con su sesión: '
+      'saldrán cuando $quien vuelva a ingresar aquí. Avise a logística.';
+}
+
+/// Lo que se le dice al conductor de un toque que el servidor no aplicó.
+String textoDeAviso(EventoLocal evento) {
+  final vehiculo = evento.vehiculo ?? 'Servicio N.º ${evento.servicioId}';
+  final paso = nombreEstado(evento.destino);
+  final que = evento.estadoEnvio == EstadoEnvio.rechazado
+      ? 'El servidor no pudo guardar su marca de «$paso».'
+      : 'Su marca de «$paso» quedó guardada, pero el servicio no cambió.';
+  final detalle = evento.resultadoDetalle;
+  return '$vehiculo: $que${detalle == null ? '' : ' $detalle'} '
+      'Logística ya recibió el aviso y lo revisará.';
+}
+
+/// El aviso de un toque que el servidor no aplicó (conflicto o rechazado). Queda a la vista hasta
+/// que el conductor toca "Entendido"; el evento sigue guardado.
+class AvisoDeEvento extends StatelessWidget {
+  const AvisoDeEvento({super.key, required this.evento, required this.alEntender});
+
+  final EventoLocal evento;
+  final VoidCallback alEntender;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Recuadro(textoDeAviso(evento), tipo: TipoRecuadro.error),
+        Align(
+          alignment: Alignment.centerRight,
+          child: TextButton(onPressed: alEntender, child: const Text('Entendido')),
+        ),
+      ],
     );
   }
 }

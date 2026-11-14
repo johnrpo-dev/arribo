@@ -217,4 +217,33 @@ void main() {
     expect(token.token, 'token-ana');
     expect(sesion.estado, EstadoSesion.activa);
   });
+
+  test('lo pendiente de otro conductor no impide cerrar la sesión del actual', () async {
+    // El evento es de Ana (3); quien tiene la sesión es Beto (8).
+    token.token = 'token-beto';
+    await prueba.base.escribirJson(Clave.conductor, conductorJson(id: 8, nombre: 'Beto'));
+    await agregarEventoPendiente();
+    servidor.responder = (_) async => http.Response('', 204);
+    final sesion = nuevaSesion();
+    await sesion.iniciar();
+
+    expect(await sesion.salir(), ResultadoSalida.cerrada);
+    expect(token.token, isNull);
+    // El evento de Ana sigue en la cola.
+    expect(await prueba.base.pendientesPorEnviar(), 1);
+    expect(await prueba.base.pendientesPorEnviar(conductorId: 3), 1);
+  });
+
+  test('con eventos propios pendientes no se cierra sesión, aunque el servidor responda', () async {
+    token.token = 'token-ana';
+    await prueba.base.escribirJson(Clave.conductor, conductorJson(id: 3));
+    await agregarEventoPendiente();
+    servidor.responder = (_) async => http.Response('', 204);
+    final sesion = nuevaSesion();
+    await sesion.iniciar();
+
+    expect(await sesion.salir(), ResultadoSalida.hayPendientes);
+    expect(servidor.peticiones, isEmpty);
+    expect(sesion.token, 'token-ana');
+  });
 }

@@ -4,7 +4,10 @@ Se hace en un celular Android real, con el APK instalado y el panel abierto en u
 Repetir completa antes de la demo y después de cualquier cambio en la cola o en las fotos.
 
 Preparación: cargar los datos ficticios, iniciar sesión como un conductor con grúa de capacidad 1 y
-asignarle tres servicios desde el panel. "Sin señal" es modo avión, con Wi-Fi apagado.
+asignarle tres servicios desde el panel. "Sin señal" es modo avión, con Wi-Fi apagado. Si la app
+habla con el computador por el cable USB (`adb reverse`, en desarrollo), el modo avión no basta:
+además hay que quitar el túnel (`adb.exe reverse --remove-all`) o desconectar el cable; para
+"volver a tener señal", repetir `adb.exe reverse tcp:8000 tcp:8000` (ver `conductor/README.md`).
 
 Anotar en cada punto: fecha, versión del APK y resultado.
 
@@ -12,12 +15,21 @@ Anotar en cada punto: fecha, versión del APK y resultado.
 
 1. [ ] **Lista sin señal.** Con señal, abrir la app y ver los tres servicios. Activar modo avión, cerrar
    la app del todo y abrirla. Esperado: la lista aparece igual, con teléfonos y direcciones.
-2. [ ] **Cambio de estado sin señal.** En modo avión, marcar "En camino" en el primer servicio.
-   Esperado: el botón responde de inmediato y aparece "pendiente por enviar". El panel aún muestra Asignado.
-3. [ ] **Sincronización al volver.** Quitar el modo avión. Esperado: en menos de un minuto desaparece
-   "pendiente por enviar" y el panel muestra En camino, con la hora del celular y la hora de sincronización distintas.
+2. [ ] **Cambio de estado sin señal.** En modo avión, abrir el primer servicio, tocar "Marcar En
+   camino" y confirmar ("Sí, marcar En camino"). Esperado: el estado cambia de inmediato a En camino
+   con la marca "Pendiente por enviar" (en el detalle y en la tarjeta de la lista), el botón pasa a
+   ser "Marcar Recogido" y arriba de la lista dice "Hay 1 cambio pendiente por enviar". El panel aún
+   muestra Asignado. Cerrar la app del todo y abrirla: sigue En camino y pendiente. En el menú,
+   "Cerrar sesión" no deja y explica por qué.
+3. [ ] **Sincronización al volver.** Quitar el modo avión y dejar la app abierta y a la vista.
+   Esperado: en menos de un minuto (la app reintenta sola cada 30 segundos como máximo; deslizar la
+   lista hacia abajo lo envía de inmediato) desaparecen "Pendiente por enviar" y el aviso de arriba, y
+   el panel muestra En camino, con la hora del celular y la hora de sincronización distintas. Con la
+   app en segundo plano el envío puede esperar hasta que se vuelva a abrir.
 4. [ ] **Sin duplicados.** En modo avión marcar un estado, quitar el modo avión y volver a activarlo
-   varias veces mientras sincroniza. Esperado: el historial del servicio en el panel tiene un solo evento por estado.
+   varias veces mientras sincroniza (deslizando la lista para forzar envíos). Esperado: el historial
+   del servicio (en `/admin/` → Solicitudes → Eventos de estado, mientras el panel no lo muestre)
+   tiene un solo evento por estado, y en Alertas no aparece ningún conflicto.
 
 ## Fotos
 

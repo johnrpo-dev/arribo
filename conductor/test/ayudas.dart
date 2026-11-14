@@ -189,3 +189,159 @@ void celularConTextoGrande(WidgetTester tester) {
 
 /// Sin señal: el cliente HTTP falla antes de llegar al servidor.
 Never sinSenal() => throw const SocketException('Network is unreachable');
+
+// ---------- eventos (POST /api/v1/eventos/) ----------
+
+/// El resultado de un evento como lo manda el servidor.
+Map<String, Object?> resultadoJson(
+  String id, {
+  String resultado = 'aplicado',
+  bool duplicado = false,
+  String? motivo,
+  String? detalle,
+  Map<String, Object?>? servicio,
+}) => {
+  'id': id,
+  'resultado': resultado,
+  'duplicado': duplicado,
+  'motivo': motivo,
+  'detalle': detalle,
+  'capacidad_excedida': false,
+  'servicio': servicio,
+};
+
+Map<String, Object?> servicioRemotoJson(
+  int id, {
+  String? estado = 'en_camino',
+  String? estadoPrevio,
+  bool? enSuRonda,
+}) => {
+  'id': id,
+  'estado': estado,
+  'estado_previo': estadoPrevio,
+  'a_bordo': estado == 'recogido' || (estado == 'novedad' && estadoPrevio == 'recogido'),
+  'en_su_ronda':
+      enSuRonda ?? const {'asignado', 'en_camino', 'recogido', 'novedad'}.contains(estado),
+};
+
+http.Response respuestaEventos(List<Map<String, Object?>> resultados) =>
+    respuestaJson(200, {'version': 1, 'resultados': resultados});
+
+Map<String, Object?> respuestaComoJson(http.Response respuesta) =>
+    jsonDecode(utf8.decode(respuesta.bodyBytes)) as Map<String, Object?>;
+
+/// Espera (con reloj real) a que se cumpla [condicion]; falla si no se cumple en 5 segundos.
+Future<void> esperarHasta(bool Function() condicion) async {
+  final limite = DateTime.now().add(const Duration(seconds: 5));
+  while (!condicion()) {
+    if (DateTime.now().isAfter(limite)) fail('La condición no se cumplió a tiempo.');
+    await Future<void>.delayed(const Duration(milliseconds: 5));
+  }
+}
+
+/// Los eventos de un lote recibido por el servidor falso.
+List<Map<String, Object?>> eventosDe(PeticionRecibida peticion) => [
+  for (final evento in peticion.json['eventos']! as List<Object?>) evento! as Map<String, Object?>,
+];
+
+/// Un servidor de eventos con memoria, que hace lo que el real: aplica cada id una sola vez (un
+/// reenvío vuelve con `duplicado` y el resultado de la primera vez), evalúa por secuencia y
+/// responde en el orden en que llegaron, con el estado del servicio al terminar el lote.
+class ServidorDeEventos {
+  ServidorDeEventos(Map<int, String> estados) : estados = {...estados};
+
+  /// El estado de cada servicio de este conductor en el servidor.
+  final Map<int, String> estados;
+  final Map<int, String> previos = {};
+
+  /// Lo que quedó guardado de cada evento, por id.
+  final Map<String, Map<String, Object?>> guardados = {};
+
+  /// Cada lote recibido, tal como llegó.
+  final List<List<Map<String, Object?>>> lotes = [];
+
+  /// Ids para los que el servidor falla al guardar (responde `reintentar`) mientras estén aquí.
+  final Set<String> fallan = {};
+
+  static const _avance = {
+    'asignado': 'en_camino',
+    'en_camino': 'recogido',
+    'recogido': 'entregado',
+  };
+  static const _detalles = {
+    'salto_de_estado': 'El estado no es el que sigue al que tenía el servicio.',
+    'servicio_cancelado': 'El servicio ya estaba cancelado.',
+    'servicio_entregado': 'El servicio ya estaba entregado.',
+    'novedad_abierta': 'El servicio tiene una novedad abierta que logística debe resolver.',
+    'servicio_no_asignado': 'El servicio ya no está asignado a este conductor.',
+  };
+
+  /// Cuántas veces cambió de verdad el estado de un servicio (lo que logística vería en el
+  /// historial como eventos aplicados).
+  int get aplicados => guardados.values.where((g) => g['resultado'] == 'aplicado').length;
+
+  http.Response recibir(PeticionRecibida peticion) {
+    final lote = eventosDe(peticion);
+    lotes.add(lote);
+    final porSecuencia = [...lote]
+      ..sort((a, b) => (a['secuencia']! as int).compareTo(b['secuencia']! as int));
+    final respuestas = <String, Map<String, Object?>>{};
+    final detenidos = <int>{};
+    for (final evento in porSecuencia) {
+      final id = evento['id']! as String;
+      final servicio = evento['servicio_id']! as int;
+      final guardado = guardados[id];
+      if (guardado != null) {
+        respuestas[id] = {...guardado, 'duplicado': true};
+        continue;
+      }
+      if (fallan.contains(id) || detenidos.contains(servicio)) {
+        respuestas[id] = {
+          'resultado': 'reintentar',
+          'motivo': fallan.contains(id) ? 'error_del_servidor' : 'espera_evento_anterior',
+          'duplicado': false,
+        };
+        detenidos.add(servicio);
+        continue;
+      }
+      final motivo = _motivoDeConflicto(servicio, evento['destino']! as String);
+      if (motivo == null) {
+        final destino = evento['destino']! as String;
+        if (destino == 'novedad') previos[servicio] = estados[servicio]!;
+        estados[servicio] = destino;
+      }
+      guardados[id] = respuestas[id] = {
+        'resultado': motivo == null ? 'aplicado' : 'conflicto',
+        'motivo': motivo,
+        'duplicado': false,
+      };
+    }
+    return respuestaEventos([
+      for (final evento in lote)
+        resultadoJson(
+          evento['id']! as String,
+          resultado: respuestas[evento['id']]!['resultado']! as String,
+          duplicado: respuestas[evento['id']]!['duplicado']! as bool,
+          motivo: respuestas[evento['id']]!['motivo'] as String?,
+          detalle: _detalles[respuestas[evento['id']]!['motivo']],
+          servicio: _servicio(evento['servicio_id']! as int),
+        ),
+    ]);
+  }
+
+  String? _motivoDeConflicto(int servicio, String destino) {
+    final estado = estados[servicio];
+    if (estado == null) return 'servicio_no_asignado';
+    if (estado == 'cancelado') return 'servicio_cancelado';
+    if (estado == 'entregado') return 'servicio_entregado';
+    if (estado == 'novedad') return 'novedad_abierta';
+    final encaja = destino == 'novedad' || _avance[estado] == destino;
+    return encaja ? null : 'salto_de_estado';
+  }
+
+  Map<String, Object?> _servicio(int id) => servicioRemotoJson(
+    id,
+    estado: estados[id],
+    estadoPrevio: estados[id] == 'novedad' ? previos[id] : null,
+  );
+}

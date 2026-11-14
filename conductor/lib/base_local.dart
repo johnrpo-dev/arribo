@@ -108,6 +108,19 @@ const List<List<String>> migraciones = [
     ''',
     'CREATE INDEX fotos_pendientes_envio ON fotos_pendientes (estado_envio, creado_en)',
   ],
+  // Versión 2 (1a-12): lo que la cola necesita para avisar sin depender de la lista, que puede
+  // cambiar o borrarse antes de que el evento se envíe.
+  [
+    // Placa o VIN del vehículo al tocar: un conflicto se le muestra al conductor aunque el
+    // servicio ya no esté en su lista (cancelado o reasignado).
+    'ALTER TABLE eventos_pendientes ADD COLUMN vehiculo TEXT',
+    // Nombre de quien lo tocó: si después ingresa otro conductor, se le dice de quién son los
+    // cambios que siguen sin enviar.
+    'ALTER TABLE eventos_pendientes ADD COLUMN conductor_nombre TEXT',
+    // Cuándo el conductor tocó "Entendido" en el aviso de un conflicto o de un rechazo. El evento
+    // no se borra: solo deja de mostrarse.
+    'ALTER TABLE eventos_pendientes ADD COLUMN visto_en TEXT',
+  ],
 ];
 
 /// Nombre del archivo de la base en la carpeta de bases de datos de la app.
@@ -120,6 +133,10 @@ abstract final class Clave {
   static const etag = 'etag';
   static const ultimaActualizacion = 'ultima_actualizacion';
   static const configuracion = 'configuracion';
+
+  /// La secuencia del último evento que se encoló en este celular. Solo crece: no se toca al
+  /// cerrar sesión ni al cambiar de conductor (ver `cola/cola_eventos.dart`).
+  static const ultimaSecuencia = 'ultima_secuencia';
 }
 
 class BaseLocal {
@@ -211,14 +228,24 @@ class BaseLocal {
     });
   }
 
-  /// Eventos y fotos que el celular aún no ha entregado al servidor. Mientras haya alguno, la app
-  /// no cierra sesión (el servidor toma como conductor del evento al dueño del token).
-  Future<int> pendientesPorEnviar() async {
+  /// Eventos y fotos que el celular aún no ha entregado al servidor. Con [conductorId], solo los de
+  /// ese conductor: mientras tenga alguno, la app no le cierra la sesión (el servidor toma como
+  /// conductor del evento al dueño del token). Los de otro conductor no cuentan para eso: solo se
+  /// envían cuando él vuelva a ingresar, y para eso este tiene que poder salir.
+  Future<int> pendientesPorEnviar({int? conductorId}) async {
+    final filtro = conductorId == null ? '' : ' AND conductor_id = ?';
+    final argumentos = [?conductorId];
     final eventos = Sqflite.firstIntValue(
-      await db.rawQuery("SELECT COUNT(*) FROM eventos_pendientes WHERE estado_envio = 'pendiente'"),
+      await db.rawQuery(
+        "SELECT COUNT(*) FROM eventos_pendientes WHERE estado_envio = 'pendiente'$filtro",
+        argumentos,
+      ),
     );
     final fotos = Sqflite.firstIntValue(
-      await db.rawQuery("SELECT COUNT(*) FROM fotos_pendientes WHERE estado_envio = 'pendiente'"),
+      await db.rawQuery(
+        "SELECT COUNT(*) FROM fotos_pendientes WHERE estado_envio = 'pendiente'$filtro",
+        argumentos,
+      ),
     );
     return (eventos ?? 0) + (fotos ?? 0);
   }

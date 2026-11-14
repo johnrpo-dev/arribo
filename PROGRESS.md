@@ -629,6 +629,96 @@ La tarea 1a-16 se partió en dos: 1a-16a (modelo de línea de cobro con sus rest
      deslizar la lista: vuelve al ingreso con el aviso del servidor y el celular de Ana ya escrito.
      Ingresar de nuevo: la lista sigue ahí.
 
+### 1a-12 App: estados y cola sin señal (13 de noviembre de 2026)
+- Hecho: el detalle del servicio tiene los botones de estado, fijos abajo: el paso que sigue
+  ("Marcar En camino", "Marcar Recogido" o "Marcar Entregado") y "Reportar novedad" (con motivo
+  obligatorio). Cada toque pide una confirmación corta en una hoja inferior (dos toques en total) y
+  se guarda como evento en la cola local antes de cambiar la pantalla y antes de intentar la red.
+  El estado nuevo se ve de inmediato en el detalle y en la lista con la marca "Pendiente por
+  enviar"; arriba de la lista dice cuántos cambios faltan por enviar. La cola se envía sola al
+  abrir la app, al volver a primer plano, al deslizar la lista, después de cada toque y con un
+  reintento de espera creciente. Sin cambios en el backend ni en el contrato.
+- Decidido (cola): `eventos_pendientes` en SQLite (`lib/cola/cola_eventos.dart`). En una sola
+  transacción se comprueba que el toque sea el paso que sigue al estado que ve el conductor (lo
+  confirmado más sus toques sin enviar), se toma la secuencia y se inserta el evento con su UUID
+  v4. Por eso dos toques seguidos en el mismo botón no crean dos eventos. La secuencia sale del
+  contador `ultima_secuencia` de `estado_local`: solo crece, sobrevive a cerrar la app, no se toca
+  al cerrar sesión ni al cambiar de conductor y nunca queda por debajo de la mayor guardada. Un
+  evento solo sale de la cola con respuesta definitiva (aplicado, conflicto o rechazado); nada se
+  borra, la fila queda con su resultado. Migración 2 de la base local: tres columnas nuevas
+  (placa o VIN del vehículo, nombre de quien tocó, y cuándo se dio por visto un aviso).
+- Decidido (envío, `lib/cola/sincronizador.dart`): un solo envío a la vez (todos los disparadores
+  piden lo mismo y, si ya hay uno, esperan ese); lotes de máximo 100 desde el pendiente más
+  antiguo, en orden de secuencia; reenviar es mandar la misma fila (mismo UUID y secuencia), así
+  que una respuesta perdida vuelve como `duplicado` y cuenta como enviada. Un evento en
+  `reintentar` va primero en el lote siguiente y la app no insiste de inmediato: espera al
+  siguiente disparador. Sin red, con un 500, un 400 del lote o una respuesta que no trae un
+  resultado por evento (o con el id de otro), la cola queda entera. Reintento con espera de 5, 10,
+  20 y 30 s (tope con la app a la vista; en segundo plano sigue creciendo hasta 5 minutos), que
+  vuelve a 5 s cuando un envío sale bien. Sin dependencias nuevas: no se agregó
+  `connectivity_plus` ni tareas en segundo plano de Android.
+- Decidido (reconciliación): el estado que se muestra se calcula al leer (lo confirmado + la
+  cola), no se escribe encima de lo confirmado. Al llegar la respuesta, en una sola transacción se
+  marca el evento y se corrige el servicio de la lista con el estado que devolvió el servidor
+  (solo si a ese servicio no le quedan pendientes); si ya no está en la ronda, sale de la lista.
+  Conflicto y rechazado no se reintentan y quedan a la vista (en la lista y en el detalle) con el
+  texto del servidor y "Logística ya recibió el aviso y lo revisará", hasta que el conductor toca
+  "Entendido"; el aviso nombra el vehículo aunque el servicio ya no esté en la lista.
+- Decidido (lista y eventos por turnos): el envío de eventos y la consulta de la lista no se
+  cruzan, y al actualizar primero se envía y después se pide la lista. Así una lista pedida antes
+  de aplicar un evento no se guarda después de su resultado. Al corregir un servicio con la
+  respuesta de un evento se olvida el ETag de la lista (si el servidor volviera al estado
+  anterior, por ejemplo al reanudar una novedad, daría 304 con la lista local ya cambiada). Si el
+  envío falla por red, no se pide la lista (una espera en vez de dos).
+- Decidido (sesión y varios conductores): con cambios propios sin enviar no se cierra sesión y un
+  diálogo explica por qué. Un 401 cierra la sesión y conserva la cola; cuando el mismo conductor
+  vuelve a ingresar, sale con su token nuevo. Los eventos de otro conductor nunca salen con el
+  token del actual: se conservan, el ingreso y la lista avisan de quién son, y no le impiden al
+  actual cerrar su sesión. Anotado en `QUESTIONS.md`.
+- Para la 1a-13: Recogido y Entregado pasan por `prepararRecogidoOEntregado`
+  (`lib/asignaciones/confirmacion.dart`), que hoy solo confirma; ahí van el bloqueo por capacidad,
+  las fotos y el nombre de quien entrega o recibe. La cola ya acepta `nombre_quien` y un UUID
+  fijado antes (para atar las fotos al evento), y la lista ya calcula "montado" con los pendientes.
+- Verificado: `flutter analyze` sin problemas; `flutter test`, 247 pruebas (137 nuevas: la cola
+  no pierde eventos si el envío falla, no los duplica, respuesta perdida → duplicado, secuencia
+  tras reabrir la base, orden de envío, no adelanta un servicio detenido en `reintentar`, un solo
+  envío a la vez, conflicto y rechazado visibles y sin reintento, 401 conserva la cola, otro
+  conductor no envía los del primero, no se cierra sesión con pendientes, estado optimista y
+  reconciliación, y la app "muerta" entre guardar, enviar, recibir y anotar); `flutter build apk
+  --debug` compila. No se probó en el celular (no había uno conectado).
+- Fuera de esta tarea: fotos, nombre de quien entrega o recibe y bloqueo por capacidad (1a-13);
+  push (1a-14). Con la app en segundo plano (por ejemplo, navegando con Waze) el envío depende de
+  que Android no la congele: se garantiza al volver a abrirla. Los eventos ya enviados quedan en
+  la base del celular (no se depuran).
+- Preguntas abiertas nuevas: tres en `QUESTIONS.md` (cambios de un conductor que no vuelve a
+  ingresar en ese celular; deshacer un toque; qué hace el conductor ante un conflicto).
+- Cómo probar (10 minutos, con el Motorola por USB; son los puntos 1 a 4 de
+  `docs/prueba-sin-senal.md`):
+  1. Ana lista para la app y con dos o tres servicios asignados (pasos de la 1a-11). Desde
+     `backend/`: `uv run python manage.py runserver`. En otra ventana:
+     `& "$env:LOCALAPPDATA\Android\sdk\platform-tools\adb.exe" reverse tcp:8000 tcp:8000` y, desde
+     `conductor/`, `flutter run`. Ingresar: aparece la lista.
+  2. Quitar la señal: modo avión **y** `... adb.exe reverse --remove-all` (o desconectar el cable; el
+     túnel USB sigue andando en modo avión). Cerrar la app del todo y abrirla: la lista aparece
+     igual (punto 1).
+  3. Tocar el primer servicio, "Marcar En camino" y "Sí, marcar En camino": cambia de inmediato a
+     En camino con "Pendiente por enviar", y el botón pasa a "Marcar Recogido". Volver a la lista:
+     la tarjeta tiene la marca y arriba dice "Hay 1 cambio pendiente por enviar". El panel sigue en
+     Asignado. Cerrar la app del todo y abrirla: sigue igual. Menú → "Cerrar sesión": no deja y
+     explica por qué (punto 2).
+  4. Devolver la señal: quitar el modo avión y repetir `adb.exe reverse tcp:8000 tcp:8000` (o
+     conectar el cable y repetirlo). Con la app a la vista, en menos de un minuto (o al deslizar
+     la lista) desaparecen la marca y el aviso; el panel muestra En camino y en `/admin/` →
+     Solicitudes → Eventos de estado el evento tiene la hora del celular y la de sincronización
+     distintas (punto 3).
+  5. Sin señal otra vez, "Marcar Recogido"; devolver y quitar la señal varias veces deslizando la
+     lista. Al final, en Eventos de estado hay un solo Recogido y en Alertas no hay conflictos
+     (punto 4).
+  6. Opcional, conflicto: sin señal, marcar En camino en otro servicio; cancelarlo desde el panel;
+     devolver la señal y deslizar la lista. El servicio sale de la lista y queda un aviso rojo con
+     la placa y "El servicio ya estaba cancelado. Logística ya recibió el aviso y lo revisará";
+     en `/admin/` → Alertas aparece el conflicto.
+
 ## Escalamientos
 
 Ninguno todavía.

@@ -76,6 +76,7 @@ class _ArriboAppState extends State<ArriboApp> {
           EstadoSesion.iniciando => const PantallaCargando(),
           EstadoSesion.sinSesion => PantallaIngreso(
             sesion: widget.sesion,
+            sincronizador: widget.lista.sincronizador,
             servidor: widget.servidor,
             reloj: widget.reloj,
           ),

@@ -12,6 +12,7 @@ import 'package:http/http.dart' as http;
 import 'package:http/io_client.dart';
 
 import 'asignaciones/servicio.dart';
+import 'cola/evento.dart';
 
 /// Dirección del servidor, sin `/api/v1`. Se cambia sin tocar el código al compilar o correr:
 /// `flutter run --dart-define=ARRIBO_API=https://arribo.ejemplo.co`. Por defecto, el backend de
@@ -24,6 +25,9 @@ const String servidorConfigurado = String.fromEnvironment(
 /// Tiempo máximo de una petición completa. El ingreso tarda cerca de un segundo en el servidor
 /// (revisa el hash del PIN); la lista, mucho menos.
 const Duration tiempoMaximoPorDefecto = Duration(seconds: 15);
+
+/// Tope de eventos por lote que acepta `POST /eventos/`. Con más, el servidor no aplica ninguno.
+const int maximoEventosPorLote = 100;
 
 /// Tiempo máximo para establecer la conexión. Sin señal, falla rápido en vez de dejar al
 /// conductor esperando.
@@ -167,6 +171,98 @@ final class AsignacionesNuevas extends RespuestaAsignaciones {
   final String? etag;
 }
 
+/// Lo que el servidor hizo con un evento del lote (`POST /eventos/`).
+class ResultadoEvento {
+  const ResultadoEvento({
+    required this.id,
+    required this.resultado,
+    this.duplicado = false,
+    this.motivo,
+    this.detalle,
+    this.capacidadExcedida = false,
+    this.servicio,
+  });
+
+  final String? id;
+
+  /// `aplicado`, `conflicto`, `rechazado` o `reintentar`.
+  final String resultado;
+
+  /// El servidor ya tenía este evento (un reenvío). La app lo trata igual que la primera vez.
+  final bool duplicado;
+  final String? motivo;
+
+  /// El texto en español para el conductor.
+  final String? detalle;
+  final bool capacidadExcedida;
+
+  /// El servicio al terminar el lote; null si no existe o el evento no se pudo leer.
+  final EstadoRemoto? servicio;
+
+  static const aplicado = 'aplicado';
+  static const conflicto = 'conflicto';
+  static const rechazado = 'rechazado';
+  static const reintentar = 'reintentar';
+
+  factory ResultadoEvento.desdeJson(Map<String, Object?> json) {
+    final id = json['id'];
+    final resultado = json['resultado'];
+    final motivo = json['motivo'];
+    final detalle = json['detalle'];
+    final servicio = json['servicio'];
+    if (resultado is! String || (servicio != null && servicio is! Map<String, Object?>)) {
+      throw FormatException('Resultado inesperado: $json');
+    }
+    return ResultadoEvento(
+      id: id is String ? id : null,
+      resultado: resultado,
+      duplicado: json['duplicado'] == true,
+      motivo: motivo is String ? motivo : null,
+      detalle: detalle is String && detalle.trim().isNotEmpty ? detalle : null,
+      capacidadExcedida: json['capacidad_excedida'] == true,
+      servicio: servicio is Map<String, Object?> ? EstadoRemoto.desdeJson(servicio) : null,
+    );
+  }
+}
+
+/// El estado de un servicio en el servidor al terminar un lote de eventos.
+class EstadoRemoto {
+  const EstadoRemoto({
+    required this.id,
+    required this.estado,
+    required this.enSuRonda,
+    this.estadoPrevio,
+    this.aBordo = false,
+  });
+
+  final int id;
+
+  /// null si el servicio ya no es de este conductor (reasignado o devuelto a la cola).
+  final String? estado;
+  final String? estadoPrevio;
+  final bool aBordo;
+
+  /// Si sigue apareciendo en `GET /asignaciones/`. En false, la app lo quita de la lista.
+  final bool enSuRonda;
+
+  factory EstadoRemoto.desdeJson(Map<String, Object?> json) {
+    final id = json['id'];
+    final estado = json['estado'];
+    final previo = json['estado_previo'];
+    final enSuRonda = json['en_su_ronda'];
+    if (id is! int || (estado != null && estado is! String) || enSuRonda is! bool) {
+      throw FormatException('Servicio inesperado en el resultado: $json');
+    }
+    return EstadoRemoto(
+      id: id,
+      estado: estado as String?,
+      estadoPrevio: previo is String && previo.isNotEmpty ? previo : null,
+      aBordo: json['a_bordo'] == true,
+      enSuRonda: enSuRonda,
+    );
+  }
+}
+
 // ---------- cliente ----------
 
 class ClienteApi {
@@ -255,6 +351,43 @@ class ClienteApi {
         etag: respuesta.headers['etag'],
       );
     });
+  }
+
+  /// `POST /eventos/`: un lote de toques pendientes, de máximo [maximoEventosPorLote]. Devuelve un
+  /// resultado por evento, en el mismo orden. Si la respuesta no trae exactamente un resultado por
+  /// evento, o alguno no es del evento de su posición, no se usa ninguno (RespuestaInesperada): la
+  /// cola queda como estaba y se reintenta.
+  Future<List<ResultadoEvento>> enviarEventos(String token, List<EventoLocal> eventos) async {
+    final respuesta = await _enviar(
+      () => _http.post(
+        _ruta('eventos/'),
+        headers: _cabeceras(token: token, conCuerpo: true),
+        body: jsonEncode({
+          'eventos': [for (final evento in eventos) evento.aJson()],
+        }),
+      ),
+    );
+    if (respuesta.statusCode != 200) throw _error(respuesta, conToken: true);
+    return _leer(respuesta, (json) {
+      final resultados = json['resultados'];
+      if (resultados is! List<Object?> || resultados.length != eventos.length) {
+        throw FormatException('Se esperaban ${eventos.length} resultados: $json');
+      }
+      return [
+        for (final (posicion, crudo) in resultados.indexed)
+          if (crudo is Map<String, Object?>)
+            _resultadoDe(eventos[posicion], ResultadoEvento.desdeJson(crudo))
+          else
+            throw FormatException('Resultado inesperado: $crudo'),
+      ];
+    });
+  }
+
+  static ResultadoEvento _resultadoDe(EventoLocal evento, ResultadoEvento resultado) {
+    if (resultado.id?.toLowerCase() != evento.id.toLowerCase()) {
+      throw FormatException('El resultado ${resultado.id} no es del evento ${evento.id}');
+    }
+    return resultado;
   }
 
   void cerrar() => _http.close();

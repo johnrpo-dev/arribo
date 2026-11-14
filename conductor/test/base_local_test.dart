@@ -196,4 +196,65 @@ void main() {
 
     expect(await prueba.base.pendientesPorEnviar(), 2);
   });
+
+  test('lo pendiente por enviar se puede contar por conductor', () async {
+    Future<void> evento(String id, int conductor, int secuencia) =>
+        prueba.base.db.insert('eventos_pendientes', {
+          'id': id,
+          'conductor_id': conductor,
+          'servicio_id': 41,
+          'destino': 'en_camino',
+          'secuencia': secuencia,
+          'hora_dispositivo': '2026-11-20T19:42:07Z',
+          'creado_en': '2026-11-20T19:42:07Z',
+        });
+    await evento('a', 3, 1);
+    await evento('b', 3, 2);
+    await evento('c', 8, 3);
+
+    expect(await prueba.base.pendientesPorEnviar(), 3);
+    expect(await prueba.base.pendientesPorEnviar(conductorId: 3), 2);
+    expect(await prueba.base.pendientesPorEnviar(conductorId: 8), 1);
+    expect(await prueba.base.pendientesPorEnviar(conductorId: 5), 0);
+  });
+
+  group('versión 2 (1a-12)', () {
+    test('la cola guarda el vehículo, el nombre de quien tocó y cuándo se vio el aviso', () async {
+      expect(
+        (await columnas(prueba.base, 'eventos_pendientes')).keys,
+        containsAll(['vehiculo', 'conductor_nombre', 'visto_en']),
+      );
+    });
+
+    test('un celular con la versión 1 sube a la 2 sin perder la lista ni la cola', () async {
+      await prueba.base.cerrar();
+      await File(prueba.ruta).delete();
+      final v1 = await BaseLocal.abrir(
+        fabricaDePrueba,
+        prueba.ruta,
+        migraciones: [migraciones.first],
+      );
+      await v1.escribir(Clave.dispositivoId, 'el-mismo');
+      await v1.db.insert('eventos_pendientes', {
+        'id': 'a',
+        'conductor_id': 3,
+        'servicio_id': 41,
+        'destino': 'en_camino',
+        'secuencia': 5,
+        'hora_dispositivo': '2026-11-20T19:42:07Z',
+        'creado_en': '2026-11-20T19:42:07Z',
+      });
+      expect(await v1.db.getVersion(), 1);
+      await v1.cerrar();
+
+      prueba.base = await BaseLocal.abrir(fabricaDePrueba, prueba.ruta);
+
+      expect(await prueba.base.db.getVersion(), migraciones.length);
+      expect(await prueba.base.leer(Clave.dispositivoId), 'el-mismo');
+      final fila = (await prueba.base.db.query('eventos_pendientes')).single;
+      expect(fila['secuencia'], 5);
+      expect(fila['vehiculo'], isNull);
+      expect(await prueba.base.pendientesPorEnviar(), 1);
+    });
+  });
 }
