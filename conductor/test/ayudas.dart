@@ -227,6 +227,18 @@ Map<String, Object?> servicioRemotoJson(
 http.Response respuestaEventos(List<Map<String, Object?>> resultados) =>
     respuestaJson(200, {'version': 1, 'resultados': resultados});
 
+Map<String, Object?> respuestaComoJson(http.Response respuesta) =>
+    jsonDecode(utf8.decode(respuesta.bodyBytes)) as Map<String, Object?>;
+
+/// Espera (con reloj real) a que se cumpla [condicion]; falla si no se cumple en 5 segundos.
+Future<void> esperarHasta(bool Function() condicion) async {
+  final limite = DateTime.now().add(const Duration(seconds: 5));
+  while (!condicion()) {
+    if (DateTime.now().isAfter(limite)) fail('La condición no se cumplió a tiempo.');
+    await Future<void>.delayed(const Duration(milliseconds: 5));
+  }
+}
+
 /// Los eventos de un lote recibido por el servidor falso.
 List<Map<String, Object?>> eventosDe(PeticionRecibida peticion) => [
   for (final evento in peticion.json['eventos']! as List<Object?>) evento! as Map<String, Object?>,

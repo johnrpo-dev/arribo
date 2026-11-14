@@ -43,8 +43,8 @@ class AlmacenAsignaciones {
       base.escribir(Clave.ultimaActualizacion, hora.toUtc().toIso8601String());
 
   /// Los servicios guardados en el orden de la ronda (el de la lista del servidor).
-  Future<List<Servicio>> leer() async {
-    final filas = await base.db.query('servicios', orderBy: 'posicion');
+  Future<List<Servicio>> leer({DatabaseExecutor? en}) async {
+    final filas = await (en ?? base.db).query('servicios', orderBy: 'posicion');
     return [for (final fila in filas) Servicio.desdeFila(fila)];
   }
 
