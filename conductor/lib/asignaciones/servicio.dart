@@ -155,6 +155,28 @@ class Servicio {
     );
   }
 
+  /// El mismo servicio con otro estado: el que resulta de sumarle los toques sin enviar.
+  Servicio conEstado({
+    required String estado,
+    required String? estadoPrevio,
+    required bool aBordo,
+  }) => Servicio(
+    id: id,
+    solicitudId: solicitudId,
+    estado: estado,
+    estadoPrevio: estadoPrevio,
+    tipo: tipo,
+    esRegreso: esRegreso,
+    ordenRonda: ordenRonda,
+    vehiculo: vehiculo,
+    origen: origen,
+    destino: destino,
+    referenciaExterna: referenciaExterna,
+    programadaPara: programadaPara,
+    grua: grua,
+    aBordo: aBordo,
+  );
+
   /// La fila de la tabla `servicios`. `posicion` es el puesto en la lista del servidor.
   Map<String, Object?> aFila(int posicion) => {
     'id': id,
