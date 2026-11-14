@@ -45,8 +45,12 @@ class ColaEventos {
   /// inserta la fila. Dos toques seguidos en el mismo botón no crean dos eventos: el segundo ya no
   /// es el paso que sigue y lanza [ToqueNoValido].
   ///
-  /// [id] permite a quien llama fijar el UUID antes (la 1a-13 lo necesita para atar las fotos al
-  /// evento); si no llega, se genera aquí.
+  /// [id] permite a quien llama fijar el UUID antes (las fotos de un Recogido o de un Entregado se
+  /// atan al evento desde que se toman); si no llega, se genera aquí.
+  ///
+  /// [alGuardar] se ejecuta dentro de la misma transacción, con el evento ya insertado: lo usa la
+  /// cola de fotos para comprobar los requisitos del paso y pasar sus fotos a la cola de subida. Si
+  /// lanza, no se guarda nada (ni el evento ni la secuencia).
   Future<EventoLocal> encolar({
     required Conductor conductor,
     required int servicioId,
@@ -55,6 +59,7 @@ class ColaEventos {
     String? motivo,
     String? nombreQuien,
     String? id,
+    Future<void> Function(Transaction txn, EventoLocal evento)? alGuardar,
   }) async {
     final motivoLimpio = _limpio(motivo);
     if (!destinosDesdeLaApp.contains(destino)) {
@@ -99,6 +104,7 @@ class ColaEventos {
         creadoEn: ahora,
       );
       await txn.insert('eventos_pendientes', evento.aFila());
+      await alGuardar?.call(txn, evento);
       return evento;
     });
   }

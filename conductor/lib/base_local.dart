@@ -121,6 +121,38 @@ const List<List<String>> migraciones = [
     // no se borra: solo deja de mostrarse.
     'ALTER TABLE eventos_pendientes ADD COLUMN visto_en TEXT',
   ],
+  // Versión 3 (1a-13): la pantalla de Recogido o Entregado se guarda a medida que avanza, y lo
+  // que la cola de fotos necesita para subirlas y avisar.
+  [
+    // El paso que el conductor está preparando: el UUID que llevará el evento (las fotos se atan
+    // a él desde que se toman) y el nombre de quien entrega o recibe, como va escrito. Si Android
+    // mata la app al abrir la cámara, al volver todo sale de aquí. `camara_abierta_en` dice desde
+    // qué paso se abrió la cámara, para entregarle la foto que quedó sin recibir. La fila se
+    // borra al marcar el paso, en la misma transacción que guarda el evento.
+    '''
+    CREATE TABLE pasos_en_curso (
+      conductor_id INTEGER NOT NULL,
+      servicio_id INTEGER NOT NULL,
+      destino TEXT NOT NULL CHECK (destino IN ('recogido', 'entregado')),
+      evento_id TEXT NOT NULL UNIQUE,
+      nombre_quien TEXT NOT NULL DEFAULT '',
+      camara_abierta_en TEXT,
+      creado_en TEXT NOT NULL,
+      PRIMARY KEY (conductor_id, servicio_id, destino)
+    )
+    ''',
+    // 1 mientras el paso no se ha marcado: la foto es de la pantalla y todavía no se sube.
+    'ALTER TABLE fotos_pendientes ADD COLUMN borrador INTEGER NOT NULL DEFAULT 0 '
+        'CHECK (borrador IN (0, 1))',
+    // Placa o VIN del vehículo al tomarla, para nombrarlo en un aviso aunque el servicio ya no
+    // esté en la lista.
+    'ALTER TABLE fotos_pendientes ADD COLUMN vehiculo TEXT',
+    // Cuándo se borró el archivo del celular. Solo después de confirmada la subida.
+    'ALTER TABLE fotos_pendientes ADD COLUMN archivo_borrado_en TEXT',
+    // Cuándo el conductor tocó "Entendido" en el aviso de una foto que el servidor rechazó.
+    'ALTER TABLE fotos_pendientes ADD COLUMN visto_en TEXT',
+    'CREATE INDEX fotos_pendientes_evento ON fotos_pendientes (evento_id)',
+  ],
 ];
 
 /// Nombre del archivo de la base en la carpeta de bases de datos de la app.
@@ -231,7 +263,8 @@ class BaseLocal {
   /// Eventos y fotos que el celular aún no ha entregado al servidor. Con [conductorId], solo los de
   /// ese conductor: mientras tenga alguno, la app no le cierra la sesión (el servidor toma como
   /// conductor del evento al dueño del token). Los de otro conductor no cuentan para eso: solo se
-  /// envían cuando él vuelva a ingresar, y para eso este tiene que poder salir.
+  /// envían cuando él vuelva a ingresar, y para eso este tiene que poder salir. Las fotos de un
+  /// paso que aún no se ha marcado (borrador) no cuentan: no hay nada que enviar todavía.
   Future<int> pendientesPorEnviar({int? conductorId}) async {
     final filtro = conductorId == null ? '' : ' AND conductor_id = ?';
     final argumentos = [?conductorId];
@@ -243,7 +276,8 @@ class BaseLocal {
     );
     final fotos = Sqflite.firstIntValue(
       await db.rawQuery(
-        "SELECT COUNT(*) FROM fotos_pendientes WHERE estado_envio = 'pendiente'$filtro",
+        'SELECT COUNT(*) FROM fotos_pendientes '
+        "WHERE estado_envio = 'pendiente' AND borrador = 0$filtro",
         argumentos,
       ),
     );

@@ -34,6 +34,7 @@ void main() {
       'servicios',
       'eventos_pendientes',
       'fotos_pendientes',
+      'pasos_en_curso',
     });
   });
 

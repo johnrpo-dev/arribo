@@ -19,6 +19,7 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
+import 'package:sqflite/sqflite.dart';
 
 import '../api.dart';
 import '../ingreso/sesion.dart';
@@ -113,13 +114,15 @@ class Sincronizador extends ChangeNotifier {
 
   /// Un toque del conductor: lo guarda en la cola y después pide enviarlo. Cuando este Future
   /// termina, el evento ya está en la base; el envío sigue por su cuenta. Lanza [ToqueNoValido] si
-  /// el toque no corresponde (y no guarda nada).
+  /// el toque no corresponde (y no guarda nada). [alGuardar] va en la misma transacción que el
+  /// evento (ver `ColaEventos.encolar`).
   Future<EventoLocal> registrar({
     required int servicioId,
     required String destino,
     String? motivo,
     String? nombreQuien,
     String? id,
+    Future<void> Function(Transaction txn, EventoLocal evento)? alGuardar,
   }) async {
     final conductor = sesion.conductor;
     if (sesion.estado != EstadoSesion.activa || conductor == null) {
@@ -132,6 +135,7 @@ class Sincronizador extends ChangeNotifier {
       motivo: motivo,
       nombreQuien: nombreQuien,
       id: id,
+      alGuardar: alGuardar,
       hora: _reloj(),
     );
     await _releer();

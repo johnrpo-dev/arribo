@@ -1,12 +1,14 @@
 // Utilidades de las pruebas: base SQLite real (ffi, sin celular), token en memoria, servidor falso
 // y respuestas de ejemplo con la forma del contrato (docs/api-conductor.md).
 
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:ui' show Size;
 
 import 'package:arribo_conductor/api.dart';
 import 'package:arribo_conductor/base_local.dart';
+import 'package:arribo_conductor/fotos/camara.dart';
 import 'package:arribo_conductor/ingreso/almacen_token.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
@@ -65,12 +67,16 @@ class AlmacenTokenEnMemoria implements AlmacenToken {
 
 /// Una petición que recibió el servidor falso.
 class PeticionRecibida {
-  PeticionRecibida(this.metodo, this.url, this.cabeceras, this.cuerpo);
+  PeticionRecibida(this.metodo, this.url, this.cabeceras, this.bytes);
 
   final String metodo;
   final Uri url;
   final Map<String, String> cabeceras;
-  final String cuerpo;
+
+  /// El cuerpo tal como llegó (la subida de una foto no es texto).
+  final List<int> bytes;
+
+  String get cuerpo => utf8.decode(bytes);
 
   Map<String, Object?> get json => jsonDecode(cuerpo) as Map<String, Object?>;
 }
@@ -83,7 +89,12 @@ class ServidorFalso {
   final List<PeticionRecibida> peticiones = [];
 
   http.Client get cliente => MockClient((request) async {
-    final peticion = PeticionRecibida(request.method, request.url, request.headers, request.body);
+    final peticion = PeticionRecibida(
+      request.method,
+      request.url,
+      request.headers,
+      request.bodyBytes,
+    );
     peticiones.add(peticion);
     return responder(peticion);
   });
@@ -345,3 +356,199 @@ class ServidorDeEventos {
     estadoPrevio: estados[id] == 'novedad' ? previos[id] : null,
   );
 }
+
+// ---------- fotos (PUT /api/v1/evidencias/<uuid>/) ----------
+
+/// Un JPEG de verdad, de 8 × 8 píxeles: lo que deja la cámara, en miniatura.
+const List<int> jpegDePrueba = [
+  255,
+  216,
+  255,
+  224,
+  0,
+  16,
+  74,
+  70,
+  73,
+  70,
+  0,
+  1,
+  1,
+  0,
+  0,
+  1,
+  0,
+  1,
+  0,
+  0,
+  255,
+  219,
+  0,
+  67,
+  0,
+  20, //
+  14, 15, 18, 15, 13, 20, 18, 16, 18, 23, 21, 20, 24, 30, 50, 33, 30, 28, 28, 30, 61, 44, 46, 36,
+  50, 73, 64, 76, 75, 71, 64, 70, 69, 80, 90, 115, 98, 80, 85, 109, 86, 69, 70, 100, 136, 101, 109,
+  119, 123, 129, 130, 129, 78, 96, 141, 151, 140, 125, 150, 115, 126, 129, 124, 255, 219, 0, 67, 1,
+  21, 23, 23, 30, 26, 30, 59, 33, 33, 59, 124, 83, 70, 83, 124, 124, 124, 124, 124, 124, 124, 124,
+  124, 124, 124, 124, 124, 124, 124, 124, 124, 124, 124, 124, 124, 124, 124, 124, 124, 124, 124,
+  124, 124, 124, 124, 124, 124, 124, 124, 124, 124, 124, 124, 124, 124, 124, 124, 124, 124, 124,
+  124, 124, 124, 124, 255, 192, 0, 17, 8, 0, 8, 0, 8, 3, 1, 34, 0, 2, 17, 1, 3, 17, 1, 255, 196, 0,
+  21, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 5, 255, 196, 0, 20, 16, 1, 0, 0, 0, 0,
+  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 255, 196, 0, 21, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+  0, 0, 0, 4, 5, 255, 196, 0, 20, 17, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 255, 218,
+  0, 12, 3, 1, 0, 2, 17, 3, 17, 0, 63, 0, 150, 2, 192, 79, 255, 217,
+];
+
+/// Una cámara de mentira: cada foto es un archivo JPEG nuevo en [carpeta] (como la caché de la app
+/// donde la cámara de verdad deja la foto comprimida). Escribe en disco de forma síncrona, para
+/// servir también dentro de testWidgets.
+class CamaraFalsa implements Camara {
+  CamaraFalsa(this.carpeta);
+
+  final Directory carpeta;
+
+  /// Lo que hace la siguiente llamada a [tomarFoto].
+  bool cancela = false;
+  ErrorDeCamara? error;
+
+  /// Android mata la app con la cámara abierta: [tomarFoto] nunca responde.
+  bool nuncaResponde = false;
+
+  /// Bytes de la siguiente foto; por defecto, un JPEG válido distinto cada vez.
+  List<int>? contenido;
+
+  /// La foto que quedó sin entregar: [recuperarFotoPerdida] la devuelve una sola vez.
+  String? perdida;
+
+  int abiertas = 0;
+  int _numero = 0;
+
+  /// Deja en [carpeta] un archivo como el que entrega la cámara y devuelve su ruta.
+  String dejarFoto() {
+    _numero++;
+    final archivo = File('${carpeta.path}/scaled_camara_$_numero.jpg');
+    // El byte final hace distinta cada foto; un JPEG admite bytes después de su marca de fin.
+    archivo.writeAsBytesSync(contenido ?? [...jpegDePrueba, _numero]);
+    contenido = null;
+    return archivo.path;
+  }
+
+  @override
+  Future<String?> tomarFoto() async {
+    abiertas++;
+    final falla = error;
+    if (falla != null) {
+      error = null;
+      throw falla;
+    }
+    if (nuncaResponde) return Completer<String?>().future;
+    if (cancela) {
+      cancela = false;
+      return null;
+    }
+    return dejarFoto();
+  }
+
+  @override
+  Future<String?> recuperarFotoPerdida() async {
+    final ruta = perdida;
+    perdida = null;
+    return ruta;
+  }
+}
+
+/// Una foto como la recibió el servidor de mentira.
+class FotoRecibida {
+  FotoRecibida({
+    required this.id,
+    required this.servicioId,
+    required this.eventoId,
+    required this.tipo,
+    required this.bytes,
+  });
+
+  final String id;
+  final String servicioId;
+  final String eventoId;
+  final String tipo;
+  final List<int> bytes;
+
+  bool mismaQue(FotoRecibida otra) =>
+      servicioId == otra.servicioId &&
+      eventoId == otra.eventoId &&
+      tipo == otra.tipo &&
+      bytes.length == otra.bytes.length &&
+      Iterable<int>.generate(bytes.length).every((i) => bytes[i] == otra.bytes[i]);
+}
+
+/// Lee el cuerpo `multipart/form-data` de una subida de foto.
+FotoRecibida fotoDe(PeticionRecibida peticion) {
+  final tipoDeCuerpo = peticion.cabeceras['content-type'] ?? '';
+  final limite = RegExp('boundary=(.+)\$').firstMatch(tipoDeCuerpo)?.group(1);
+  if (!tipoDeCuerpo.startsWith('multipart/form-data') || limite == null) {
+    fail('La foto no llegó como multipart/form-data: $tipoDeCuerpo');
+  }
+  // latin1 conserva cada byte como un carácter: sirve para partir el cuerpo sin dañar el JPEG.
+  final cuerpo = latin1.decode(peticion.bytes);
+  final campos = <String, String>{};
+  for (final parte in cuerpo.split('--$limite')) {
+    final corte = parte.indexOf('\r\n\r\n');
+    if (corte < 0) continue;
+    final nombre = RegExp('name="([^"]+)"').firstMatch(parte.substring(0, corte))?.group(1);
+    if (nombre == null) continue;
+    campos[nombre] = parte.substring(corte + 4, parte.length - 2);
+  }
+  return FotoRecibida(
+    id: peticion.url.pathSegments.lastWhere((segmento) => segmento.isNotEmpty),
+    servicioId: campos['servicio_id'] ?? '',
+    eventoId: campos['evento_id'] ?? '',
+    tipo: campos['tipo'] ?? '',
+    bytes: latin1.encode(campos['archivo'] ?? ''),
+  );
+}
+
+/// Un servidor de fotos con memoria, que hace lo que el real: guarda cada UUID una sola vez (201),
+/// responde 200 `repetida` si llega otra vez la misma foto y 409 si el mismo UUID trae otra cosa.
+class ServidorDeFotos {
+  /// Lo que quedó guardado, por UUID.
+  final Map<String, FotoRecibida> guardadas = {};
+
+  /// El UUID de cada subida recibida, en orden (también las repetidas y las rechazadas).
+  final List<String> recibidas = [];
+
+  /// Si no es null, responde esto en vez de guardar (para simular 413, 500...).
+  http.Response? Function(FotoRecibida foto)? responderCon;
+
+  /// El servidor guarda la foto pero la respuesta no llega al celular.
+  bool perderRespuesta = false;
+
+  http.Response recibir(PeticionRecibida peticion) {
+    final foto = fotoDe(peticion);
+    recibidas.add(foto.id);
+    final forzada = responderCon?.call(foto);
+    if (forzada != null) return forzada;
+    final guardada = guardadas[foto.id];
+    if (guardada != null && !guardada.mismaQue(foto)) {
+      return errorDelContrato(409, 'evidencia_distinta', 'Ya hay otra foto con ese identificador.');
+    }
+    guardadas[foto.id] = guardada ?? foto;
+    if (perderRespuesta) {
+      perderRespuesta = false;
+      sinSenal();
+    }
+    return respuestaJson(guardada == null ? 201 : 200, {
+      'version': 1,
+      'id': foto.id,
+      'resultado': guardada == null ? 'guardada' : 'repetida',
+      'enlazada': true,
+    });
+  }
+}
+
+http.Response fotoDemasiadoGrande() => errorDelContrato(
+  413,
+  'foto_demasiado_grande',
+  'La foto pesa más de 5 MB.',
+  extra: {'maximo_bytes': 5242880},
+);
