@@ -11,6 +11,8 @@ import 'base_local.dart';
 import 'cola/cola_eventos.dart';
 import 'cola/sincronizador.dart';
 import 'dispositivo.dart';
+import 'fotos/almacen_fotos.dart';
+import 'fotos/subidor_fotos.dart';
 import 'ingreso/almacen_token.dart';
 import 'ingreso/sesion.dart';
 
@@ -29,11 +31,14 @@ Future<void> main() async {
   );
   // Un solo sincronizador: es el único que envía la cola de eventos.
   final sincronizador = Sincronizador(cola: ColaEventos(base), api: api, sesion: sesion);
+  // Y un solo subidor de fotos: una foto a la vez. Los JPEG van en una carpeta junto a la base.
+  final fotos = SubidorDeFotos(almacen: AlmacenFotos(base), api: api, sesion: sesion);
   final lista = ListaAsignaciones(
     almacen: AlmacenAsignaciones(base),
     api: api,
     sesion: sesion,
     sincronizador: sincronizador,
+    fotos: fotos,
   );
   runApp(ArriboApp(sesion: sesion, lista: lista));
   await sesion.iniciar();

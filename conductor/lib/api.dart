@@ -13,6 +13,7 @@ import 'package:http/io_client.dart';
 
 import 'asignaciones/servicio.dart';
 import 'cola/evento.dart';
+import 'fotos/foto.dart';
 
 /// Dirección del servidor, sin `/api/v1`. Se cambia sin tocar el código al compilar o correr:
 /// `flutter run --dart-define=ARRIBO_API=https://arribo.ejemplo.co`. Por defecto, el backend de
@@ -28,6 +29,10 @@ const Duration tiempoMaximoPorDefecto = Duration(seconds: 15);
 
 /// Tope de eventos por lote que acepta `POST /eventos/`. Con más, el servidor no aplica ninguno.
 const int maximoEventosPorLote = 100;
+
+/// Tiempo máximo para subir una foto completa (unos cientos de KB): con señal mala tarda mucho más
+/// que una petición de datos. Si se agota, la foto se sube de nuevo entera con el mismo UUID.
+const Duration tiempoMaximoPorFoto = Duration(minutes: 2);
 
 /// Tiempo máximo para establecer la conexión. Sin señal, falla rápido en vez de dejar al
 /// conductor esperando.
@@ -263,6 +268,18 @@ class EstadoRemoto {
   }
 }
 
+/// Lo que respondió el servidor a la subida de una foto (`PUT /evidencias/<uuid>/`). Con
+/// cualquiera de los dos resultados la foto está en el servidor y la app puede borrar su copia.
+class ResultadoFoto {
+  const ResultadoFoto({required this.resultado, required this.enlazada});
+
+  /// `guardada` (201) o `repetida` (200: el servidor ya la tenía).
+  final String resultado;
+
+  /// Si ya quedó unida a su evento.
+  final bool enlazada;
+}
+
 // ---------- cliente ----------
 
 class ClienteApi {
@@ -270,12 +287,16 @@ class ClienteApi {
     String servidor = servidorConfigurado,
     http.Client? cliente,
     this.tiempoMaximo = tiempoMaximoPorDefecto,
+    this.tiempoMaximoFoto = tiempoMaximoPorFoto,
   }) : servidor = servidor.endsWith('/') ? servidor.substring(0, servidor.length - 1) : servidor,
        _http = cliente ?? crearClienteHttp();
 
   /// Dirección del servidor, sin barra final.
   final String servidor;
   final Duration tiempoMaximo;
+
+  /// Tiempo máximo de la subida de una foto.
+  final Duration tiempoMaximoFoto;
   final http.Client _http;
 
   Uri _ruta(String ruta) => Uri.parse('$servidor/api/v1/$ruta');
@@ -390,6 +411,39 @@ class ClienteApi {
     return resultado;
   }
 
+  /// `PUT /evidencias/<uuid>/`: sube una foto como `multipart/form-data`. El archivo se lee del
+  /// disco por partes mientras se envía; nunca se carga completo en memoria. Subir otra vez la
+  /// misma foto es seguro: el servidor responde 200 y no la duplica. Si el archivo no está en el
+  /// disco, lanza FileSystemException.
+  Future<ResultadoFoto> subirFoto(String token, FotoLocal foto) async {
+    final archivo = File(foto.ruta);
+    final peticion = http.MultipartRequest('PUT', _ruta('evidencias/${foto.id}/'))
+      ..headers.addAll(_cabeceras(token: token))
+      ..fields['servicio_id'] = '${foto.servicioId}'
+      ..fields['evento_id'] = foto.eventoId
+      ..fields['tipo'] = foto.tipo
+      ..files.add(
+        http.MultipartFile(
+          'archivo',
+          archivo.openRead(),
+          archivo.lengthSync(),
+          filename: '${foto.id}.jpg',
+        ),
+      );
+    final respuesta = await _enviar(
+      () async => http.Response.fromStream(await _http.send(peticion)),
+      tiempoMaximo: tiempoMaximoFoto,
+    );
+    if (respuesta.statusCode != 200 && respuesta.statusCode != 201) {
+      throw _error(respuesta, conToken: true);
+    }
+    return _leer(respuesta, (json) {
+      final resultado = json['resultado'];
+      if (resultado is! String) throw FormatException('Foto inesperada: $json');
+      return ResultadoFoto(resultado: resultado, enlazada: json['enlazada'] == true);
+    });
+  }
+
   void cerrar() => _http.close();
 
   Map<String, String> _cabeceras({String? token, bool conCuerpo = false}) => {
@@ -398,9 +452,12 @@ class ClienteApi {
     if (token != null) 'Authorization': 'Bearer $token',
   };
 
-  Future<http.Response> _enviar(Future<http.Response> Function() peticion) async {
+  Future<http.Response> _enviar(
+    Future<http.Response> Function() peticion, {
+    Duration? tiempoMaximo,
+  }) async {
     try {
-      return await peticion().timeout(tiempoMaximo);
+      return await peticion().timeout(tiempoMaximo ?? this.tiempoMaximo);
     } on TimeoutException catch (e) {
       throw ErrorDeRed(e);
     } on SocketException catch (e) {

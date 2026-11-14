@@ -13,9 +13,14 @@ import '../cola/cola_eventos.dart';
 import '../cola/evento.dart';
 import '../cola/fila.dart';
 import '../cola/sincronizador.dart';
+import '../fotos/almacen_fotos.dart';
+import '../fotos/foto.dart';
+import '../fotos/subidor_fotos.dart';
 import '../ingreso/sesion.dart';
 import 'almacen_asignaciones.dart';
 import 'estados.dart';
+import 'requisitos.dart' as requisitos;
+import 'requisitos.dart' show BloqueoDeRecogida;
 import 'servicio.dart';
 
 class ListaAsignaciones extends ChangeNotifier {
@@ -24,13 +29,23 @@ class ListaAsignaciones extends ChangeNotifier {
     required this.api,
     required this.sesion,
     Sincronizador? sincronizador,
+    SubidorDeFotos? fotos,
     DateTime Function()? reloj,
   }) : _reloj = reloj ?? DateTime.now,
        sincronizador =
            sincronizador ??
-           Sincronizador(cola: ColaEventos(almacen.base), api: api, sesion: sesion, reloj: reloj) {
+           Sincronizador(cola: ColaEventos(almacen.base), api: api, sesion: sesion, reloj: reloj),
+       fotos =
+           fotos ??
+           SubidorDeFotos(
+             almacen: AlmacenFotos(almacen.base),
+             api: api,
+             sesion: sesion,
+             reloj: reloj,
+           ) {
     _enviosVistos = this.sincronizador.enviosCorrectos;
     this.sincronizador.addListener(_alCambiarLaCola);
+    this.fotos.addListener(notifyListeners);
   }
 
   final AlmacenAsignaciones almacen;
@@ -40,6 +55,11 @@ class ListaAsignaciones extends ChangeNotifier {
   /// Quien envía la cola de eventos. La lista le pide enviar antes de refrescarse y vuelve a leer
   /// la base cada vez que la cola cambia.
   final Sincronizador sincronizador;
+
+  /// Quien sube las fotos de evidencia. La lista lo despierta cuando sabe que hay conexión (un
+  /// envío de eventos llegó, o el servidor respondió la lista) y avisa a las pantallas cuando la
+  /// cola de fotos cambia.
+  final SubidorDeFotos fotos;
   final DateTime Function() _reloj;
 
   List<Servicio> _servicios = const [];
@@ -85,9 +105,11 @@ class ListaAsignaciones extends ChangeNotifier {
   /// Lee la base local. No usa la red.
   Future<void> cargarLocal() async {
     await sincronizador.cargar();
+    await fotos.cargar();
     await _recargar();
     _cargada = true;
     notifyListeners();
+    fotos.despertar();
   }
 
   /// Un toque del conductor en un botón de estado. Cuando termina, el evento ya está guardado en la
@@ -106,6 +128,35 @@ class ListaAsignaciones extends ChangeNotifier {
       motivo: motivo,
       nombreQuien: nombreQuien,
       id: idEvento,
+    );
+    await _recargar();
+    return evento;
+  }
+
+  /// Por qué [servicio] no se puede marcar Recogido todavía (le falta la placa o el VIN, o la grúa
+  /// va llena), o null si puede. Se calcula con el estado que ve el conductor: lo confirmado más
+  /// sus toques sin enviar.
+  BloqueoDeRecogida? bloqueoDeRecogida(Servicio servicio) =>
+      requisitos.bloqueoDeRecogida(servicio, _servicios, configuracion: _configuracion);
+
+  /// Marca el Recogido o el Entregado que el conductor preparó en su pantalla: guarda el evento en
+  /// la cola con el UUID del paso y, en la misma transacción, pasa sus fotos a la cola de subida.
+  /// Antes vuelve a revisar todo lo que exige el paso (identificación y capacidad en un Recogido;
+  /// mínimo de fotos y nombre en los dos). Si falta algo lanza [ToqueNoValido] y no guarda nada.
+  Future<EventoLocal> confirmarPaso(PasoEnCurso paso, {required String nombreQuien}) async {
+    final servicio = this.servicio(paso.servicioId);
+    if (servicio == null) throw const ToqueNoValido('Este servicio ya no está en su lista.');
+    if (paso.destino == Estado.recogido) {
+      final bloqueo = bloqueoDeRecogida(servicio);
+      if (bloqueo != null) throw ToqueNoValido(bloqueo.mensaje);
+    }
+    final minimoFotos = _configuracion?.minimoFotos ?? 0;
+    final evento = await sincronizador.registrar(
+      servicioId: paso.servicioId,
+      destino: paso.destino,
+      nombreQuien: nombreQuien,
+      id: paso.eventoId,
+      alGuardar: (txn, evento) => fotos.almacen.confirmar(txn, evento, minimoFotos: minimoFotos),
     );
     await _recargar();
     return evento;
@@ -157,6 +208,8 @@ class ListaAsignaciones extends ChangeNotifier {
       }
       _problema = null;
       await _recargar();
+      // El servidor respondió: hay conexión para las fotos que estén listas.
+      fotos.despertar();
     } on SesionCerrada catch (error) {
       _problema = null;
       await sesion.cerrarPorServidor(error, tokenUsado: token);
@@ -169,9 +222,15 @@ class ListaAsignaciones extends ChangeNotifier {
   /// lista estaba sin conexión y un envío acaba de llegar al servidor, además se refresca.
   void _alCambiarLaCola() {
     final envios = sincronizador.enviosCorrectos;
-    final volvioLaConexion = envios != _enviosVistos && _problema != null;
+    final llegoUnEnvio = envios != _enviosVistos;
+    final volvioLaConexion = llegoUnEnvio && _problema != null;
     _enviosVistos = envios;
-    unawaited(_recargar());
+    unawaited(
+      _recargar().then((_) {
+        // Un lote de eventos llegó al servidor: las fotos de esos eventos ya se pueden subir.
+        if (llegoUnEnvio) fotos.despertar();
+      }),
+    );
     if (volvioLaConexion) unawaited(actualizar());
   }
 
@@ -204,6 +263,7 @@ class ListaAsignaciones extends ChangeNotifier {
     _pendientes = {for (final MapEntry(:key, :value) in destinos.entries) key: value.length};
     _configuracion = await almacen.configuracion();
     _ultimaActualizacion = await almacen.ultimaActualizacion();
+    await fotos.releer();
   }
 
   static Servicio _conPendientes(Servicio servicio, List<String> destinos) {
@@ -218,6 +278,7 @@ class ListaAsignaciones extends ChangeNotifier {
   @override
   void dispose() {
     sincronizador.removeListener(_alCambiarLaCola);
+    fotos.removeListener(notifyListeners);
     super.dispose();
   }
 }
