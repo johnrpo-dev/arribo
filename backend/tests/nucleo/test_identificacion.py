@@ -5,15 +5,23 @@ import pytest
 
 from nucleo.identificacion import (
     PATRON_VIN,
+    CampoIdentificacion,
+    Complemento,
+    DatoPorRevisar,
     IdentificacionIncompleta,
     MomentoIdentificacion,
+    PlacaInvalida,
+    Revision,
     TelefonoInvalido,
     VinInvalido,
+    completar_identificacion,
     identificacion_exigida,
     normalizar_placa,
     normalizar_telefono,
     normalizar_vin,
     validar_identificacion,
+    validar_identificacion_al_recoger,
+    validar_placa,
     validar_vin,
 )
 from nucleo.tipos import TipoServicio
@@ -202,3 +210,124 @@ def test_al_recoger_se_exige_siempre(configurado):
 def test_el_momento_se_acepta_como_texto_guardado():
     assert identificacion_exigida("asignar", "asignar") is True
     assert identificacion_exigida("recoger", "asignar") is False
+
+
+# --- Placa: lo que cabe en el vehículo -----------------------------------------------------------
+
+
+@pytest.mark.parametrize("placa", ["ABC123", "ABC12D", "A", "ABCDEFGHIJ"])
+def test_placa_de_1_a_10_letras_o_digitos_es_valida(placa):
+    validar_placa(placa)
+
+
+@pytest.mark.parametrize("placa", ["", "ABCDEFGHIJK", "abc123", "ABC-123"])
+def test_placa_vacia_larga_o_sin_normalizar_es_invalida(placa):
+    with pytest.raises(PlacaInvalida, match="de 1 a 10 letras o dígitos"):
+        validar_placa(placa)
+
+
+def test_placa_invalida_es_un_value_error():
+    assert issubclass(PlacaInvalida, ValueError)
+
+
+# --- Placa o VIN digitados al recoger ------------------------------------------------------------
+
+C, R = CampoIdentificacion, Revision
+
+
+def test_al_recoger_cuenta_la_placa_digitada_si_el_vehiculo_no_tiene_identificacion():
+    validar_identificacion_al_recoger("", "", "abc-123", None, TipoServicio.TRASLADO)
+
+
+def test_al_recoger_cuenta_el_vin_digitado_en_un_traslado():
+    validar_identificacion_al_recoger(None, None, None, VIN, TipoServicio.TRASLADO)
+
+
+def test_al_recoger_un_desvare_exige_la_placa_aunque_digiten_el_vin():
+    with pytest.raises(IdentificacionIncompleta, match="desvare exige la placa"):
+        validar_identificacion_al_recoger("", "", "", VIN, TipoServicio.DESVARE)
+
+
+def test_al_recoger_un_desvare_con_vin_guardado_se_completa_con_la_placa_digitada():
+    validar_identificacion_al_recoger("", VIN, "ABC123", None, TipoServicio.DESVARE)
+
+
+@pytest.mark.parametrize("digitada", [None, "", " - "])
+def test_al_recoger_sin_nada_digitado_ni_guardado_falta_identificacion(digitada):
+    with pytest.raises(IdentificacionIncompleta, match="placa o VIN"):
+        validar_identificacion_al_recoger("", "", digitada, digitada, TipoServicio.TRASLADO)
+
+
+def test_al_recoger_lo_digitado_cuenta_aunque_no_sea_valido():
+    # El conductor lo leyó del vehículo: el Recogido se aplica y logística revisa el dato.
+    validar_identificacion_al_recoger("", "", None, VIN[:16], TipoServicio.TRASLADO)
+    validar_identificacion_al_recoger("", "", "ABCDEFGHIJKLM", None, TipoServicio.DESVARE)
+
+
+def test_al_recoger_con_el_vehiculo_identificado_no_hace_falta_digitar():
+    validar_identificacion_al_recoger("ABC123", "", None, None, TipoServicio.DESVARE)
+
+
+def test_completar_guarda_la_placa_digitada_normalizada_si_el_vehiculo_no_tiene():
+    complemento = completar_identificacion("", "", "abc-123", None)
+    assert (complemento.placa, complemento.vin) == ("ABC123", "")
+    assert complemento.nuevos == (C.PLACA,)
+    assert complemento.por_revisar == ()
+
+
+def test_completar_guarda_placa_y_vin_digitados_si_el_vehiculo_no_tiene_ninguno():
+    complemento = completar_identificacion(None, None, "ABC123", VIN.lower())
+    assert (complemento.placa, complemento.vin) == ("ABC123", VIN)
+    assert complemento.nuevos == (C.PLACA, C.VIN)
+
+
+def test_completar_agrega_el_vin_a_un_vehiculo_que_solo_tenia_placa():
+    complemento = completar_identificacion("ABC123", "", None, VIN)
+    assert (complemento.placa, complemento.vin, complemento.nuevos) == ("ABC123", VIN, (C.VIN,))
+
+
+def test_completar_con_el_mismo_dato_no_cambia_nada_ni_pide_revision():
+    complemento = completar_identificacion("ABC123", VIN, "abc 123", VIN.lower())
+    assert (complemento.nuevos, complemento.por_revisar) == ((), ())
+
+
+def test_completar_no_sobreescribe_una_placa_distinta_y_la_deja_por_revisar():
+    complemento = completar_identificacion("ABC123", "", "XYZ789", None)
+    assert complemento.placa == "ABC123"
+    assert complemento.nuevos == ()
+    assert complemento.por_revisar == (
+        DatoPorRevisar(C.PLACA, "XYZ789", R.DISTINTO, existente="ABC123"),
+    )
+
+
+def test_completar_no_sobreescribe_un_vin_distinto():
+    otro = "WVWZZZ1JZXW000001"
+    complemento = completar_identificacion("", VIN, None, otro)
+    assert complemento.vin == VIN
+    assert complemento.por_revisar == (DatoPorRevisar(C.VIN, otro, R.DISTINTO, existente=VIN),)
+
+
+@pytest.mark.parametrize("vin", [VIN[:16], VIN[:-1] + "O", "1HGCM.82633A004352"])
+def test_completar_no_guarda_un_vin_invalido_y_lo_deja_por_revisar(vin):
+    complemento = completar_identificacion("", "", None, vin)
+    assert complemento.vin == ""
+    assert complemento.nuevos == ()
+    assert complemento.por_revisar == (DatoPorRevisar(C.VIN, normalizar_vin(vin), R.INVALIDO),)
+
+
+def test_completar_no_guarda_una_placa_que_no_cabe_y_la_deja_por_revisar():
+    complemento = completar_identificacion("", "", "ABC-DEF-GHI-JK", None)
+    assert complemento.placa == ""
+    assert complemento.por_revisar == (DatoPorRevisar(C.PLACA, "ABCDEFGHIJK", R.INVALIDO),)
+
+
+def test_completar_un_vin_invalido_no_impide_guardar_la_placa():
+    complemento = completar_identificacion("", "", "ABC123", "MALO")
+    assert (complemento.placa, complemento.vin) == ("ABC123", "")
+    assert complemento.nuevos == (C.PLACA,)
+    assert [dato.campo for dato in complemento.por_revisar] == [C.VIN]
+
+
+def test_completar_sin_nada_digitado_deja_el_vehiculo_como_estaba():
+    complemento = completar_identificacion("ABC123", "", None, " - ")
+    assert complemento == Complemento("ABC123", "", (), ())

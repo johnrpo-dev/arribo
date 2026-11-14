@@ -8,6 +8,7 @@ from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
 from django.db.models import ProtectedError
 
+from nucleo.identificacion import LARGO_MAXIMO_PLACA
 from solicitudes.models import Servicio, Vehiculo
 
 from ..conftest import VIN, crear_solicitud
@@ -26,6 +27,11 @@ def rechazado_por_la_base(restriccion, **datos):
 
 
 # --- Normalización -----------------------------------------------------------------------------
+
+
+def test_la_placa_valida_del_nucleo_es_la_que_cabe_en_el_vehiculo():
+    # validar_placa (placa digitada en la app al recoger) acepta justo lo que cabe en la columna.
+    assert Vehiculo._meta.get_field("placa").max_length == LARGO_MAXIMO_PLACA
 
 
 def test_la_placa_y_el_vin_se_guardan_normalizados():

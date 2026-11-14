@@ -2,9 +2,15 @@
 
 La misma placa o el mismo número se escriben de muchas formas. Se normaliza antes de guardar y
 antes de buscar, para que "abc-123" encuentre "ABC123" y "+57 300 123 4567" encuentre "3001234567".
-Python puro: lo usan los modelos y, más adelante, la app.
+Python puro: lo usan los modelos y la app del conductor (su copia en Dart cumple los casos de
+docs/casos-reglas.json).
+
+Placa o VIN digitados al recoger (1a-13b): si el vehículo llega sin identificación, el conductor
+la digita en la app y viaja en el evento de Recogido. `validar_identificacion_al_recoger` cuenta
+lo digitado; `completar_identificacion` dice qué se guarda en el vehículo y qué revisa logística.
 """
 import re
+from dataclasses import dataclass
 from enum import StrEnum
 
 from nucleo.tipos import TipoServicio
@@ -12,6 +18,9 @@ from nucleo.tipos import TipoServicio
 INDICATIVO_COLOMBIA = "57"
 MIN_DIGITOS_TELEFONO = 7
 MAX_DIGITOS_TELEFONO = 15
+
+# Lo que cabe en la placa del vehículo (`solicitudes.Vehiculo.placa`), ya normalizada.
+LARGO_MAXIMO_PLACA = 10
 
 LARGO_VIN = 17
 # Letras y dígitos sin I, O ni Q (se confunden con 1 y 0). No se valida el dígito verificador.
@@ -23,10 +32,15 @@ _NO_ALFANUMERICO = re.compile(r"[^A-Z0-9]")
 _NO_DIGITO = re.compile(r"[^0-9]")
 _SEPARADORES_VIN = re.compile(r"[\s-]")
 _VIN_VALIDO = re.compile(rf"[{CARACTERES_VIN}]{{{LARGO_VIN}}}")
+_PLACA_VALIDA = re.compile(rf"[A-Z0-9]{{1,{LARGO_MAXIMO_PLACA}}}")
 
 
 class TelefonoInvalido(ValueError):
     """El texto no se puede leer como un teléfono."""
+
+
+class PlacaInvalida(ValueError):
+    """La placa no tiene de 1 a 10 letras o dígitos."""
 
 
 class VinInvalido(ValueError):
@@ -79,6 +93,15 @@ def validar_vin(vin: str) -> None:
         )
 
 
+def validar_placa(placa: str) -> None:
+    """Una placa ya normalizada: de 1 a 10 letras o dígitos (lo que cabe en el vehículo)."""
+    if not _PLACA_VALIDA.fullmatch(placa or ""):
+        raise PlacaInvalida(
+            f"La placa debe tener de 1 a {LARGO_MAXIMO_PLACA} letras o dígitos; "
+            f"se leyó {placa!r} ({len(placa or '')} caracteres)."
+        )
+
+
 def validar_identificacion(
     placa: str | None, vin: str | None, tipo_servicio: TipoServicio | str
 ) -> None:
@@ -91,6 +114,113 @@ def validar_identificacion(
         raise IdentificacionIncompleta("Un desvare exige la placa del vehículo.")
     if not tiene_placa and not normalizar_vin(vin):
         raise IdentificacionIncompleta("El vehículo necesita placa o VIN (al menos uno).")
+
+
+# --- Placa o VIN digitados al recoger ------------------------------------------------------------
+
+
+def validar_identificacion_al_recoger(
+    placa_guardada: str | None,
+    vin_guardado: str | None,
+    placa_digitada: str | None,
+    vin_digitado: str | None,
+    tipo_servicio: TipoServicio | str,
+) -> None:
+    """Un Recogido que llega de la app: `validar_identificacion` con lo que el vehículo tiene y,
+    donde le falte, lo que el conductor digitó al recogerlo.
+
+    Lo digitado cuenta aunque no se pueda guardar en el vehículo (mal formado, o de otro vehículo):
+    el conductor lo leyó del vehículo que montó, queda en el evento y logística lo revisa. Solo
+    revisa que esté, como `validar_identificacion`. Lanza IdentificacionIncompleta.
+    """
+    validar_identificacion(
+        normalizar_placa(placa_guardada) or normalizar_placa(placa_digitada),
+        normalizar_vin(vin_guardado) or normalizar_vin(vin_digitado),
+        tipo_servicio,
+    )
+
+
+class CampoIdentificacion(StrEnum):
+    PLACA = "placa"
+    VIN = "vin"
+
+
+class Revision(StrEnum):
+    """Por qué un dato digitado al recoger no quedó en el vehículo. Logística lo revisa."""
+
+    # El vehículo ya tenía otro: no se sobreescribe.
+    DISTINTO = "distinto"
+    # No cumple el formato (`validar_placa`, `validar_vin`).
+    INVALIDO = "invalido"
+    # Otro vehículo ya lo tiene (placa y VIN son únicos). Lo detecta la base, no esta función.
+    DE_OTRO_VEHICULO = "de_otro_vehiculo"
+
+
+@dataclass(frozen=True)
+class DatoPorRevisar:
+    campo: CampoIdentificacion
+    digitado: str  # normalizado
+    revision: Revision
+    # Lo que impidió guardarlo: el dato que ya tenía el vehículo (DISTINTO) o el vehículo que ya
+    # tiene ese dato (DE_OTRO_VEHICULO). Vacío en INVALIDO.
+    existente: str = ""
+
+
+@dataclass(frozen=True)
+class Complemento:
+    """Lo que la placa y el VIN digitados al recoger hacen con la identificación del vehículo."""
+
+    placa: str  # la placa que queda en el vehículo (normalizada; vacía si no tiene)
+    vin: str
+    nuevos: tuple[CampoIdentificacion, ...]  # los datos que se completan con lo digitado
+    por_revisar: tuple[DatoPorRevisar, ...]
+
+
+def _es_valido(validar, dato: str) -> bool:
+    try:
+        validar(dato)
+    except ValueError:
+        return False
+    return True
+
+
+def completar_identificacion(
+    placa_guardada: str | None,
+    vin_guardado: str | None,
+    placa_digitada: str | None,
+    vin_digitado: str | None,
+) -> Complemento:
+    """La placa y el VIN que el conductor digitó al recoger, comparados con los del vehículo.
+
+    Por cada dato digitado (normalizado; vacío = no digitado):
+    - Si el vehículo no lo tiene y es válido, se completa con él (`nuevos`).
+    - Si es igual al que tiene, no pasa nada.
+    - Si el vehículo ya tiene otro, no se sobreescribe: queda por revisar (DISTINTO).
+    - Si no es válido, no se guarda: queda por revisar (INVALIDO).
+    Que otro vehículo ya tenga ese dato lo sabe la base: quien guarda agrega DE_OTRO_VEHICULO.
+    """
+    placa, vin = normalizar_placa(placa_guardada), normalizar_vin(vin_guardado)
+    quedan = {CampoIdentificacion.PLACA: placa, CampoIdentificacion.VIN: vin}
+    nuevos, por_revisar = [], []
+    for campo, guardado, digitado, validar in (
+        (CampoIdentificacion.PLACA, placa, normalizar_placa(placa_digitada), validar_placa),
+        (CampoIdentificacion.VIN, vin, normalizar_vin(vin_digitado), validar_vin),
+    ):
+        if not digitado or digitado == guardado:
+            continue
+        if not _es_valido(validar, digitado):
+            por_revisar.append(DatoPorRevisar(campo, digitado, Revision.INVALIDO))
+        elif guardado:
+            por_revisar.append(DatoPorRevisar(campo, digitado, Revision.DISTINTO, guardado))
+        else:
+            quedan[campo] = digitado
+            nuevos.append(campo)
+    return Complemento(
+        placa=quedan[CampoIdentificacion.PLACA],
+        vin=quedan[CampoIdentificacion.VIN],
+        nuevos=tuple(nuevos),
+        por_revisar=tuple(por_revisar),
+    )
 
 
 class MomentoIdentificacion(StrEnum):

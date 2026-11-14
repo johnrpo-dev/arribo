@@ -18,6 +18,7 @@ from nucleo.estados import NOVEDAD_DESDE, Estado, estado_solicitud
 from nucleo.estados import Servicio as ServicioNucleo
 from nucleo.evidencia import Foto
 from nucleo.identificacion import (
+    LARGO_MAXIMO_PLACA,
     PATRON_VIN,
     VinInvalido,
     normalizar_placa,
@@ -72,7 +73,7 @@ class Vehiculo(models.Model):
 
     placa = models.CharField(
         "placa",
-        max_length=10,
+        max_length=LARGO_MAXIMO_PLACA,
         blank=True,
         help_text="Se guarda en mayúsculas, solo con letras y dígitos.",
     )
