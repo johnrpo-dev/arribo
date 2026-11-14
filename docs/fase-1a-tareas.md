@@ -76,6 +76,10 @@ Toda tarea termina con `uv run pytest -q` y `uv run ruff check .` en verde, más
   Recogido y Entregado exigen el mínimo de fotos configurado y el nombre de quien entrega o recibe. Fotos
   comprimidas en el celular, subida en cola. Bloqueo por capacidad mostrando qué falta entregar.
   Verificar: pruebas del bloqueo y del mínimo de fotos; puntos 5 a 9 de `docs/prueba-sin-senal.md`.
+  Corregido en 1a-13b: con "placa/VIN al recoger", un vehículo sin placa ni VIN bloqueaba el
+  Recogido ("llame a logística") y sin señal no se podía recoger. Ahora el conductor digita la placa
+  o el VIN en la pantalla del Recogido y viajan en el evento (contrato 1.1); punto 9c de
+  `docs/prueba-sin-senal.md`.
 
 - [ ] **1a-14 Push al conductor** (5 h). Depende de: 13.
   Requiere que el dueño cree un proyecto de Firebase (gratis) y descargue sus credenciales.
