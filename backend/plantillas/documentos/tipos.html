@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block titulo %}Tipos de documento{% endblock %}
+{% block contenido %}
+<p><a href="{% url 'flota' %}">Flota y documentos</a></p>
+<h1 class="titulo-pagina">Tipos de documento</h1>
+
+<div class="tabla-contenedor">
+  <table class="tabla">
+    <thead>
+      <tr>
+        <th scope="col">Nombre</th>
+        <th scope="col">Aplica a</th>
+        <th scope="col">Aviso</th>
+        <th scope="col">Estado</th>
+        <th scope="col">Editar</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for tipo in tipos %}
+      <tr>
+        <td>{{ tipo.nombre }}</td>
+        <td>{{ tipo.get_aplica_a_display }}</td>
+        <td class="cifra">{{ tipo.dias_anticipacion }} día{{ tipo.dias_anticipacion|pluralize }} antes</td>
+        <td>{% if tipo.activo %}Activo{% else %}<span class="texto-secundario">Inactivo</span>{% endif %}</td>
+        <td><a href="{% url 'editar_tipo_documento' tipo.pk %}" aria-label="Editar {{ tipo.nombre }}">Editar</a></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+<p class="ayuda">Un tipo no se borra: se desactiva. Un tipo inactivo no se exige ni bloquea a nadie, y sus documentos quedan en el historial.</p>
+
+<section class="bloque" aria-labelledby="t-nuevo">
+  <h2 class="titulo-seccion" id="t-nuevo">Tipo nuevo</h2>
+  {% include "documentos/parcial_formulario_tipo.html" with boton="Crear tipo" %}
+</section>
+{% endblock %}

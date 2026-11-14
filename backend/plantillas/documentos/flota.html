@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+{% block titulo %}Flota y documentos{% endblock %}
+{% block contenido %}
+<h1 class="titulo-pagina">Flota y documentos</h1>
+
+{% if vencidos %}
+<p class="aviso aviso--error">{% if vencidos == 1 %}Hay 1 documento vencido{% else %}Hay {{ vencidos }} documentos vencidos{% endif %}. Un conductor con un documento vencido, o cuya grúa tenga uno vencido, no recibe servicios nuevos; lo que ya tiene en curso sigue.</p>
+{% endif %}
+{% if por_vencer %}
+<p class="aviso aviso--advertencia">{% if por_vencer == 1 %}Hay 1 documento por vencer{% else %}Hay {{ por_vencer }} documentos por vencer{% endif %}.</p>
+{% endif %}
+<p class="ayuda">Estado al {{ hoy|date:"d/m/Y" }}. Un documento sirve hasta el día en que vence, inclusive. Para renovar uno, abra su estado y registre el nuevo: reemplaza al anterior, que queda en el historial.</p>
+
+<section class="bloque" aria-labelledby="t-gruas">
+  <h2 class="titulo-seccion" id="t-gruas">Grúas</h2>
+  {% if gruas %}
+  <div class="tabla-contenedor">
+    <table class="tabla">
+      <thead>
+        <tr>
+          <th scope="col">Grúa</th>
+          {% for tipo in tipos_grua %}<th scope="col">{{ tipo.nombre }}</th>{% endfor %}
+        </tr>
+      </thead>
+      <tbody>
+        {% for grua, estados in gruas %}
+        <tr>
+          <th scope="row">{{ grua.placa }}{% if not grua.activa %} <span class="texto-secundario">(inactiva)</span>{% endif %}</th>
+          {% for e in estados %}
+          <td>{% url 'documento_de_grua' grua.pk e.tipo.pk as enlace %}{% include "documentos/parcial_celda.html" %}</td>
+          {% endfor %}
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="vacio"><p>No hay grúas registradas. Se crean en el admin (Flota → Grúas).</p></div>
+  {% endif %}
+</section>
+
+<section class="bloque" aria-labelledby="t-conductores">
+  <h2 class="titulo-seccion" id="t-conductores">Conductores</h2>
+  {% if conductores %}
+  <div class="tabla-contenedor">
+    <table class="tabla">
+      <thead>
+        <tr>
+          <th scope="col">Conductor</th>
+          {% for tipo in tipos_conductor %}<th scope="col">{{ tipo.nombre }}</th>{% endfor %}
+        </tr>
+      </thead>
+      <tbody>
+        {% for conductor, estados in conductores %}
+        <tr>
+          <th scope="row">{{ conductor.nombre }}{% if not conductor.activo %} <span class="texto-secundario">(inactivo)</span>{% endif %}</th>
+          {% for e in estados %}
+          <td>{% url 'documento_de_conductor' conductor.pk e.tipo.pk as enlace %}{% include "documentos/parcial_celda.html" %}</td>
+          {% endfor %}
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="vacio"><p>No hay conductores registrados. Se crean en el admin (Flota → Conductores).</p></div>
+  {% endif %}
+</section>
+
+<div class="acciones">
+  <a class="boton boton--secundario" href="{% url 'tipos_documento' %}">Tipos de documento</a>
+</div>
+{% endblock %}

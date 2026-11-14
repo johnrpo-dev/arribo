@@ -1,0 +1,1 @@
+{% if documento %}<br><span class="texto-secundario">{% if documento.aun_no_aplica %}aplica desde <time datetime="{{ documento.aplica_desde|date:'Y-m-d' }}">{{ documento.aplica_desde|date:"d/m/Y" }}</time>{% else %}vence <time datetime="{{ documento.vence|date:'Y-m-d' }}">{{ documento.vence|date:"d/m/Y" }}</time>{% endif %}</span>{% endif %}

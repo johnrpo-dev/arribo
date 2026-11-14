@@ -34,7 +34,13 @@ SECCIONES = (
     ),
     Seccion("solicitudes", "Solicitudes", "solicitudes/", (LOGISTICA, ADMINISTRADOR)),
     Seccion("cobros", "Cobros", "cobros/", (FACTURACION, ADMINISTRADOR)),
-    Seccion("flota", "Flota y documentos", "flota/", (ADMINISTRADOR,)),
+    Seccion(
+        "flota",
+        "Flota y documentos",
+        "flota/",
+        (ADMINISTRADOR,),
+        vista="documentos.views.flota",
+    ),
     Seccion("panel_dueno", "Panel del dueño", "dueno/", (ADMINISTRADOR,)),
     Seccion(
         "configuracion",

@@ -109,6 +109,18 @@ def estados_de(sujeto: Grua | Conductor, hoy: date | None = None) -> list[Estado
     return estados_por_sujeto(aplica_a, [sujeto], hoy)[sujeto.pk]
 
 
+def estado_de_tipo(
+    sujeto: Grua | Conductor, tipo: TipoDocumento, hoy: date | None = None
+) -> EstadoDeTipo:
+    """Estado de un tipo para un sujeto, también si el tipo está inactivo (para su historial)."""
+    filtro = {"grua": sujeto} if isinstance(sujeto, Grua) else {"conductor": sujeto}
+    documento = Documento.objects.filter(tipo=tipo, **filtro).order_by("-registrado_en", "-pk").first()
+    estado = regla.estado_documento(
+        documento.como_nucleo() if documento else None, hoy or dia_local(), tipo.dias_anticipacion
+    )
+    return EstadoDeTipo(tipo, sujeto, documento, estado)
+
+
 def vencidos_para_asignar(
     conductor: Conductor, grua: Grua | None, hoy: date | None = None
 ) -> tuple[str, ...]:
