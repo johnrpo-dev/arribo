@@ -67,7 +67,7 @@ Toda tarea termina con `uv run pytest -q` y `uv run ruff check .` en verde, más
   la dirección en Google Maps o Waze. La lista se ve sin señal.
   Verificar: `flutter test`; en el celular, abrir la lista en modo avión.
 
-- [ ] **1a-12 App: estados y cola sin señal** (7 h). Depende de: 11.
+- [x] **1a-12 App: estados y cola sin señal** (7 h). Depende de: 11.
   Botones En camino, Recogido, Entregado y Novedad. Cada toque se guarda como evento en la cola local y
   se envía al abrir la app o al recuperar señal. Indicador "pendiente por enviar".
   Verificar: pruebas de la cola (no pierde eventos, no los duplica, respeta la secuencia); puntos 1 a 4 de `docs/prueba-sin-senal.md`.

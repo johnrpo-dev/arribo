@@ -2,8 +2,9 @@
 
 App Flutter de Arribo para los conductores de grúa: solo Android, distribuida por APK directo
 (sin tiendas). Desde la 1a-11: ingreso con celular y PIN, lista de asignaciones en orden de ronda
-que se ve sin señal, detalle de solo lectura, y llamar o abrir la dirección en Google Maps o Waze
-con un toque. Los botones de estado y la cola sin señal llegan en la 1a-12; las fotos, en la 1a-13.
+que se ve sin señal, y llamar o abrir la dirección en Google Maps o Waze con un toque. Desde la
+1a-12: botones de estado en el detalle (En camino, Recogido, Entregado y Novedad) y cola de eventos
+que funciona sin señal. Las fotos y el bloqueo por capacidad llegan en la 1a-13.
 
 - Paquete: `co.arribo.arribo_conductor`
 - `minSdk = 26` (Android 8.0 o superior), fijado en `android/app/build.gradle.kts`.
@@ -64,12 +65,16 @@ Carpetas por funcionalidad:
 - `lib/api.dart`: cliente de la API (tiempos máximos cortos, errores del contrato, ETag, 401).
 - `lib/base_local.dart`: base SQLite y sus migraciones.
 - `lib/ingreso/`: sesión (token y conductor), almacén seguro del token y pantalla de ingreso.
-- `lib/asignaciones/`: modelo del servicio, su almacén en la base, la lista, sus pantallas y los enlaces.
+- `lib/asignaciones/`: modelo del servicio, su almacén en la base, la lista, sus pantallas, los
+  enlaces, los estados (`estados.dart`) y la confirmación de cada toque (`confirmacion.dart`).
+- `lib/cola/`: la cola de eventos (`cola_eventos.dart`, sin red), quien la envía
+  (`sincronizador.dart`), el evento (`evento.dart`) y las tareas por turnos (`fila.dart`).
 - `lib/formato.dart`, `lib/tema.dart`, `lib/comunes.dart`, `lib/dispositivo.dart`: textos y fechas,
   tema, piezas compartidas, nombre del celular.
 
-**Estado:** `ChangeNotifier` propios (`Sesion`, `ListaAsignaciones`) que las pantallas escuchan con
-`ListenableBuilder`. Sin paquetes de estado: son dos piezas y se pasan por constructor.
+**Estado:** `ChangeNotifier` propios (`Sesion`, `ListaAsignaciones`, `Sincronizador`) que las
+pantallas escuchan con `ListenableBuilder`. Sin paquetes de estado: son tres piezas y se pasan por
+constructor. La lista escucha al sincronizador y avisa a las pantallas cuando la cola cambia.
 
 **Nada importante vive solo en memoria.** La lista se muestra siempre desde la base local; el
 servidor solo la refresca (al abrir, al volver a primer plano y al deslizar hacia abajo). El token va
@@ -87,15 +92,19 @@ Versión 1:
 
 | Tabla | Para qué |
 |---|---|
-| `estado_local` | Datos sueltos por clave: `dispositivo_id`, `conductor`, `etag`, `ultima_actualizacion`, `configuracion` (y `ultima_secuencia` desde la 1a-12) |
+| `estado_local` | Datos sueltos por clave: `dispositivo_id`, `conductor`, `etag`, `ultima_actualizacion`, `configuracion` y `ultima_secuencia` |
 | `servicios` | La lista de `GET /asignaciones/` con todos sus campos; `posicion` es el puesto en la lista del servidor (orden de ronda). Sin columnas de cobro |
-| `eventos_pendientes` | Cola de eventos de la 1a-12 (todavía sin uso) |
+| `eventos_pendientes` | Cola de eventos (1a-12): pendientes y ya respondidos, con su resultado |
 | `fotos_pendientes` | Fotos por subir de la 1a-13 (todavía sin uso) |
+
+Versión 2 (1a-12): agrega a `eventos_pendientes` las columnas `vehiculo` (placa o VIN al tocar, para
+nombrarlo en un aviso aunque el servicio ya no esté en la lista), `conductor_nombre` (de quién son
+los cambios que siguen sin enviar) y `visto_en` (cuándo el conductor dio por visto un aviso).
 
 La lista, su configuración, su ETag y la hora se guardan en una sola transacción: nunca queda un ETag
 nuevo con datos viejos (un 304 escondería los cambios).
 
-Previsto para la 1a-12 (`eventos_pendientes`): `id` es el UUID v4 del evento generado al tocar;
+En `eventos_pendientes`: `id` es el UUID v4 del evento generado al tocar;
 `conductor_id` es quien lo tocó (el evento se envía solo con su token); `destino` solo admite
 `en_camino`, `recogido`, `entregado` y `novedad`; `secuencia` es única y sale de `ultima_secuencia`
 en `estado_local`, que se incrementa en la misma transacción que inserta el evento y nunca baja (no
@@ -110,8 +119,43 @@ bytes en la base), `id` (UUID de `PUT /evidencias/<id>/`), `evento_id`, `tipo` (
 Si esas tareas necesitan otro esquema, lo cambian con una migración nueva: las dos tablas llegan
 vacías a todo celular instalado, así que se pueden rehacer sin perder nada.
 
-`BaseLocal.pendientesPorEnviar()` ya cuenta eventos y fotos pendientes: con alguno, la app no cierra
-sesión (el servidor toma como conductor del evento al dueño del token).
+`BaseLocal.pendientesPorEnviar()` cuenta eventos y fotos pendientes (de todos, o de un conductor):
+mientras el conductor de la sesión tenga alguno, la app no le cierra la sesión (el servidor toma como
+conductor del evento al dueño del token).
+
+### Estados y cola de eventos (1a-12)
+
+`lib/asignaciones/estados.dart` repite la regla de `backend/nucleo/estados.py` (el paso que sigue,
+desde dónde se reporta una novedad) solo para ofrecer el botón correcto y mostrar el estado con los
+toques pendientes. Quien decide es el servidor: si no coinciden, el evento llega como conflicto.
+
+Un toque del conductor:
+
+1. Confirmación corta en una hoja inferior (`confirmacion.dart`). Recogido y Entregado pasan por
+   `prepararRecogidoOEntregado`: ahí engancha la 1a-13 (capacidad, fotos y nombre).
+2. `ColaEventos.encolar`, en una transacción: comprueba que sea el paso que sigue al estado que ve
+   el conductor, toma la secuencia (`ultima_secuencia`, que solo crece) e inserta el evento con su
+   UUID v4. Si la app muere aquí, el evento ya está guardado.
+3. La lista vuelve a leer la base: el estado que se muestra es lo confirmado por el servidor más los
+   eventos pendientes, en orden. No se escribe encima de lo confirmado.
+4. `Sincronizador.enviar()`: un lote de máximo 100, desde el pendiente más antiguo, con el token de
+   quien tocó. La respuesta se anota en una transacción: el evento sale de la cola (aplicado,
+   conflicto o rechazado) y el servicio queda con el estado que devolvió el servidor, o sale de la
+   lista si ya no está en la ronda. `reintentar` lo deja en la cola.
+
+Disparadores del envío: abrir la app y volver a primer plano (la lista se actualiza y antes envía),
+deslizar la lista, cada toque, y un reintento con espera creciente (5, 10, 20 y 30 s con la app a la
+vista; hasta 5 minutos en segundo plano). Nunca hay dos envíos a la vez, y el envío y la consulta de
+la lista van por turnos para que una lista vieja no se guarde después del resultado de un evento.
+
+Reglas que no se rompen:
+
+- El UUID y la secuencia de un evento no cambian nunca. Reenviar es mandar la misma fila; si la
+  respuesta se perdió, vuelve como `duplicado` y se trata igual.
+- Conflicto y rechazado no se reintentan: quedan a la vista hasta que el conductor toca "Entendido".
+- Cada evento se envía solo con el token de quien lo tocó. Un 401 conserva la cola. Los eventos de
+  otro conductor esperan a que él ingrese de nuevo; mientras, la app avisa de quién son.
+- Con cambios propios sin enviar no se cierra sesión.
 
 ### Sesión y errores de la API
 
@@ -119,7 +163,8 @@ sesión (el servidor toma como conductor del evento al dueño del token).
   en la base; el nombre (`dispositivo_nombre`, por ejemplo "Motorola moto g32") lo da `MainActivity.kt`.
 - Toda respuesta 401 a una petición con token borra el token y vuelve al ingreso mostrando el
   `detalle` del servidor. Nada local se borra: ni la lista ni lo pendiente por enviar.
-- Si ingresa otro conductor en el mismo celular, se borra la lista del anterior (no lo pendiente).
+- Si ingresa otro conductor en el mismo celular, se borra la lista del anterior (no lo pendiente,
+  que tampoco se envía con el token del nuevo).
 - Cerrar sesión sin señal borra el token del celular igual; en el servidor queda revocado cuando se
   vuelva a ingresar en ese celular (o desde el admin).
 - Sin red, tiempo agotado o un 500: la lista sigue mostrando lo guardado, con un aviso discreto.

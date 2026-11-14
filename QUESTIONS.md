@@ -127,6 +127,8 @@ Formato: fecha, tarea, pregunta, qué se asumió mientras tanto (si se asumió a
   y Beto ingresa en ese celular, los toques de Ana llegarían como de Beto (conflictos con alerta).
   Asumido en el contrato: la app no deja cerrar sesión con pendientes (lo construye la 1a-12). Si
   debe poder cerrarla, la app guarda el token junto a cada evento pendiente y los envía con él.
+  **Aplicado en 1a-12:** con cambios propios sin enviar, "Cerrar sesión" no cierra y explica por
+  qué; lo pendiente de otro conductor no se lo impide (ver la pregunta de la 1a-11, abajo).
 - **2026-11-13, 1a-10. ¿Hasta cuándo puede un conductor subir fotos de un servicio que ya no es
   suyo?** Asumido: siempre que lo tenga o lo haya tenido (hay un evento suyo en el historial),
   también entregado, cancelado o reasignado, sin plazo; para uno que nunca fue suyo, no. Si debe
@@ -144,6 +146,28 @@ Formato: fecha, tarea, pregunta, qué se asumió mientras tanto (si se asumió a
   guarda el `conductor_id` de quien lo tocó y solo se envía con el token de ese conductor; si ingresa
   otro, los del anterior esperan a que él vuelva a ingresar. Si se prefiere bloquear el ingreso de
   otro conductor mientras haya pendientes de alguien, se agrega en la pantalla de ingreso.
+  **Aplicado en 1a-12 (lo más seguro):** los eventos del primero se conservan aparte y nunca salen
+  con el token del segundo. La pantalla de ingreso dice cuántos cambios sin enviar hay y de quién
+  ("se envían cuando Ana ingrese de nuevo en este celular"); al segundo conductor la lista le
+  muestra un aviso fijo con lo mismo y "Avise a logística". El segundo sí puede cerrar su sesión
+  (si no, el primero nunca podría volver a ingresar para enviarlos).
+- **2026-11-13, 1a-12. ¿Qué se hace con los cambios sin enviar de un conductor que no vuelve a
+  ingresar en ese celular?** (cambió de celular, salió de la empresa, o lo inhabilitaron). Como lo
+  que el conductor hizo no se descarta, la app no tiene botón para borrarlos: quedan guardados en
+  el celular y el aviso sigue a la vista de quien lo use. Logística no los ve hasta que salgan.
+  Asumido: nada más por ahora. Si hace falta rescatarlos, las opciones son que el servidor acepte
+  que otro token los entregue a nombre del conductor original (cambia el contrato) o una pantalla
+  para que logística los lea del celular y los registre a mano en el panel.
+- **2026-11-13, 1a-12. ¿El conductor puede deshacer un estado que marcó por error?** La app pide
+  confirmar cada toque ("¿Marcar En camino?") y no tiene deshacer: un evento guardado se envía.
+  Asumido: no; si se equivoca, llama a logística y ellos corrigen el estado desde el panel. Si
+  debe poder deshacer mientras el evento no se haya enviado, se agrega a la cola con su prueba
+  (un evento ya enviado no se puede retirar: los eventos son de solo agregar).
+- **2026-11-13, 1a-12. ¿Qué debe hacer el conductor cuando la app le avisa que un cambio no se
+  aplicó?** (conflicto: el servicio estaba cancelado, reasignado o con novedad). Asumido: nada
+  obligatorio; la app muestra qué pasó con el texto del servidor y "Logística ya recibió el aviso
+  y lo revisará", y el aviso queda a la vista hasta que toca "Entendido". Si debe llamar a
+  logística, o no puede seguir trabajando hasta que lo resuelvan, se cambia el texto o se bloquea.
 
 ## Resueltas
 
