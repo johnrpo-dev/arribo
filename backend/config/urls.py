@@ -14,4 +14,5 @@ urlpatterns = [
     path("api/v1/", include("api.urls")),
     path("", include("panel.urls")),
     path("", include("solicitudes.urls")),
+    path("", include("documentos.urls")),
 ]

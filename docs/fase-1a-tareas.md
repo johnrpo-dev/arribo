@@ -84,7 +84,7 @@ Toda tarea termina con `uv run pytest -q` y `uv run ruff check .` en verde, más
 
 ## Panel
 
-- [ ] **1a-15 Documentos** (3 h). Depende de: 08.
+- [x] **1a-15 Documentos** (3 h). Depende de: 08.
   App `documentos`: tipos configurables, vencimiento, "aún no aplica". Alerta desde 30 días antes. Grúa o
   conductor con documento vencido no es asignable.
   Verificar: pruebas de bloqueo y de que un servicio en curso no se interrumpe; vencer un SOAT y ver al conductor bloqueado.

@@ -1,0 +1,7 @@
+{% extends "base.html" %}
+{% block titulo %}{{ tipo.nombre }} · tipo de documento{% endblock %}
+{% block contenido %}
+<p><a href="{% url 'tipos_documento' %}">Tipos de documento</a></p>
+<h1 class="titulo-pagina">{{ tipo.nombre }}</h1>
+{% include "documentos/parcial_formulario_tipo.html" with boton="Guardar tipo" %}
+{% endblock %}

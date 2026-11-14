@@ -1,0 +1,25 @@
+<form method="post" class="formulario" novalidate>
+  {% csrf_token %}
+  {% if formulario.errors %}
+  <p class="aviso aviso--error" role="alert">No se guardó: revise los campos marcados.</p>
+  {% for error in formulario.non_field_errors %}<p class="aviso aviso--error">{{ error }}</p>{% endfor %}
+  {% endif %}
+  {% include "parciales/campo.html" with campo=formulario.nombre %}
+  <fieldset class="grupo-opciones{% if formulario.aplica_a.errors %} campo--error{% endif %}">
+    <legend>{{ formulario.aplica_a.label|capfirst }}</legend>
+    {% for opcion in formulario.aplica_a %}
+    <label class="opcion">{{ opcion.tag }} {{ opcion.choice_label }}</label>
+    {% endfor %}
+    {% if formulario.aplica_a.help_text %}<p class="ayuda">{{ formulario.aplica_a.help_text }}</p>{% endif %}
+    {% for error in formulario.aplica_a.errors %}<p class="campo-error">{{ error }}</p>{% endfor %}
+  </fieldset>
+  {% include "parciales/campo.html" with campo=formulario.dias_anticipacion %}
+  <fieldset class="grupo-opciones">
+    <legend>Estado</legend>
+    <label class="opcion">{{ formulario.activo }} Activo</label>
+    <p class="ayuda">{{ formulario.activo.help_text }}</p>
+  </fieldset>
+  <div class="acciones">
+    <button type="submit" class="boton boton--principal">{{ boton }}</button>
+  </div>
+</form>

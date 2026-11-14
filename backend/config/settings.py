@@ -30,6 +30,7 @@ INSTALLED_APPS = [
     "cobros",
     "configuracion",
     "alertas",
+    "documentos",
     "panel",
     "api",
 ]

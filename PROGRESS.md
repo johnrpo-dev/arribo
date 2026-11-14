@@ -718,6 +718,73 @@ La tarea 1a-16 se partió en dos: 1a-16a (modelo de línea de cobro con sus rest
      devolver la señal y deslizar la lista. El servicio sale de la lista y queda un aviso rojo con
      la placa y "El servicio ya estaba cancelado. Logística ya recibió el aviso y lo revisará";
      en `/admin/` → Alertas aparece el conflicto.
+### 1a-15 Documentos (13 de noviembre de 2026)
+- Hecho: en el núcleo, `nucleo/documentos.py`: estado de un documento en un día (vigente, por vencer
+  según los días de anticipación de su tipo, vencido, aún no aplica, falta), qué estado bloquea
+  (solo vencido), cuándo hay que avisar y qué archivos se aceptan. App nueva `documentos`:
+  `TipoDocumento` (nombre único sin importar mayúsculas, aplica a grúa o a conductor, días de
+  anticipación con 30 por defecto, activo) sembrado por migración con SOAT y Tecnomecánica (grúa) y
+  Licencia de conducción (conductor); `Documento` (tipo, grúa o conductor, número opcional, vence o
+  "aún no aplica" con la fecha desde la que aplica, archivo opcional, quién y cuándo).
+  `documentos/consultas.py`: estado de cada tipo por grúa o conductor, documentos vencidos para
+  asignar y `documentos_por_vencer(fecha)` para la alerta de la 1a-18 (no se construyó el comando
+  ni el tablero). Pantalla Flota y documentos (`/flota/`, solo administrador, conectada en
+  `panel/secciones.py`): grúas y conductores con la etiqueta de estado de cada documento, la página
+  de cada documento (estado, registrar uno nuevo con foto o PDF opcional, historial con enlace al
+  archivo) y los tipos de documento (crear, editar, desactivar). Admin de solo consulta.
+- Decidido (bloqueo): `solicitudes/disponibilidad.py` llena `documentos_vencidos` con los
+  documentos vencidos del conductor y de su grúa vigente. Asignar y reasignar lo rechazan con el
+  motivo ("Documento vencido: SOAT de la grúa GRU001.") y la lista de conductores lo muestra
+  bloqueado. Lo que está en curso no se interrumpe: los eventos de la app y los cambios de estado
+  del panel no pasan por la disponibilidad (probado con documentos vencidos: En camino, Recogido y
+  Entregado desde la app, por la API y desde el panel). Un documento que falta no bloquea (pregunta
+  en `QUESTIONS.md`). Un tipo inactivo no se exige ni bloquea.
+- Decidido (fechas): los días se cuentan en America/Bogota. Un documento que vence hoy sirve todo
+  el día de hoy (hasta la medianoche de Medellín, aunque en UTC ya sea mañana): queda "por vencer"
+  y vencido desde el día siguiente. "Por vencer" desde los días de anticipación del tipo,
+  inclusive (con 30, el que vence en 30 días ya avisa; el de 31, no). "Aún no aplica" cuenta como
+  vencido desde la fecha desde la que aplica si no se registró otro (pregunta en `QUESTIONS.md`).
+- Decidido (base): el documento es de una grúa o de un conductor, exactamente uno, y del lado de su
+  tipo. Lo garantiza PostgreSQL: el documento copia el lado del tipo (`aplica_a`) y una llave
+  foránea compuesta (tipo, aplica_a) → (id, aplica_a) del tipo (escrita en SQL en la migración 0001,
+  porque Django no las declara) impide que no coincidan; así, un tipo con documentos no puede
+  cambiar de lado (la pantalla lo deshabilita). También son restricciones de la base: vence o aún
+  no aplica (una de las dos), archivo con su tipo, nombre del tipo no vacío y único.
+- Decidido (historial): nada se borra ni se edita. El vigente es el registrado más recientemente
+  (no el que vence más tarde): así se corrige un error registrando otro. Guardar de nuevo un
+  documento ya guardado da error.
+- Decidido (archivo): JPEG, PNG o PDF de hasta 10 MB, reconocido por su contenido (pregunta en
+  `QUESTIONS.md`). Se escribe en disco por partes desde el primer byte (la vista cambia los
+  manejadores de subida, con la protección CSRF aplicada dentro de la vista) y se guarda en
+  `MEDIA_ROOT/documentos/<grua|conductor>/<id>/<nombre aleatorio>.<ext>`; del nombre original no se
+  usa nada. Si pasa del máximo se deja de escribir y no queda nada. Se ve en el panel por
+  `/flota/documentos/<n>/archivo/`, solo administrador.
+- Decidido (pantalla): etiquetas de estado existentes: vencido con la de Novedad (rojo), por vencer
+  con la de Recogido (ámbar), vigente con la de Entregado (verde), aún no aplica con la de Asignado
+  y falta con la de Pendiente. Sin CSS nuevo. Revisado a 375 px sin desplazamiento horizontal de la
+  página (las tablas se desplazan dentro de su caja, como en el resto del panel).
+- Preguntas abiertas nuevas: cuatro en `QUESTIONS.md` (documento que falta, fecha de "aún no
+  aplica", avisos de inactivos, archivos aceptados).
+- Cómo probar (5 minutos): `uv run pytest -q` (1529 pruebas) y
+  `uv run python manage.py migrate`. Con Ana en la grúa GRU001 (pasos de la 1a-08) y un servicio
+  pendiente en una solicitud abierta, `uv run python manage.py runserver` y entrar como
+  administrador:
+  1. Abrir Flota y documentos: las grúas con columnas SOAT y Tecnomecánica y los conductores con
+     Licencia de conducción, todo en "Falta".
+  2. Pulsar la etiqueta del SOAT de GRU001, dejar "Tiene fecha de vencimiento", poner como fecha
+     **ayer**, adjuntar una foto JPEG y pulsar "Registrar SOAT": "SOAT registrado. Reemplaza al
+     anterior.", estado "Vencido" en rojo y el aviso de que quien maneje la grúa no recibe
+     servicios nuevos. En el historial, "Ver archivo" abre la foto.
+  3. Abrir el detalle de la solicitud: en "Conductores", Ana sale "Bloqueado. Documento vencido:
+     SOAT de la grúa GRU001." y en la lista de Asignar aparece gris.
+  4. Volver al SOAT de GRU001 y registrar otro que venza en un año: queda "Vigente", el anterior
+     pasa a "Reemplazado" en el historial y Ana vuelve a estar disponible.
+  5. Adjuntar un archivo que no sea foto ni PDF (por ejemplo un .txt renombrado a .jpg): "El
+     archivo debe ser una foto JPEG o PNG, o un PDF." y no se registra nada.
+  6. En "Tipos de documento", crear "Póliza" para grúa con 45 días: aparece como columna nueva.
+     Desactivarla: desaparece de la lista.
+  7. Con un usuario de logística, `/flota/` da "Sin acceso a esta página". Angostar a 375 px: sin
+     desplazamiento horizontal.
 
 ## Escalamientos
 

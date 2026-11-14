@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+{% block titulo %}{{ tipo.nombre }} · {% if es_grua %}grúa {{ sujeto.placa }}{% else %}{{ sujeto.nombre }}{% endif %}{% endblock %}
+{% block contenido %}
+<p><a href="{% url 'flota' %}">Flota y documentos</a></p>
+<h1 class="titulo-pagina">{{ tipo.nombre }} · {% if es_grua %}grúa {{ sujeto.placa }}{% else %}{{ sujeto.nombre }}{% endif %}</h1>
+
+<div class="tabla-contenedor">
+  <table class="tabla">
+    <tbody>
+      <tr><th scope="row">Estado</th><td><span class="estado estado--{{ estado.clase }}">{{ estado.nombre_estado }}</span>{% include "documentos/parcial_fechas.html" with documento=estado.documento %}</td></tr>
+      <tr><th scope="row">Aviso</th><td>Desde {{ tipo.dias_anticipacion }} día{{ tipo.dias_anticipacion|pluralize }} antes del vencimiento{% if not tipo.activo %}. <strong>Tipo inactivo:</strong> no se exige ni bloquea{% endif %}</td></tr>
+    </tbody>
+  </table>
+</div>
+{% if estado.bloquea %}
+<p class="aviso aviso--error">Vencido: {% if es_grua %}quien maneje esta grúa{% else %}{{ sujeto.nombre }}{% endif %} no recibe servicios nuevos hasta registrar el documento renovado. Lo que ya tiene en curso sigue.</p>
+{% endif %}
+
+{% if formulario %}
+<section class="bloque" aria-labelledby="t-registrar">
+  <h2 class="titulo-seccion" id="t-registrar">Registrar documento nuevo</h2>
+  <p class="ayuda">El nuevo reemplaza al actual; el actual queda en el historial. Un documento registrado no se edita: para corregirlo, registre otro.</p>
+  <form method="post" enctype="multipart/form-data" class="formulario" novalidate>
+    {% csrf_token %}
+    {% if formulario.errors %}
+    <p class="aviso aviso--error" role="alert">No se registró: revise los campos marcados.</p>
+    {% for error in formulario.non_field_errors %}<p class="aviso aviso--error">{{ error }}</p>{% endfor %}
+    {% endif %}
+    <fieldset class="grupo-opciones{% if formulario.situacion.errors %} campo--error{% endif %}">
+      <legend>{{ formulario.situacion.label }}</legend>
+      {% for opcion in formulario.situacion %}
+      <label class="opcion">{{ opcion.tag }} {{ opcion.choice_label }}</label>
+      {% endfor %}
+      {% for error in formulario.situacion.errors %}<p class="campo-error">{{ error }}</p>{% endfor %}
+    </fieldset>
+    <div class="fila-campos">
+      {% include "parciales/campo.html" with campo=formulario.vence %}
+      {% include "parciales/campo.html" with campo=formulario.aplica_desde %}
+    </div>
+    {% include "parciales/campo.html" with campo=formulario.numero %}
+    {% include "parciales/campo.html" with campo=formulario.archivo %}
+    <div class="acciones">
+      <button type="submit" class="boton boton--principal">Registrar {{ tipo.nombre }}</button>
+    </div>
+  </form>
+</section>
+{% endif %}
+
+<section class="bloque" aria-labelledby="t-historial">
+  <h2 class="titulo-seccion" id="t-historial">Historial</h2>
+  {% if historial %}
+  <div class="tabla-contenedor">
+    <table class="tabla">
+      <thead>
+        <tr>
+          <th scope="col">Registrado</th>
+          <th scope="col">Fechas</th>
+          <th scope="col">Número</th>
+          <th scope="col">Archivo</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for d in historial %}
+        <tr>
+          <td><time datetime="{{ d.registrado_en|date:'c' }}">{{ d.registrado_en|date:"d/m/Y H:i" }}</time> por {{ d.registrado_por.get_full_name|default:d.registrado_por.get_username }}{% if forloop.first %}<br><strong>Vigente</strong>{% else %}<br><span class="texto-secundario">Reemplazado</span>{% endif %}</td>
+          <td>{% if d.aun_no_aplica %}Aún no aplica; aplica desde {{ d.aplica_desde|date:"d/m/Y" }}{% else %}Vence {{ d.vence|date:"d/m/Y" }}{% endif %}</td>
+          <td>{{ d.numero|default:"—" }}</td>
+          <td>{% if d.archivo %}<a href="{% url 'archivo_documento' d.pk %}" target="_blank" rel="noopener">Ver archivo ({{ d.get_tipo_archivo_display }})</a>{% else %}—{% endif %}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="vacio"><p>Sin documentos registrados.</p></div>
+  {% endif %}
+</section>
+{% endblock %}
