@@ -618,6 +618,20 @@ class EventoEstado(models.Model):
     longitud = models.FloatField("longitud", null=True, blank=True)
     motivo = models.TextField("motivo", blank=True)
     nombre_quien = models.TextField("nombre de quien entrega o recibe", blank=True)
+    # Placa y VIN que el conductor digitó al recoger (1a-13b), normalizados y tal como llegaron:
+    # sin restricción de formato, para guardar también lo que no se pudo poner en el vehículo.
+    placa_digitada = models.TextField(
+        "placa digitada",
+        blank=True,
+        help_text="En un Recogido de la app: la placa que digitó el conductor porque el vehículo "
+        "llegó sin ella.",
+    )
+    vin_digitado = models.TextField(
+        "VIN digitado",
+        blank=True,
+        help_text="En un Recogido de la app: el VIN que digitó el conductor porque el vehículo "
+        "llegó sin él.",
+    )
     resultado = models.CharField("resultado", max_length=10, choices=ResultadoEvento.choices)
     motivo_conflicto = models.CharField(
         "motivo del conflicto",

@@ -1,9 +1,10 @@
 """Las reglas que la app del conductor copia cumplen los casos de `docs/casos-reglas.json`.
 
 La app repite en Dart la máquina de estados, la capacidad, la identificación del vehículo (también
-la placa o el VIN digitados al recoger) y los límites de las fotos. Ese archivo es el contrato entre las dos copias: lo recorren estas pruebas y
-`conductor/test/casos_compartidos_test.dart`. Si una regla cambia aquí, estas pruebas fallan hasta
-que el archivo cambie; y con el archivo cambiado falla la prueba de la app hasta que cambie su copia.
+la placa o el VIN digitados al recoger) y los límites de las fotos. Ese archivo es el contrato entre
+las dos copias: lo recorren estas pruebas y `conductor/test/casos_compartidos_test.dart`. Si una
+regla cambia aquí, estas pruebas fallan hasta que el archivo cambie; y con el archivo cambiado falla
+la prueba de la app hasta que cambie su copia.
 """
 import json
 from pathlib import Path

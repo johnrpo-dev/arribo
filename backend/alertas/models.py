@@ -18,6 +18,10 @@ class TipoAlerta(models.TextChoices):
     CONFLICTO_SINCRONIZACION = "conflicto_sincronizacion", "Conflicto de sincronización"
     CAPACIDAD_EXCEDIDA = "capacidad_excedida", "Capacidad de la grúa excedida"
     EVENTO_RECHAZADO = "evento_rechazado", "Evento de la app que no se pudo guardar"
+    IDENTIFICACION_POR_REVISAR = (
+        "identificacion_por_revisar",
+        "Placa o VIN digitado por revisar",
+    )
 
 
 class Alerta(models.Model):

@@ -11,12 +11,13 @@ import uuid
 import pytest
 from django.db import connection
 
+from alertas.models import Alerta, TipoAlerta
 from nucleo.capacidad import CapacidadExcedida
 from nucleo.estados import Estado, TransicionInvalida
 from nucleo.registro import CierreNoPermitido
 from nucleo.sincronizacion import Resultado
 from solicitudes import operaciones, registro
-from solicitudes.models import EstadoRegistro, EventoEstado
+from solicitudes.models import EstadoRegistro, EventoEstado, Vehiculo
 from solicitudes.operaciones import SolicitudNoAsignable, aplicar_evento_del_conductor
 
 from ..conftest import crear_solicitud
@@ -218,3 +219,50 @@ def test_asignar_que_espera_al_cierre_ve_la_solicitud_ya_cerrada(
     servicio.refresh_from_db()
     assert (servicio.estado, servicio.conductor_id) == (E.PENDIENTE_ASIGNAR, None)
     assert not EventoEstado.objects.exists()
+
+
+def test_dos_recogidas_a_la_vez_con_la_misma_placa_digitada_guardan_una_y_alertan_la_otra(
+    monkeypatch, crear_servicio, nuevo_vehiculo, ana, beto, evento_app
+):
+    # 1a-13b. Ana y Beto (cada uno con su grúa) recogen a la vez dos vehículos sin placa y digitan
+    # la misma. El cruce peligroso, forzado: los dos pasan la consulta previa ("nadie tiene esa
+    # placa") antes de que cualquiera guarde. La unicidad de la base deja entrar una; la otra
+    # transacción no se aborta (punto de restauración): su Recogido se aplica y queda la alerta.
+    vehiculos = [nuevo_vehiculo(placa="", vin="") for _ in range(2)]
+    servicios = [
+        crear_servicio(E.EN_CAMINO, conductor=conductor, vehiculo=vehiculo)
+        for conductor, vehiculo in zip((ana, beto), vehiculos, strict=True)
+    ]
+    eventos = [
+        evento_app(servicio, E.RECOGIDO, conductor=conductor, placa="ABC123")
+        for conductor, servicio in zip((ana, beto), servicios, strict=True)
+    ]
+    consultar = operaciones._vehiculo_con
+    juntos = threading.Barrier(2)
+    hilo = threading.local()
+
+    def consultar_y_esperar_al_otro(*args, **kwargs):
+        encontrado = consultar(*args, **kwargs)
+        if not getattr(hilo, "espero", False):  # solo la consulta previa de cada hilo
+            hilo.espero = True
+            juntos.wait(timeout=10)
+        return encontrado
+
+    monkeypatch.setattr(operaciones, "_vehiculo_con", consultar_y_esperar_al_otro)
+
+    salidas = en_paralelo(
+        *[lambda datos=datos: aplicar_evento_del_conductor(**datos) for datos in eventos]
+    )
+
+    assert salidas == [Resultado.APLICADO, Resultado.APLICADO], salidas
+    for servicio in servicios:
+        servicio.refresh_from_db()
+        assert servicio.estado == E.RECOGIDO
+    con_placa = Vehiculo.objects.filter(pk__in=[v.pk for v in vehiculos], placa="ABC123")
+    assert con_placa.count() == 1
+    (alerta,) = Alerta.objects.filter(tipo=TipoAlerta.IDENTIFICACION_POR_REVISAR)
+    ganador = con_placa.get().pk
+    perdedor = next(e for e, v in zip(eventos, vehiculos, strict=True) if v.pk != ganador)
+    assert alerta.registro_id == str(perdedor["id"])
+    assert "que ya es de otro vehículo" in alerta.mensaje
+    assert EventoEstado.objects.filter(placa_digitada="ABC123").count() == 2
