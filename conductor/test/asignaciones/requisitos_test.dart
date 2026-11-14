@@ -1,5 +1,6 @@
-// Lo que exige la app antes de guardar un Recogido o un Entregado: identificación del vehículo y
-// puesto libre en la grúa (Recogido), mínimo de fotos y nombre de quien entrega o recibe (los dos).
+// Lo que exige la app antes de guardar un Recogido o un Entregado: identificación del vehículo
+// (digitada en la pantalla si le falta, 1a-13b) y puesto libre en la grúa (Recogido), mínimo de
+// fotos y nombre de quien entrega o recibe (los dos).
 
 import 'package:arribo_conductor/asignaciones/requisitos.dart';
 import 'package:arribo_conductor/asignaciones/servicio.dart';
@@ -110,43 +111,107 @@ void main() {
   });
 
   group('placa o VIN al recoger', () {
-    test('con placa se puede recoger', () {
+    const alAsignar = ConfiguracionApp(minimoFotos: 4, momentoPlacaVin: 'asignar');
+    const vin = '1HGCM82633A004352';
+
+    test('con placa se puede recoger y no se pide digitar nada', () {
       final s = servicio(41);
 
       expect(bloqueoDeRecogida(s, [s], configuracion: configuracion), isNull);
+      expect(identificacionPorDigitar(s, configuracion: configuracion), isNull);
     });
 
-    test('con VIN y sin placa se puede recoger un traslado', () {
-      final s = servicio(41, placa: null, vin: '1HGCM82633A004352');
+    test('con VIN y sin placa se puede recoger un traslado sin digitar nada', () {
+      final s = servicio(41, placa: null, vin: vin);
 
       expect(bloqueoDeRecogida(s, [s], configuracion: configuracion), isNull);
+      expect(identificacionPorDigitar(s, configuracion: configuracion), isNull);
     });
 
-    test('sin placa ni VIN no se puede recoger, y dice que lo registre logística', () {
+    // Antes de la 1a-13b este caso bloqueaba el Recogido ("llame a logística") y, sin señal, el
+    // conductor no podía recoger el vehículo. Ahora no bloquea: la pantalla del paso le pide
+    // digitar la placa o el VIN.
+    test('con "al recoger", un traslado sin placa ni VIN no se bloquea: pide placa o VIN', () {
       final s = servicio(41, placa: null);
 
-      final bloqueo = bloqueoDeRecogida(s, [s], configuracion: configuracion)!;
+      expect(bloqueoDeRecogida(s, [s], configuracion: configuracion), isNull);
+      expect(identificacionPorDigitar(s, configuracion: configuracion), (placa: true, vin: true));
+    });
 
+    test('con "al recoger", un desvare sin placa pide solo la placa, aunque tenga VIN', () {
+      final s = servicio(41, placa: null, vin: vin, tipo: 'desvare');
+
+      expect(bloqueoDeRecogida(s, [s], configuracion: configuracion), isNull);
+      expect(identificacionPorDigitar(s, configuracion: configuracion), (placa: true, vin: false));
+    });
+
+    test('sin configuración guardada vale la de fábrica: pide digitarla', () {
+      final s = servicio(41, placa: null);
+
+      expect(bloqueoDeRecogida(s, [s], configuracion: null), isNull);
+      expect(identificacionPorDigitar(s, configuracion: null), isNotNull);
+    });
+
+    test('con "al asignar" no se pide: el Recogido se bloquea y dice que llame a logística', () {
+      final s = servicio(41, placa: null);
+
+      final bloqueo = bloqueoDeRecogida(s, [s], configuracion: alAsignar)!;
+
+      expect(identificacionPorDigitar(s, configuracion: alAsignar), isNull);
       expect(bloqueo.titulo, 'Falta identificar el vehículo');
       expect(bloqueo.mensaje, contains('El vehículo necesita placa o VIN (al menos uno).'));
       expect(bloqueo.mensaje, contains('Llame a logística'));
       expect(bloqueo.faltanPorEntregar, isEmpty);
     });
 
-    test('un desvare exige la placa aunque tenga VIN', () {
-      final s = servicio(41, placa: null, vin: '1HGCM82633A004352', tipo: 'desvare');
+    test('con "al asignar", un desvare sin placa se bloquea aunque tenga VIN', () {
+      final s = servicio(41, placa: null, vin: vin, tipo: 'desvare');
 
-      final bloqueo = bloqueoDeRecogida(s, [s], configuracion: configuracion)!;
+      final bloqueo = bloqueoDeRecogida(s, [s], configuracion: alAsignar)!;
 
       expect(bloqueo.mensaje, contains('Un desvare exige la placa del vehículo.'));
     });
+  });
 
-    test('al recoger se exige siempre, también con la configuración "al asignar"', () {
-      final s = servicio(41, placa: null);
-      const alAsignar = ConfiguracionApp(minimoFotos: 4, momentoPlacaVin: 'asignar');
+  group('placa o VIN digitados', () {
+    const vin = '1HGCM82633A004352';
+    final sinIdentificar = servicio(41, placa: null);
+    final desvare = servicio(41, placa: null, tipo: 'desvare');
 
-      expect(bloqueoDeRecogida(s, [s], configuracion: alAsignar), isNotNull);
-      expect(bloqueoDeRecogida(s, [s], configuracion: null), isNotNull);
+    List<String> faltan(Servicio s, {String placa = '', String vin = ''}) =>
+        faltantesDeIdentificacion(s, placaDigitada: placa, vinDigitado: vin);
+
+    test('sin digitar nada dice qué falta', () {
+      expect(faltan(sinIdentificar), ['El vehículo necesita placa o VIN (al menos uno).']);
+      expect(faltan(desvare), ['Un desvare exige la placa del vehículo.']);
+    });
+
+    test('una placa digitada basta, escrita como se lea: se normaliza', () {
+      expect(faltan(sinIdentificar, placa: 'abc-123'), isEmpty);
+      expect(faltan(desvare, placa: ' abc 123 '), isEmpty);
+    });
+
+    test('un VIN digitado basta en un traslado, con espacios o guiones', () {
+      expect(faltan(sinIdentificar, vin: '1hgcm-82633 a004352'), isEmpty);
+    });
+
+    test('un desvare con solo el VIN digitado sigue sin poder recogerse', () {
+      expect(faltan(desvare, vin: vin), ['Un desvare exige la placa del vehículo.']);
+    });
+
+    test('un VIN mal digitado dice cómo debe ser: 17, sin I, O ni Q', () {
+      const formato = 'El VIN debe tener 17 letras o dígitos, sin I, O ni Q.';
+      expect(faltan(sinIdentificar, vin: '1HGCM82633A00435'), [formato]);
+      expect(faltan(sinIdentificar, vin: '1HGCM82633A0O4352'), [formato]);
+      // Aunque la placa ya baste, un VIN mal escrito no se envía.
+      expect(faltan(sinIdentificar, placa: 'ABC123', vin: 'MALO'), [formato]);
+    });
+
+    test('una placa de más de 10 letras o dígitos no es válida', () {
+      expect(faltan(desvare, placa: 'ABCDEFGHIJK'), [
+        'La placa debe tener de 1 a 10 letras o dígitos.',
+      ]);
+      expect(faltan(desvare, placa: 'ABCDEFGHIJ'), isEmpty);
     });
   });
 
@@ -225,7 +290,17 @@ void main() {
       );
     });
 
-    test('la identificación se revisa antes que la capacidad', () {
+    test('con "al asignar", la identificación se revisa antes que la capacidad', () {
+      final montado = servicio(41, estado: 'recogido');
+      final sinPlaca = servicio(42, placa: null);
+      const alAsignar = ConfiguracionApp(minimoFotos: 4, momentoPlacaVin: 'asignar');
+
+      final bloqueo = bloqueoDeRecogida(sinPlaca, [montado, sinPlaca], configuracion: alAsignar)!;
+
+      expect(bloqueo.titulo, 'Falta identificar el vehículo');
+    });
+
+    test('con "al recoger", un vehículo sin placa ni VIN se bloquea igual por la grúa llena', () {
       final montado = servicio(41, estado: 'recogido');
       final sinPlaca = servicio(42, placa: null);
 
@@ -234,7 +309,7 @@ void main() {
         sinPlaca,
       ], configuracion: configuracion)!;
 
-      expect(bloqueo.titulo, 'Falta identificar el vehículo');
+      expect(bloqueo.titulo, 'La grúa va llena');
     });
   });
 }

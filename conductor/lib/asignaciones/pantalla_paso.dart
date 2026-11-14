@@ -1,11 +1,13 @@
 // La pantalla de un Recogido o de un Entregado: las fotos de evidencia y el nombre de quien entrega
-// o recibe el vehículo. Solo con el mínimo de fotos y el nombre se guarda el evento.
+// o recibe el vehículo. Solo con el mínimo de fotos y el nombre se guarda el evento. En un Recogido
+// de un vehículo sin placa ni VIN (o un desvare sin placa), con la configuración "placa/VIN al
+// recoger", el conductor además los digita (1a-13b) y viajan en el evento.
 //
 // Todo lo que el conductor hace aquí queda en la base local a medida que avanza (el paso, cada
-// foto y el nombre como va escrito), y la ruta es restaurable: si Android mata la app al abrir la
-// cámara, al volver la pantalla se arma otra vez desde la base y recibe la foto que quedó sin
-// entregar. Las fotos se muestran como miniaturas decodificadas en pequeño (`cacheWidth`), nunca la
-// imagen completa.
+// foto, el nombre, la placa y el VIN como van escritos), y la ruta es restaurable: si Android mata
+// la app al abrir la cámara, al volver la pantalla se arma otra vez desde la base y recibe la foto
+// que quedó sin entregar. Las fotos se muestran como miniaturas decodificadas en pequeño
+// (`cacheWidth`), nunca la imagen completa.
 
 import 'dart:async';
 import 'dart:io';
@@ -60,6 +62,8 @@ class PantallaPaso extends StatefulWidget {
 
 class _PantallaPasoState extends State<PantallaPaso> {
   final _nombre = TextEditingController();
+  final _placa = TextEditingController();
+  final _vin = TextEditingController();
 
   /// El paso como está en la base; null mientras se lee (o sin conductor).
   PasoEnCurso? _paso;
@@ -74,7 +78,8 @@ class _PantallaPasoState extends State<PantallaPaso> {
   /// Un problema con la cámara o con la foto que se acaba de tomar.
   String? _aviso;
 
-  /// La última escritura del nombre en la base: se espera antes de abrir la cámara o de marcar.
+  /// La última escritura del nombre, la placa o el VIN en la base: se espera antes de abrir la
+  /// cámara o de marcar.
   Future<void> _guardado = Future.value();
 
   VoidCallback? _esperaDeLaLista;
@@ -90,6 +95,8 @@ class _PantallaPasoState extends State<PantallaPaso> {
     final espera = _esperaDeLaLista;
     if (espera != null) widget.lista.removeListener(espera);
     _nombre.dispose();
+    _placa.dispose();
+    _vin.dispose();
     super.dispose();
   }
 
@@ -129,6 +136,8 @@ class _PantallaPasoState extends State<PantallaPaso> {
     setState(() {
       _paso = paso;
       _nombre.text = paso?.nombreQuien ?? '';
+      _placa.text = paso?.placaDigitada ?? '';
+      _vin.text = paso?.vinDigitado ?? '';
       _cargando = false;
       // Hasta saber si quedó una foto sin entregar no se abre la cámara ni se marca el paso.
       _ocupado = paso != null;
@@ -172,6 +181,26 @@ class _PantallaPasoState extends State<PantallaPaso> {
     _guardado = widget.lista.fotos.almacen.guardarNombre(paso, texto);
     if (_faltantes.isNotEmpty) setState(() => _faltantes = const []);
   }
+
+  void _alEscribirPlaca(String texto) {
+    final paso = _paso;
+    if (paso == null) return;
+    _guardado = widget.lista.fotos.almacen.guardarIdentificacion(paso, placa: texto);
+    if (_faltantes.isNotEmpty) setState(() => _faltantes = const []);
+  }
+
+  void _alEscribirVin(String texto) {
+    final paso = _paso;
+    if (paso == null) return;
+    _guardado = widget.lista.fotos.almacen.guardarIdentificacion(paso, vin: texto);
+    if (_faltantes.isNotEmpty) setState(() => _faltantes = const []);
+  }
+
+  /// Los datos que la pantalla pide digitar en este paso, o null si ninguno.
+  ({bool placa, bool vin})? _porDigitar(Servicio? servicio) =>
+      servicio == null || widget.destino != Estado.recogido
+      ? null
+      : widget.lista.identificacionPorDigitar(servicio);
 
   Future<void> _tomarFoto() async {
     final paso = _paso;
@@ -236,12 +265,20 @@ class _PantallaPasoState extends State<PantallaPaso> {
     final paso = _paso;
     if (_ocupado || paso == null) return;
     final nombre = _nombre.text.trim();
-    final faltantes = faltantesDelPaso(
-      destino: paso.destino,
-      fotos: paso.fotos.length,
-      minimoFotos: minimoFotos,
-      nombreQuien: nombre,
-    );
+    final servicio = widget.lista.servicio(widget.servicioId);
+    final porDigitar = _porDigitar(servicio);
+    final placa = porDigitar?.placa ?? false ? _placa.text : '';
+    final vin = porDigitar?.vin ?? false ? _vin.text : '';
+    final faltantes = [
+      if (servicio != null && porDigitar != null)
+        ...faltantesDeIdentificacion(servicio, placaDigitada: placa, vinDigitado: vin),
+      ...faltantesDelPaso(
+        destino: paso.destino,
+        fotos: paso.fotos.length,
+        minimoFotos: minimoFotos,
+        nombreQuien: nombre,
+      ),
+    ];
     if (faltantes.isNotEmpty) {
       setState(() => _faltantes = faltantes);
       return;
@@ -250,7 +287,12 @@ class _PantallaPasoState extends State<PantallaPaso> {
     try {
       await _guardado;
       // Primero queda guardado en la cola, con sus fotos; después se cierra la pantalla.
-      await widget.lista.confirmarPaso(paso, nombreQuien: nombre);
+      await widget.lista.confirmarPaso(
+        paso,
+        nombreQuien: nombre,
+        placaDigitada: placa,
+        vinDigitado: vin,
+      );
       if (mounted) Navigator.of(context).pop();
     } on ToqueNoValido catch (error) {
       if (mounted) setState(() => _faltantes = [error.mensaje]);
@@ -279,10 +321,15 @@ class _PantallaPasoState extends State<PantallaPaso> {
                   servicio: servicio,
                   paso: enCurso,
                   minimoFotos: minimoFotos,
+                  porDigitar: _porDigitar(servicio),
+                  placa: _placa,
+                  vin: _vin,
                   nombre: _nombre,
                   ocupado: _ocupado,
                   aviso: _aviso,
                   faltantes: _faltantes,
+                  alEscribirPlaca: _alEscribirPlaca,
+                  alEscribirVin: _alEscribirVin,
                   alEscribirNombre: _alEscribirNombre,
                   alTomarFoto: _tomarFoto,
                   alQuitarFoto: _quitarFoto,
@@ -339,10 +386,15 @@ class _Contenido extends StatelessWidget {
     required this.servicio,
     required this.paso,
     required this.minimoFotos,
+    required this.porDigitar,
+    required this.placa,
+    required this.vin,
     required this.nombre,
     required this.ocupado,
     required this.aviso,
     required this.faltantes,
+    required this.alEscribirPlaca,
+    required this.alEscribirVin,
     required this.alEscribirNombre,
     required this.alTomarFoto,
     required this.alQuitarFoto,
@@ -351,10 +403,17 @@ class _Contenido extends StatelessWidget {
   final Servicio servicio;
   final PasoEnCurso paso;
   final int minimoFotos;
+
+  /// Los datos de identificación que el conductor debe digitar; null si ninguno.
+  final ({bool placa, bool vin})? porDigitar;
+  final TextEditingController placa;
+  final TextEditingController vin;
   final TextEditingController nombre;
   final bool ocupado;
   final String? aviso;
   final List<String> faltantes;
+  final ValueChanged<String> alEscribirPlaca;
+  final ValueChanged<String> alEscribirVin;
   final ValueChanged<String> alEscribirNombre;
   final VoidCallback alTomarFoto;
   final void Function(FotoLocal foto, int numero) alQuitarFoto;
@@ -367,6 +426,7 @@ class _Contenido extends StatelessWidget {
       ?servicio.vehiculo.descripcion,
     ].join(' · ');
     final fotos = paso.fotos;
+    final porDigitar = this.porDigitar;
     // Pocos elementos: todos se construyen (no una lista perezosa), y el botón de la cámara va
     // antes de las miniaturas para que no cambie de sitio con cada foto.
     return SingleChildScrollView(
@@ -376,6 +436,38 @@ class _Contenido extends StatelessWidget {
         children: [
           Text(vehiculo, style: textos.headlineSmall),
           const SizedBox(height: 20),
+          if (porDigitar != null) ...[
+            Text('Identificación del vehículo', style: textos.titleMedium),
+            const SizedBox(height: 4),
+            Text(
+              porDigitar.vin
+                  ? 'Este servicio no tiene placa ni VIN. Escriba al menos uno, como se ve en '
+                        'el vehículo.'
+                  : 'Un desvare exige la placa y este servicio no la tiene. Escríbala como se '
+                        've en el vehículo.',
+              key: const Key('pide-identificacion'),
+              style: textos.bodyLarge,
+            ),
+            if (porDigitar.placa) ...[
+              const SizedBox(height: 12),
+              _CampoIdentificacion(
+                key: const Key('placa-digitada'),
+                controlador: placa,
+                etiqueta: 'Placa',
+                alEscribir: alEscribirPlaca,
+              ),
+            ],
+            if (porDigitar.vin) ...[
+              const SizedBox(height: 12),
+              _CampoIdentificacion(
+                key: const Key('vin-digitado'),
+                controlador: vin,
+                etiqueta: 'VIN',
+                alEscribir: alEscribirVin,
+              ),
+            ],
+            const SizedBox(height: 24),
+          ],
           Text('Fotos', style: textos.titleMedium),
           const SizedBox(height: 4),
           Text(
@@ -433,6 +525,32 @@ class _Contenido extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Una placa o un VIN como se leen en el vehículo: en mayúsculas y sin autocorrección.
+class _CampoIdentificacion extends StatelessWidget {
+  const _CampoIdentificacion({
+    super.key,
+    required this.controlador,
+    required this.etiqueta,
+    required this.alEscribir,
+  });
+
+  final TextEditingController controlador;
+  final String etiqueta;
+  final ValueChanged<String> alEscribir;
+
+  @override
+  Widget build(BuildContext context) => TextField(
+    controller: controlador,
+    style: Theme.of(context).textTheme.bodyLarge,
+    textCapitalization: TextCapitalization.characters,
+    autocorrect: false,
+    enableSuggestions: false,
+    textInputAction: TextInputAction.next,
+    decoration: InputDecoration(labelText: etiqueta),
+    onChanged: alEscribir,
+  );
 }
 
 /// "Lleva 2 de 4 fotos." o, sin mínimo, "Lleva 2 fotos. No son obligatorias."

@@ -134,6 +134,8 @@ class AlmacenFotos {
       destino: destino,
       eventoId: eventoId,
       nombreQuien: fila['nombre_quien']! as String,
+      placaDigitada: fila['placa_digitada']! as String,
+      vinDigitado: fila['vin_digitado']! as String,
       fotos: [for (final foto in fotos) FotoLocal.desdeFila(foto)],
     );
   }
@@ -145,6 +147,19 @@ class AlmacenFotos {
     where: 'evento_id = ?',
     whereArgs: [paso.eventoId],
   );
+
+  /// La placa o el VIN que el conductor digita en un Recogido, como van escritos. Solo cambia el
+  /// dato que llega.
+  Future<void> guardarIdentificacion(PasoEnCurso paso, {String? placa, String? vin}) {
+    final cambios = {'placa_digitada': ?placa, 'vin_digitado': ?vin};
+    if (cambios.isEmpty) return Future.value();
+    return base.db.update(
+      'pasos_en_curso',
+      cambios,
+      where: 'evento_id = ?',
+      whereArgs: [paso.eventoId],
+    );
+  }
 
   /// Se va a abrir la cámara desde este paso. Si Android mata la app mientras está abierta, la
   /// foto se le entrega a este paso al volver ([entregarFotoPerdida]).

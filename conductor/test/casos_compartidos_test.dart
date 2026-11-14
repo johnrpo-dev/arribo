@@ -139,6 +139,64 @@ void main() {
       }
     });
 
+    test('la placa válida es la que cabe en el servidor: de 1 a 10 letras o dígitos', () {
+      expect(largoMaximoPlaca, identificacion['largo_maximo_placa']);
+      for (final caso in lista(identificacion['placa_valida'])) {
+        expect(placaValida(caso['placa']! as String), caso['valida'], reason: '$caso');
+      }
+    });
+
+    test('al recoger, la placa o el VIN digitados cuentan donde al vehículo le faltan', () {
+      for (final caso in lista(identificacion['al_recoger'])) {
+        final vehiculo = caso['vehiculo']! as Map<String, Object?>;
+        final digitada = caso['digitada']! as Map<String, Object?>;
+        final falta = identificacionFaltanteAlRecoger(
+          placaGuardada: vehiculo['placa'] as String?,
+          vinGuardado: vehiculo['vin'] as String?,
+          placaDigitada: digitada['placa'] as String?,
+          vinDigitado: digitada['vin'] as String?,
+          tipo: caso['tipo']! as String,
+        );
+        expect(falta == null, caso['completa'], reason: '${caso['nombre']}');
+      }
+    });
+
+    test(
+      'lo digitado completa el vehículo sin sobreescribir; lo que no encaja queda por revisar',
+      () {
+        for (final caso in lista(identificacion['completar'])) {
+          final vehiculo = caso['vehiculo']! as Map<String, Object?>;
+          final digitada = caso['digitada']! as Map<String, Object?>;
+          final complemento = completarIdentificacion(
+            placaGuardada: vehiculo['placa'] as String?,
+            vinGuardado: vehiculo['vin'] as String?,
+            placaDigitada: digitada['placa'] as String?,
+            vinDigitado: digitada['vin'] as String?,
+          );
+          final razon = '${caso['nombre']}';
+          expect(
+            {'placa': complemento.placa, 'vin': complemento.vin},
+            caso['queda'],
+            reason: razon,
+          );
+          expect(complemento.nuevos, caso['nuevos'], reason: razon);
+          expect(
+            [
+              for (final dato in complemento.porRevisar)
+                {
+                  'campo': dato.campo,
+                  'digitado': dato.digitado,
+                  'revision': dato.revision,
+                  'existente': dato.existente,
+                },
+            ],
+            caso['por_revisar'],
+            reason: razon,
+          );
+        }
+      },
+    );
+
     test('al recoger se exige siempre; al asignar, según la configuración', () {
       for (final caso in lista(identificacion['exigida'])) {
         expect(

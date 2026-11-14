@@ -1,6 +1,7 @@
-// La pantalla de Recogido y Entregado: mínimo de fotos y nombre exigidos, placa o VIN al recoger,
-// bloqueo por capacidad mostrando qué falta entregar, el estado de la pantalla que sobrevive a que
-// Android mate la app, miniaturas decodificadas en pequeño y los indicadores de fotos pendientes.
+// La pantalla de Recogido y Entregado: mínimo de fotos y nombre exigidos, placa o VIN digitados al
+// recoger un vehículo que llegó sin ellos (1a-13b), bloqueo por capacidad mostrando qué falta
+// entregar, el estado de la pantalla que sobrevive a que Android mate la app, miniaturas
+// decodificadas en pequeño y los indicadores de fotos pendientes.
 
 import 'dart:io';
 
@@ -66,6 +67,9 @@ void main() {
   var tipo = 'traslado';
   var sinIdentificar = <int>{};
 
+  /// Cuándo exige la empresa la placa o el VIN (`momento_placa_vin`).
+  var momento = 'recoger';
+
   const placas = {41: 'ABC123', 42: 'XYZ789'};
 
   /// El estado que tenía antes un servicio guardado en novedad.
@@ -94,7 +98,7 @@ void main() {
               if (const {'asignado', 'en_camino', 'recogido', 'novedad'}.contains(estado))
                 servicioDe(id, estado),
           ]),
-          'configuracion': {'minimo_fotos': minimoFotos, 'momento_placa_vin': 'recoger'},
+          'configuracion': {'minimo_fotos': minimoFotos, 'momento_placa_vin': momento},
         },
         cabeceras: {'etag': '"${eventos.estados}"'},
       ),
@@ -111,7 +115,7 @@ void main() {
         for (final MapEntry(key: id, value: estado) in estados.entries)
           Servicio.desdeJson(servicioDe(id, estado)),
       ],
-      configuracion: ConfiguracionApp(minimoFotos: minimoFotos, momentoPlacaVin: 'recoger'),
+      configuracion: ConfiguracionApp(minimoFotos: minimoFotos, momentoPlacaVin: momento),
       etag: '"e1"',
       hora: ahora.subtract(const Duration(minutes: 30)),
     );
@@ -157,6 +161,7 @@ void main() {
     capacidad = 1;
     tipo = 'traslado';
     sinIdentificar = {};
+    momento = 'recoger';
     previos = {};
     prueba = await BaseDePrueba.crear();
     servidor = ServidorFalso(responder);
@@ -226,6 +231,20 @@ void main() {
   }
 
   Future<void> marcar(WidgetTester tester) => tocar(tester, find.byKey(const Key('confirmar')));
+
+  /// Escribe en un campo de la pantalla del paso ('placa-digitada', 'vin-digitado').
+  Future<void> escribir(WidgetTester tester, String campo, String texto) async {
+    await tester.ensureVisible(find.byKey(Key(campo)));
+    await tester.enterText(find.byKey(Key(campo)), texto);
+    await tester.pumpAndSettle();
+  }
+
+  String textoDe(WidgetTester tester, String campo) => tester
+      .widget<TextField>(
+        find.descendant(of: find.byKey(Key(campo)), matching: find.byType(TextField)),
+      )
+      .controller!
+      .text;
 
   /// La flecha de volver de la barra superior.
   Future<void> volver(WidgetTester tester) => tocar(tester, find.byType(BackButton));
@@ -427,39 +446,195 @@ void main() {
   });
 
   group('placa o VIN al recoger', () {
-    testWidgets('un vehículo sin placa ni VIN no se puede recoger: dice que llame a logística', (
+    /// Las fotos y el nombre completos: solo falta (o no) la identificación.
+    Future<void> completarFotosYNombre(WidgetTester tester) async {
+      await tomarFotos(tester, 4);
+      await escribirNombre(tester, 'Carlos Pérez');
+    }
+
+    // Antes de la 1a-13b este caso bloqueaba el Recogido ("llame a logística") y, sin señal, el
+    // conductor no podía recoger el vehículo.
+    testWidgets('un vehículo sin placa ni VIN abre el Recogido y pide digitar placa o VIN', (
       tester,
     ) async {
       sinIdentificar = {41};
       await guardar({41: 'en_camino'});
-      await abrirDetalle(tester, vehiculo: 'Sin placa ni VIN');
+      await abrirPaso(tester, vehiculo: 'Sin placa ni VIN');
 
-      await tocar(tester, find.text('Marcar Recogido'));
-
-      expect(find.text('Falta identificar el vehículo'), findsOneWidget);
+      expect(enLaPantallaDelPaso(), isTrue);
+      expect(find.byKey(const Key('placa-digitada')), findsOneWidget);
+      expect(find.byKey(const Key('vin-digitado')), findsOneWidget);
       expect(
-        find.textContaining('El vehículo necesita placa o VIN (al menos uno). Llame a logística'),
+        find.text(
+          'Este servicio no tiene placa ni VIN. Escriba al menos uno, como se ve en el vehículo.',
+        ),
         findsOneWidget,
       );
-      expect(enLaPantallaDelPaso(), isFalse);
-      await tocar(tester, find.text('Entendido'));
+
+      await completarFotosYNombre(tester);
+      await marcar(tester);
+
+      expect(find.text('El vehículo necesita placa o VIN (al menos uno).'), findsOneWidget);
+      expect(enLaPantallaDelPaso(), isTrue);
       expect(await tabla(tester, 'eventos_pendientes'), isEmpty);
-      expect(await tabla(tester, 'pasos_en_curso'), isEmpty);
     });
 
-    testWidgets('un desvare sin placa no se puede recoger', (tester) async {
+    testWidgets('sin señal marca Recogido con la placa digitada: va en el evento y ya se ve', (
+      tester,
+    ) async {
+      sinIdentificar = {41};
+      await guardar({41: 'en_camino'});
+      await abrirPaso(tester, vehiculo: 'Sin placa ni VIN');
+      await completarFotosYNombre(tester);
+      await escribir(tester, 'placa-digitada', 'xyz-987');
+
+      await marcar(tester);
+
+      // Vuelve al detalle, que ya muestra la placa digitada; la lista también.
+      expect(enLaPantallaDelPaso(), isFalse);
+      expect(find.text('XYZ987'), findsOneWidget);
+      expect(find.text('Pendiente por enviar'), findsOneWidget);
+      final evento = (await tabla(tester, 'eventos_pendientes')).single;
+      expect((evento['destino'], evento['placa'], evento['vin']), ('recogido', 'XYZ987', null));
+      expect(await tabla(tester, 'pasos_en_curso'), isEmpty);
+      await volver(tester);
+      expect(find.text('XYZ987'), findsOneWidget);
+      expect(find.text('Sin placa ni VIN'), findsNothing);
+
+      // Con señal, el evento sale con la placa y el vehículo la conserva.
+      conSenal = true;
+      await sincronizador.enviar();
+      await tester.pumpAndSettle();
+      final enviado = eventos.lotes.single.single;
+      expect((enviado['id'], enviado['placa'], enviado['vin']), (evento['id'], 'XYZ987', null));
+      expect(eventos.estados[41], 'recogido');
+      expect(find.text('XYZ987'), findsOneWidget);
+    });
+
+    testWidgets('un traslado se puede recoger con solo el VIN digitado', (tester) async {
+      sinIdentificar = {41};
+      await guardar({41: 'en_camino'});
+      await abrirPaso(tester, vehiculo: 'Sin placa ni VIN');
+      await completarFotosYNombre(tester);
+      await escribir(tester, 'vin-digitado', '1hgcm-82633 a004352');
+
+      await marcar(tester);
+
+      final evento = (await tabla(tester, 'eventos_pendientes')).single;
+      expect((evento['placa'], evento['vin']), (null, '1HGCM82633A004352'));
+      expect(find.text('1HGCM82633A004352'), findsOneWidget);
+    });
+
+    testWidgets('un desvare sin placa pide solo la placa, y sin ella no deja marcar', (
+      tester,
+    ) async {
       sinIdentificar = {41};
       tipo = 'desvare';
       await guardar({41: 'en_camino'});
-      await abrirDetalle(tester, vehiculo: 'Sin placa ni VIN');
+      await abrirPaso(tester, vehiculo: 'Sin placa ni VIN');
 
-      await tocar(tester, find.text('Marcar Recogido'));
+      expect(find.byKey(const Key('placa-digitada')), findsOneWidget);
+      expect(find.byKey(const Key('vin-digitado')), findsNothing);
+      expect(
+        find.text(
+          'Un desvare exige la placa y este servicio no la tiene. Escríbala como se ve en el '
+          'vehículo.',
+        ),
+        findsOneWidget,
+      );
+      await completarFotosYNombre(tester);
+      await marcar(tester);
+      expect(find.text('Un desvare exige la placa del vehículo.'), findsOneWidget);
+      expect(await tabla(tester, 'eventos_pendientes'), isEmpty);
 
-      expect(find.textContaining('Un desvare exige la placa del vehículo.'), findsOneWidget);
-      expect(enLaPantallaDelPaso(), isFalse);
+      await escribir(tester, 'placa-digitada', 'ABC 123');
+      expect(find.byKey(const Key('faltantes')), findsNothing);
+      await marcar(tester);
+      expect((await tabla(tester, 'eventos_pendientes')).single['placa'], 'ABC123');
     });
 
-    testWidgets('cuando logística registra la placa y la lista se actualiza, ya deja recoger', (
+    testWidgets('un VIN mal digitado no deja marcar y dice cómo debe ser', (tester) async {
+      sinIdentificar = {41};
+      await guardar({41: 'en_camino'});
+      await abrirPaso(tester, vehiculo: 'Sin placa ni VIN');
+      await completarFotosYNombre(tester);
+      await escribir(tester, 'vin-digitado', '1HGCM82633A0O4352');
+
+      await marcar(tester);
+
+      expect(find.text('El VIN debe tener 17 letras o dígitos, sin I, O ni Q.'), findsOneWidget);
+      expect(await tabla(tester, 'eventos_pendientes'), isEmpty);
+
+      await escribir(tester, 'vin-digitado', '1HGCM82633A004352');
+      await marcar(tester);
+      expect((await tabla(tester, 'eventos_pendientes')).single['vin'], '1HGCM82633A004352');
+    });
+
+    testWidgets('lo digitado sigue en la pantalla si Android mata la app', (tester) async {
+      sinIdentificar = {41};
+      await guardar({41: 'en_camino'});
+      await abrirPaso(tester, vehiculo: 'Sin placa ni VIN');
+      await escribir(tester, 'placa-digitada', 'xyz-9');
+      await escribir(tester, 'vin-digitado', '1HGCM');
+      final paso = (await tabla(tester, 'pasos_en_curso')).single;
+      expect((paso['placa_digitada'], paso['vin_digitado']), ('xyz-9', '1HGCM'));
+
+      await matarYReabrir(tester);
+      await abrirPaso(tester, vehiculo: 'Sin placa ni VIN');
+
+      expect(textoDe(tester, 'placa-digitada'), 'xyz-9');
+      expect(textoDe(tester, 'vin-digitado'), '1HGCM');
+      // Y sigue hasta marcar con lo que había escrito.
+      await escribir(tester, 'placa-digitada', 'xyz-987');
+      await escribir(tester, 'vin-digitado', '');
+      await completarFotosYNombre(tester);
+      await marcar(tester);
+      final evento = (await tabla(tester, 'eventos_pendientes')).single;
+      expect((evento['id'], evento['placa'], evento['vin']), (paso['evento_id'], 'XYZ987', null));
+    });
+
+    testWidgets(
+      'con la configuración "al asignar" no se pide: se bloquea y dice que llame a logística',
+      (tester) async {
+        sinIdentificar = {41};
+        momento = 'asignar';
+        await guardar({41: 'en_camino'});
+        await abrirDetalle(tester, vehiculo: 'Sin placa ni VIN');
+
+        await tocar(tester, find.text('Marcar Recogido'));
+
+        expect(find.text('Falta identificar el vehículo'), findsOneWidget);
+        expect(
+          find.textContaining('El vehículo necesita placa o VIN (al menos uno). Llame a logística'),
+          findsOneWidget,
+        );
+        expect(enLaPantallaDelPaso(), isFalse);
+        await tocar(tester, find.text('Entendido'));
+        expect(await tabla(tester, 'eventos_pendientes'), isEmpty);
+        expect(await tabla(tester, 'pasos_en_curso'), isEmpty);
+      },
+    );
+
+    testWidgets('un vehículo con placa no pide digitar nada', (tester) async {
+      await abrirPaso(tester);
+
+      expect(enLaPantallaDelPaso(), isTrue);
+      expect(find.byKey(const Key('placa-digitada')), findsNothing);
+      expect(find.byKey(const Key('vin-digitado')), findsNothing);
+      expect(find.byKey(const Key('pide-identificacion')), findsNothing);
+    });
+
+    testWidgets('el Entregado no pide la placa ni el VIN', (tester) async {
+      sinIdentificar = {41};
+      await guardar({41: 'recogido'});
+      await abrirPaso(tester, vehiculo: 'Sin placa ni VIN', paso: 'Entregado');
+
+      expect(enLaPantallaDelPaso(), isTrue);
+      expect(find.byKey(const Key('placa-digitada')), findsNothing);
+      expect(find.byKey(const Key('vin-digitado')), findsNothing);
+    });
+
+    testWidgets('cuando logística registra la placa y la lista se actualiza, ya no la pide', (
       tester,
     ) async {
       sinIdentificar = {41};
@@ -475,6 +650,7 @@ void main() {
       await tocar(tester, find.text('Marcar Recogido'));
 
       expect(enLaPantallaDelPaso(), isTrue);
+      expect(find.byKey(const Key('placa-digitada')), findsNothing);
     });
   });
 

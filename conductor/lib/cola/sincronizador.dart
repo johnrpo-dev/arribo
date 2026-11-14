@@ -121,6 +121,8 @@ class Sincronizador extends ChangeNotifier {
     required String destino,
     String? motivo,
     String? nombreQuien,
+    String? placa,
+    String? vin,
     String? id,
     Future<void> Function(Transaction txn, EventoLocal evento)? alGuardar,
   }) async {
@@ -134,6 +136,8 @@ class Sincronizador extends ChangeNotifier {
       destino: destino,
       motivo: motivo,
       nombreQuien: nombreQuien,
+      placa: placa,
+      vin: vin,
       id: id,
       alGuardar: alGuardar,
       hora: _reloj(),

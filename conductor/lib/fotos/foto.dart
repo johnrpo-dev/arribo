@@ -141,6 +141,8 @@ class PasoEnCurso {
     required this.destino,
     required this.eventoId,
     this.nombreQuien = '',
+    this.placaDigitada = '',
+    this.vinDigitado = '',
     this.fotos = const [],
   });
 
@@ -155,6 +157,11 @@ class PasoEnCurso {
 
   /// Quien entrega (Recogido) o recibe (Entregado) el vehículo, como va escrito.
   final String nombreQuien;
+
+  /// La placa y el VIN que el conductor digita en un Recogido de un vehículo que llegó sin ellos,
+  /// como van escritos (1a-13b). Vacíos si no digitó nada.
+  final String placaDigitada;
+  final String vinDigitado;
 
   /// Las fotos tomadas, de la más antigua a la más nueva.
   final List<FotoLocal> fotos;
