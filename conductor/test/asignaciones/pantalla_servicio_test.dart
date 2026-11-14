@@ -105,7 +105,13 @@ void main() {
 
   Future<void> abrirApp(WidgetTester tester) async {
     await tester.pumpWidget(
-      ArriboApp(sesion: sesion, lista: lista, reloj: () => ahora, abrirEnlace: (_) async => true),
+      ArriboApp(
+        sesion: sesion,
+        lista: lista,
+        reloj: () => ahora,
+        abrirEnlace: (_) async => true,
+        camara: CamaraFalsa(prueba.carpeta),
+      ),
     );
     await sesion.iniciar();
     await tester.pumpAndSettle();
@@ -121,6 +127,15 @@ void main() {
   Future<void> tocar(WidgetTester tester, Finder boton) async {
     await tester.tap(boton);
     await tester.pumpAndSettle();
+  }
+
+  /// En la pantalla de Recogido o Entregado: toma las fotos, escribe el nombre y marca el paso.
+  Future<void> completarPaso(WidgetTester tester, {int fotos = 4}) async {
+    for (var i = 0; i < fotos; i++) {
+      await tocar(tester, find.byKey(const Key('tomar-foto')));
+    }
+    await tester.enterText(find.byKey(const Key('nombre-quien')), 'Carlos Pérez');
+    await tocar(tester, find.byKey(const Key('confirmar')));
   }
 
   /// La flecha de volver de la barra superior.
@@ -268,19 +283,26 @@ void main() {
       expect(eventos.aplicados, 1);
     });
 
-    testWidgets('Recogido y Entregado se confirman y quedan en la cola, en orden', (tester) async {
+    testWidgets('Recogido y Entregado se marcan con sus fotos y su nombre y quedan en la cola, '
+        'en orden', (tester) async {
       await guardar({41: 'en_camino'});
       await abrirDetalle(tester);
 
       await tocar(tester, find.text('Marcar Recogido'));
-      expect(find.text('¿Marcar Recogido?'), findsOneWidget);
-      await tocar(tester, find.byKey(const Key('confirmar')));
+      // Ya no basta una confirmación: se abre la pantalla de fotos y nombre.
+      expect(find.byKey(const Key('tomar-foto')), findsOneWidget);
+      expect(await cola(tester), isEmpty);
+      await completarPaso(tester);
       expect(find.text('Recogido'), findsOneWidget);
       expect(find.textContaining('Montado en la grúa: Sí'), findsOneWidget);
       await tocar(tester, find.text('Marcar Entregado'));
-      await tocar(tester, find.byKey(const Key('confirmar')));
+      await completarPaso(tester);
 
       expect([for (final e in await cola(tester)) e['destino']], ['recogido', 'entregado']);
+      expect(
+        [for (final e in await cola(tester)) e['nombre_quien']],
+        ['Carlos Pérez', 'Carlos Pérez'],
+      );
       expect([for (final e in await cola(tester)) e['secuencia']], [1, 2]);
       expect(find.text('Entregado'), findsOneWidget);
       expect(find.text('Pendiente por enviar'), findsOneWidget);

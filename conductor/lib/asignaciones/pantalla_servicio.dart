@@ -1,6 +1,7 @@
 // Detalle de un servicio, con los botones de estado: el paso que sigue (En camino, Recogido o
 // Entregado) y Novedad. Cada toque se guarda como evento en la cola local antes de cambiar la
-// pantalla; el estado nuevo se ve de inmediato, marcado como pendiente por enviar.
+// pantalla; el estado nuevo se ve de inmediato, marcado como pendiente por enviar. Recogido y
+// Entregado abren antes su pantalla de fotos y nombre (pantalla_paso.dart).
 
 import 'package:material_ui/material_ui.dart';
 
@@ -51,6 +52,7 @@ class PantallaServicio extends StatelessWidget {
               : _Detalle(
                   servicio: servicio,
                   pendiente: lista.pendientesDe(id) > 0,
+                  fotosPendientes: lista.fotos.pendientesDe(id),
                   avisos: avisos,
                   alEntender: alEntender,
                   ahora: reloj(),
@@ -113,30 +115,23 @@ class _AccionesState extends State<_Acciones> {
     setState(() => _ocupado = true);
     try {
       String? motivo;
-      var datos = const DatosDelPaso();
-      if (destino == Estado.novedad) {
-        motivo = await pedirMotivoDeNovedad(context, servicio: servicio);
-        if (motivo == null) return;
-      } else if (destino == Estado.recogido || destino == Estado.entregado) {
-        final preparado = await prepararRecogidoOEntregado(
+      if (destino == Estado.recogido || destino == Estado.entregado) {
+        // Recogido y Entregado se marcan en su propia pantalla, con las fotos y el nombre.
+        return await abrirRecogidoOEntregado(
           context,
           servicio: servicio,
           destino: destino,
           lista: widget.lista,
         );
-        if (preparado == null) return;
-        datos = preparado;
+      }
+      if (destino == Estado.novedad) {
+        motivo = await pedirMotivoDeNovedad(context, servicio: servicio);
+        if (motivo == null) return;
       } else if (!await confirmarPaso(context, servicio: servicio, destino: destino)) {
         return;
       }
       // Primero queda guardado en la cola; la pantalla cambia cuando la lista vuelve a leer.
-      await widget.lista.marcar(
-        servicio.id,
-        destino,
-        motivo: motivo,
-        nombreQuien: datos.nombreQuien,
-        idEvento: datos.idEvento,
-      );
+      await widget.lista.marcar(servicio.id, destino, motivo: motivo);
     } on ToqueNoValido catch (error) {
       mensajero.showSnackBar(SnackBar(content: Text(error.mensaje)));
     } finally {
@@ -185,6 +180,7 @@ class _Detalle extends StatelessWidget {
   const _Detalle({
     required this.servicio,
     required this.pendiente,
+    required this.fotosPendientes,
     required this.avisos,
     required this.alEntender,
     required this.ahora,
@@ -195,6 +191,9 @@ class _Detalle extends StatelessWidget {
 
   /// El servicio tiene toques que aún no han llegado al servidor.
   final bool pendiente;
+
+  /// Fotos de este servicio que aún no están en el servidor.
+  final int fotosPendientes;
 
   /// Toques de este servicio que el servidor no aplicó y el conductor no ha dado por vistos.
   final List<EventoLocal> avisos;
@@ -233,6 +232,7 @@ class _Detalle extends StatelessWidget {
           children: [
             EtiquetaEstado(servicio.estado),
             if (pendiente) const EtiquetaPendiente(),
+            if (fotosPendientes > 0) EtiquetaFotosPendientes(fotosPendientes),
             Text(tipoDe(servicio), style: textos.bodyLarge),
           ],
         ),

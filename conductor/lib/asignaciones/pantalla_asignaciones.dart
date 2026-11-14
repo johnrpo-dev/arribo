@@ -44,9 +44,13 @@ class _PantallaAsignacionesState extends State<PantallaAsignaciones> {
     _ciclo = AppLifecycleListener(
       onResume: () {
         widget.lista.sincronizador.enPrimerPlano = true;
+        widget.lista.fotos.enPrimerPlano = true;
         widget.lista.actualizar();
       },
-      onPause: () => widget.lista.sincronizador.enPrimerPlano = false,
+      onPause: () {
+        widget.lista.sincronizador.enPrimerPlano = false;
+        widget.lista.fotos.enPrimerPlano = false;
+      },
     );
     _iniciar();
   }
@@ -57,12 +61,20 @@ class _PantallaAsignacionesState extends State<PantallaAsignaciones> {
     await widget.lista.actualizar();
   }
 
-  /// Con cambios sin enviar no se cierra sesión: se explica por qué y se intenta enviarlos.
-  Future<void> _explicarPendientes(int pendientes) {
+  /// Con cambios o fotos sin enviar no se cierra sesión: se explica por qué y se intenta enviarlos.
+  Future<void> _explicarPendientes(int pendientes, int fotos) {
     widget.lista.actualizar();
-    final cuantos = pendientes == 1
-        ? 'Hay 1 cambio pendiente por enviar.'
-        : 'Hay $pendientes cambios pendientes por enviar.';
+    final cambios = pendientes == 1 ? '1 cambio' : '$pendientes cambios';
+    final cuantasFotos = fotos == 1 ? '1 foto' : '$fotos fotos';
+    final cuantos = fotos == 0
+        ? (pendientes == 1
+              ? 'Hay 1 cambio pendiente por enviar.'
+              : 'Hay $pendientes cambios pendientes por enviar.')
+        : pendientes == 0
+        ? (fotos == 1
+              ? 'Hay 1 foto pendiente por subir.'
+              : 'Hay $fotos fotos pendientes por subir.')
+        : 'Hay $cambios y $cuantasFotos pendientes por enviar.';
     return showDialog<void>(
       context: context,
       builder: (context) => AlertDialog(
@@ -86,7 +98,8 @@ class _PantallaAsignacionesState extends State<PantallaAsignaciones> {
 
   Future<void> _salir() async {
     final pendientes = widget.lista.sincronizador.pendientes;
-    if (pendientes > 0) return _explicarPendientes(pendientes);
+    final fotos = widget.lista.fotos.pendientes;
+    if (pendientes + fotos > 0) return _explicarPendientes(pendientes, fotos);
     final confirmado = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -113,8 +126,8 @@ class _PantallaAsignacionesState extends State<PantallaAsignaciones> {
       mensajero.showSnackBar(
         const SnackBar(
           content: Text(
-            'No se puede cerrar sesión: hay cambios sin enviar, y se envían con su sesión. '
-            'Espere a tener señal.',
+            'No se puede cerrar sesión: hay cambios o fotos sin enviar, y se envían con su '
+            'sesión. Espere a tener señal.',
           ),
         ),
       );
@@ -174,6 +187,7 @@ class _PantallaAsignacionesState extends State<PantallaAsignaciones> {
                   TarjetaServicio(
                     servicio: servicio,
                     pendiente: lista.pendientesDe(servicio.id) > 0,
+                    fotosPendientes: lista.fotos.pendientesDe(servicio.id),
                     ahora: ahora,
                     abrirEnlace: widget.abrirEnlace,
                     alTocar: () =>
@@ -192,7 +206,8 @@ class _PantallaAsignacionesState extends State<PantallaAsignaciones> {
 }
 
 /// Una línea discreta con la hora de la última actualización y el aviso si no hay conexión; y,
-/// cuando los hay, cuántos cambios están pendientes por enviar y los que el servidor no aplicó.
+/// cuando los hay, cuántos cambios y cuántas fotos están pendientes por enviar, los cambios que el
+/// servidor no aplicó y las fotos que rechazó.
 class _EstadoDeLaLista extends StatelessWidget {
   const _EstadoDeLaLista({required this.lista, required this.ahora});
 
@@ -205,6 +220,7 @@ class _EstadoDeLaLista extends StatelessWidget {
     final actualizada = textoUltimaActualizacion(lista.ultimaActualizacion, ahora: ahora);
     final problema = lista.problema;
     final cola = lista.sincronizador;
+    final fotos = lista.fotos;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -225,8 +241,33 @@ class _EstadoDeLaLista extends StatelessWidget {
           ),
           const SizedBox(height: 8),
         ],
+        if (fotos.pendientes > 0) ...[
+          Recuadro(
+            textoFotosPendientes(fotos.pendientes, problema: fotos.problema),
+            key: const Key('fotos-pendientes'),
+            tipo: TipoRecuadro.aviso,
+            icono: Icons.photo_camera_outlined,
+          ),
+          const SizedBox(height: 8),
+        ],
+        if (fotos.ajenas > 0) ...[
+          Recuadro(
+            textoFotosAjenas(fotos.ajenas),
+            tipo: TipoRecuadro.aviso,
+            icono: Icons.report_problem_outlined,
+          ),
+          const SizedBox(height: 8),
+        ],
         for (final evento in cola.avisos) ...[
           AvisoDeEvento(evento: evento, alEntender: () => cola.marcarVisto(evento.id)),
+          const SizedBox(height: 8),
+        ],
+        for (final foto in fotos.conProblema) ...[
+          AvisoDeFoto(
+            key: Key('foto-con-problema-${foto.id}'),
+            foto: foto,
+            alEntender: () => fotos.marcarVista(foto.id),
+          ),
           const SizedBox(height: 8),
         ],
         if (lista.sinConexion)
@@ -268,12 +309,16 @@ class TarjetaServicio extends StatelessWidget {
     required this.abrirEnlace,
     required this.alTocar,
     this.pendiente = false,
+    this.fotosPendientes = 0,
   });
 
   final Servicio servicio;
 
   /// El servicio tiene toques que aún no han llegado al servidor.
   final bool pendiente;
+
+  /// Fotos de este servicio que aún no están en el servidor.
+  final int fotosPendientes;
   final DateTime ahora;
   final AbrirEnlace abrirEnlace;
   final VoidCallback alTocar;
@@ -305,6 +350,7 @@ class TarjetaServicio extends StatelessWidget {
                     ),
                   EtiquetaEstado(servicio.estado),
                   if (pendiente) const EtiquetaPendiente(),
+                  if (fotosPendientes > 0) EtiquetaFotosPendientes(fotosPendientes),
                   Text(tipoDe(servicio), style: textos.bodyLarge),
                 ],
               ),

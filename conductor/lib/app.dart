@@ -6,8 +6,10 @@ import 'api.dart';
 import 'asignaciones/enlaces.dart';
 import 'asignaciones/lista_asignaciones.dart';
 import 'asignaciones/pantalla_asignaciones.dart';
+import 'asignaciones/pantalla_paso.dart';
 import 'asignaciones/pantalla_servicio.dart';
 import 'comunes.dart';
+import 'fotos/camara.dart';
 import 'ingreso/pantalla_ingreso.dart';
 import 'ingreso/sesion.dart';
 import 'tema.dart';
@@ -18,6 +20,7 @@ class ArriboApp extends StatefulWidget {
     required this.sesion,
     required this.lista,
     this.abrirEnlace = abrirEnlaceExterno,
+    this.camara,
     this.servidor = servidorConfigurado,
     this.reloj = DateTime.now,
   });
@@ -25,6 +28,9 @@ class ArriboApp extends StatefulWidget {
   final Sesion sesion;
   final ListaAsignaciones lista;
   final AbrirEnlace abrirEnlace;
+
+  /// Con qué se toman las fotos de evidencia; por defecto, la cámara del sistema.
+  final Camara? camara;
   final String servidor;
   final DateTime Function() reloj;
 
@@ -35,6 +41,7 @@ class ArriboApp extends StatefulWidget {
 class _ArriboAppState extends State<ArriboApp> {
   final _navegador = GlobalKey<NavigatorState>();
   late EstadoSesion _estadoAnterior = widget.sesion.estado;
+  late final Camara _camara = widget.camara ?? CamaraDelSistema();
 
   @override
   void initState() {
@@ -89,17 +96,34 @@ class _ArriboAppState extends State<ArriboApp> {
         },
       ),
       onGenerateRoute: (ajustes) {
-        final id = ajustes.arguments;
-        if (ajustes.name != rutaServicio || id is! int) return null;
-        return MaterialPageRoute<void>(
-          settings: ajustes,
-          builder: (context) => PantallaServicio(
-            id: id,
-            lista: widget.lista,
-            abrirEnlace: widget.abrirEnlace,
-            reloj: widget.reloj,
-          ),
-        );
+        final argumentos = ajustes.arguments;
+        if (ajustes.name == rutaServicio && argumentos is int) {
+          return MaterialPageRoute<void>(
+            settings: ajustes,
+            builder: (context) => PantallaServicio(
+              id: argumentos,
+              lista: widget.lista,
+              abrirEnlace: widget.abrirEnlace,
+              reloj: widget.reloj,
+            ),
+          );
+        }
+        if (ajustes.name == rutaPaso && argumentos is Map) {
+          final id = argumentos['id'];
+          final destino = argumentos['destino'];
+          if (id is! int || destino is! String) return null;
+          return MaterialPageRoute<void>(
+            settings: ajustes,
+            builder: (context) => PantallaPaso(
+              servicioId: id,
+              destino: destino,
+              lista: widget.lista,
+              camara: _camara,
+              reloj: widget.reloj,
+            ),
+          );
+        }
+        return null;
       },
     );
   }

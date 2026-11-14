@@ -6,6 +6,7 @@ import '../api.dart';
 import '../cola/evento.dart';
 import '../comunes.dart';
 import '../formato.dart';
+import '../fotos/foto.dart';
 import '../tema.dart';
 import 'enlaces.dart';
 import 'servicio.dart';
@@ -66,6 +67,90 @@ class EtiquetaPendiente extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// Marca de un servicio con fotos de evidencia que aún no están en el servidor.
+class EtiquetaFotosPendientes extends StatelessWidget {
+  const EtiquetaFotosPendientes(this.cantidad, {super.key});
+
+  final int cantidad;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: Colores.avisoFondo,
+        border: Border.all(color: Colores.aviso),
+        borderRadius: const BorderRadius.all(Radius.circular(6)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.photo_camera_outlined, size: 18, color: Colores.aviso),
+          const SizedBox(width: 6),
+          Flexible(
+            child: Text(
+              cantidad == 1 ? '1 foto por subir' : '$cantidad fotos por subir',
+              style: Theme.of(context).textTheme.labelMedium?.copyWith(color: Colores.aviso),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// "Hay 4 fotos pendientes por subir. Se suben solas cuando haya señal."
+String textoFotosPendientes(int cantidad, {ErrorApi? problema}) {
+  final cuantas = cantidad == 1
+      ? 'Hay 1 foto pendiente por subir.'
+      : 'Hay $cantidad fotos pendientes por subir.';
+  if (problema != null && problema is! ErrorDeRed) {
+    return '$cuantas El servidor no las recibió; la app lo intenta de nuevo sola.';
+  }
+  return cantidad == 1
+      ? '$cuantas Se sube sola cuando haya señal.'
+      : '$cuantas Se suben solas cuando haya señal.';
+}
+
+/// Las fotos de otro conductor que siguen en este celular: no se suben con la sesión actual.
+String textoFotosAjenas(int cantidad) {
+  final cuantas = cantidad == 1 ? '1 foto' : '$cantidad fotos';
+  return 'En este celular hay $cuantas sin subir de otro conductor. No se suben con su sesión: '
+      'saldrán cuando él vuelva a ingresar aquí. Avise a logística.';
+}
+
+/// Lo que se le dice al conductor de una foto que el servidor rechazó.
+String textoDeFotoConProblema(FotoLocal foto) {
+  final vehiculo = foto.vehiculo ?? 'Servicio N.º ${foto.servicioId}';
+  final de = foto.tipo == TipoFoto.recogida ? 'la recogida' : 'la entrega';
+  final motivo = foto.error;
+  return '$vehiculo: una foto de $de no se pudo subir.${motivo == null ? '' : ' $motivo'} '
+      'La foto sigue guardada en este celular. Avise a logística.';
+}
+
+/// El aviso de una foto que el servidor rechazó. Queda a la vista hasta que el conductor toca
+/// "Entendido"; la foto sigue guardada en el celular.
+class AvisoDeFoto extends StatelessWidget {
+  const AvisoDeFoto({super.key, required this.foto, required this.alEntender});
+
+  final FotoLocal foto;
+  final VoidCallback alEntender;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Recuadro(textoDeFotoConProblema(foto), tipo: TipoRecuadro.error),
+        Align(
+          alignment: Alignment.centerRight,
+          child: TextButton(onPressed: alEntender, child: const Text('Entendido')),
+        ),
+      ],
     );
   }
 }

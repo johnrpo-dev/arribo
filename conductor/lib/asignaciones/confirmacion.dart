@@ -1,5 +1,7 @@
-// Lo que pasa entre tocar un botón de estado y guardar el evento: una confirmación corta, al
-// alcance del pulgar, para que un toque accidental no cambie el estado. Dos toques en total.
+// Lo que pasa entre tocar un botón de estado y guardar el evento. En camino pide una confirmación
+// corta, al alcance del pulgar, para que un toque accidental no cambie el estado (dos toques en
+// total). Novedad pide el motivo. Recogido y Entregado abren su pantalla de fotos y nombre
+// (pantalla_paso.dart); un Recogido que no se puede marcar todavía se bloquea aquí, diciendo por qué.
 
 import 'package:material_ui/material_ui.dart';
 
@@ -7,36 +9,68 @@ import '../formato.dart';
 import 'componentes.dart';
 import 'estados.dart';
 import 'lista_asignaciones.dart';
+import 'pantalla_paso.dart';
+import 'requisitos.dart';
 import 'servicio.dart';
 
-/// Lo que acompaña a un Recogido o a un Entregado.
-class DatosDelPaso {
-  const DatosDelPaso({this.nombreQuien, this.idEvento});
-
-  /// Quien entrega (en un Recogido) o recibe (en un Entregado) el vehículo.
-  final String? nombreQuien;
-
-  /// El UUID del evento, si ya se fijó antes de guardarlo (las fotos se atan a él).
-  final String? idEvento;
-}
-
-/// PUNTO DE ENGANCHE DE LA 1a-13. Todo Recogido y todo Entregado pasan por aquí antes de guardarse
-/// en la cola. Devuelve lo que acompaña al evento, o null si no se debe marcar (el conductor
-/// canceló, o falta un requisito).
-///
-/// Hoy (1a-12) solo pide la confirmación. La 1a-13 pone aquí, antes de confirmar: el bloqueo por
-/// capacidad en un Recogido (con [lista] se ve qué vehículos van montados y cuál falta entregar),
-/// el mínimo de fotos de `lista.configuracion` y el nombre de quien entrega o recibe; y devuelve el
-/// `nombreQuien` y el `idEvento` con que guardó las fotos. Quien llama no cambia.
-Future<DatosDelPaso?> prepararRecogidoOEntregado(
+/// Todo Recogido y todo Entregado pasan por aquí. Un Recogido se bloquea si al vehículo le falta
+/// la placa o el VIN, o si la grúa va llena (se le muestra al conductor qué vehículo le falta
+/// marcar como Entregado). Si no hay bloqueo, abre la pantalla de fotos y nombre, que es la que
+/// guarda el evento. La ruta es restaurable: sobrevive a que Android mate la app con la cámara
+/// abierta.
+Future<void> abrirRecogidoOEntregado(
   BuildContext context, {
   required Servicio servicio,
   required String destino,
   required ListaAsignaciones lista,
 }) async {
   assert(destino == Estado.recogido || destino == Estado.entregado);
-  final confirmado = await confirmarPaso(context, servicio: servicio, destino: destino);
-  return confirmado ? const DatosDelPaso() : null;
+  if (destino == Estado.recogido) {
+    final bloqueo = lista.bloqueoDeRecogida(servicio);
+    if (bloqueo != null) return mostrarBloqueo(context, bloqueo);
+  }
+  Navigator.of(context).restorablePushNamed(
+    rutaPaso,
+    arguments: argumentosDePaso(servicioId: servicio.id, destino: destino),
+  );
+}
+
+/// Por qué no se puede marcar Recogido, en una hoja inferior. En un bloqueo por capacidad lista
+/// los vehículos que falta marcar como Entregado.
+Future<void> mostrarBloqueo(BuildContext context, BloqueoDeRecogida bloqueo) {
+  return showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    builder: (context) {
+      final textos = Theme.of(context).textTheme;
+      return _Hoja(
+        children: [
+          Text(bloqueo.titulo, style: textos.titleLarge),
+          const SizedBox(height: 8),
+          Text(bloqueo.mensaje, key: const Key('bloqueo'), style: textos.bodyLarge),
+          if (bloqueo.faltanPorEntregar.isNotEmpty) ...[
+            const SizedBox(height: 16),
+            Text('Falta marcar como Entregado:', style: textos.titleMedium),
+            const SizedBox(height: 4),
+            for (final servicio in bloqueo.faltanPorEntregar)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 4),
+                child: Text(
+                  _vehiculoDe(servicio),
+                  key: Key('falta-entregar-${servicio.id}'),
+                  style: textos.bodyLarge,
+                ),
+              ),
+          ],
+          const SizedBox(height: 20),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Entendido', textAlign: TextAlign.center),
+          ),
+        ],
+      );
+    },
+  );
 }
 
 String _vehiculoDe(Servicio servicio) =>
