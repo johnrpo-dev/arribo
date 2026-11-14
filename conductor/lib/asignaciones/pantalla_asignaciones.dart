@@ -40,13 +40,42 @@ class _PantallaAsignacionesState extends State<PantallaAsignaciones> {
   @override
   void initState() {
     super.initState();
-    _ciclo = AppLifecycleListener(onResume: widget.lista.actualizar);
+    // Al volver a primer plano se envía lo pendiente y se refresca la lista (en ese orden).
+    _ciclo = AppLifecycleListener(
+      onResume: () {
+        widget.lista.sincronizador.enPrimerPlano = true;
+        widget.lista.actualizar();
+      },
+      onPause: () => widget.lista.sincronizador.enPrimerPlano = false,
+    );
     _iniciar();
   }
 
+  /// Al abrir la app (o al ingresar): la lista guardada, y después enviar lo pendiente y refrescar.
   Future<void> _iniciar() async {
     await widget.lista.cargarLocal();
     await widget.lista.actualizar();
+  }
+
+  /// Con cambios sin enviar no se cierra sesión: se explica por qué y se intenta enviarlos.
+  Future<void> _explicarPendientes(int pendientes) {
+    widget.lista.actualizar();
+    final cuantos = pendientes == 1
+        ? 'Hay 1 cambio pendiente por enviar.'
+        : 'Hay $pendientes cambios pendientes por enviar.';
+    return showDialog<void>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Todavía no puede cerrar sesión'),
+        content: Text(
+          '$cuantos Se envían con su sesión: si la cierra antes, no llegarían a su nombre. '
+          'Busque señal y espere a que se envíen.',
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('Entendido')),
+        ],
+      ),
+    );
   }
 
   @override
@@ -56,6 +85,8 @@ class _PantallaAsignacionesState extends State<PantallaAsignaciones> {
   }
 
   Future<void> _salir() async {
+    final pendientes = widget.lista.sincronizador.pendientes;
+    if (pendientes > 0) return _explicarPendientes(pendientes);
     final confirmado = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -77,9 +108,14 @@ class _PantallaAsignacionesState extends State<PantallaAsignaciones> {
     final mensajero = ScaffoldMessenger.of(context);
     final resultado = await widget.sesion.salir();
     if (resultado == ResultadoSalida.hayPendientes) {
+      // La sesión volvió a revisar la base y encontró algo sin enviar (por ejemplo, un toque hecho
+      // mientras el diálogo estaba abierto).
       mensajero.showSnackBar(
         const SnackBar(
-          content: Text('No se puede cerrar sesión: hay cambios sin enviar. Espere a tener señal.'),
+          content: Text(
+            'No se puede cerrar sesión: hay cambios sin enviar, y se envían con su sesión. '
+            'Espere a tener señal.',
+          ),
         ),
       );
     }
@@ -137,6 +173,7 @@ class _PantallaAsignacionesState extends State<PantallaAsignaciones> {
                 for (final servicio in lista.servicios) ...[
                   TarjetaServicio(
                     servicio: servicio,
+                    pendiente: lista.pendientesDe(servicio.id) > 0,
                     ahora: ahora,
                     abrirEnlace: widget.abrirEnlace,
                     alTocar: () =>
@@ -154,7 +191,8 @@ class _PantallaAsignacionesState extends State<PantallaAsignaciones> {
   }
 }
 
-/// Una línea discreta con la hora de la última actualización, y el aviso si no hay conexión.
+/// Una línea discreta con la hora de la última actualización y el aviso si no hay conexión; y,
+/// cuando los hay, cuántos cambios están pendientes por enviar y los que el servidor no aplicó.
 class _EstadoDeLaLista extends StatelessWidget {
   const _EstadoDeLaLista({required this.lista, required this.ahora});
 
@@ -166,9 +204,31 @@ class _EstadoDeLaLista extends StatelessWidget {
     final textos = Theme.of(context).textTheme;
     final actualizada = textoUltimaActualizacion(lista.ultimaActualizacion, ahora: ahora);
     final problema = lista.problema;
+    final cola = lista.sincronizador;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        if (cola.pendientes > 0) ...[
+          Recuadro(
+            textoPendientes(cola.pendientes, problema: cola.problema),
+            key: const Key('pendientes'),
+            tipo: TipoRecuadro.aviso,
+            icono: Icons.cloud_upload_outlined,
+          ),
+          const SizedBox(height: 8),
+        ],
+        for (final ajenos in cola.pendientesAjenos) ...[
+          Recuadro(
+            textoPendientesAjenos(ajenos),
+            tipo: TipoRecuadro.aviso,
+            icono: Icons.report_problem_outlined,
+          ),
+          const SizedBox(height: 8),
+        ],
+        for (final evento in cola.avisos) ...[
+          AvisoDeEvento(evento: evento, alEntender: () => cola.marcarVisto(evento.id)),
+          const SizedBox(height: 8),
+        ],
         if (lista.sinConexion)
           Recuadro(
             'Sin conexión. Se muestra lo guardado en el celular. $actualizada',
@@ -207,9 +267,13 @@ class TarjetaServicio extends StatelessWidget {
     required this.ahora,
     required this.abrirEnlace,
     required this.alTocar,
+    this.pendiente = false,
   });
 
   final Servicio servicio;
+
+  /// El servicio tiene toques que aún no han llegado al servidor.
+  final bool pendiente;
   final DateTime ahora;
   final AbrirEnlace abrirEnlace;
   final VoidCallback alTocar;
@@ -240,6 +304,7 @@ class TarjetaServicio extends StatelessWidget {
                       semanticsLabel: 'Puesto ${servicio.ordenRonda} en la ronda',
                     ),
                   EtiquetaEstado(servicio.estado),
+                  if (pendiente) const EtiquetaPendiente(),
                   Text(tipoDe(servicio), style: textos.bodyLarge),
                 ],
               ),
