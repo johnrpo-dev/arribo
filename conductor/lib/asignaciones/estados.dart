@@ -3,7 +3,9 @@
 // La regla vive en el servidor (backend/nucleo/estados.py) y es él quien decide. La app la repite
 // solo para dos cosas: ofrecer el botón del paso que sigue y mostrar de inmediato el estado con los
 // toques que aún no se han enviado. Si esta copia y el servidor no coinciden, el evento llega como
-// conflicto y logística lo revisa: nada se pierde. Lo vigila test/asignaciones/estados_test.dart.
+// conflicto y logística lo revisa: nada se pierde. Lo vigilan test/asignaciones/estados_test.dart y
+// test/casos_compartidos_test.dart, que recorre los mismos casos (docs/casos-reglas.json) que la
+// prueba del servidor: si la regla cambia allá y no aquí, esa prueba falla.
 
 abstract final class Estado {
   static const asignado = 'asignado';

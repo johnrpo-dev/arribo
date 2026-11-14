@@ -115,6 +115,9 @@ class ListaAsignaciones extends ChangeNotifier {
   /// Un toque del conductor en un botón de estado. Cuando termina, el evento ya está guardado en la
   /// cola y la lista muestra el estado nuevo como pendiente por enviar; el envío sigue por su
   /// cuenta. Lanza [ToqueNoValido] si ese paso no corresponde (y no guarda nada).
+  ///
+  /// Las pantallas marcan así En camino y Novedad. Recogido y Entregado van por [confirmarPaso],
+  /// que exige sus fotos y el nombre de quien entrega o recibe.
   Future<EventoLocal> marcar(
     int servicioId,
     String destino, {

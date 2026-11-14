@@ -139,6 +139,8 @@ void main() {
     );
 
     await expectLater(api.subirFoto('token-ana', foto), throwsA(isA<ErrorDeRed>()));
+    // El servidor de mentira no sabe abortar: se espera a que termine de leer el archivo.
+    await esperarHasta(() => servidor.peticiones.isNotEmpty);
   });
 
   test('si el archivo no está en el disco, falla sin llamar al servidor', () async {

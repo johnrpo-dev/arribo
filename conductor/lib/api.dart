@@ -417,23 +417,37 @@ class ClienteApi {
   /// disco, lanza FileSystemException.
   Future<ResultadoFoto> subirFoto(String token, FotoLocal foto) async {
     final archivo = File(foto.ruta);
-    final peticion = http.MultipartRequest('PUT', _ruta('evidencias/${foto.id}/'))
-      ..headers.addAll(_cabeceras(token: token))
-      ..fields['servicio_id'] = '${foto.servicioId}'
-      ..fields['evento_id'] = foto.eventoId
-      ..fields['tipo'] = foto.tipo
-      ..files.add(
-        http.MultipartFile(
-          'archivo',
-          archivo.openRead(),
-          archivo.lengthSync(),
-          filename: '${foto.id}.jpg',
-        ),
+    // Si la subida falla o se agota su tiempo, la petición se aborta: deja de leer el archivo y
+    // suelta la conexión, en vez de seguir de fondo mientras se reintenta.
+    final abortar = Completer<void>();
+    final peticion =
+        http.AbortableMultipartRequest(
+            'PUT',
+            _ruta('evidencias/${foto.id}/'),
+            abortTrigger: abortar.future,
+          )
+          ..headers.addAll(_cabeceras(token: token))
+          ..fields['servicio_id'] = '${foto.servicioId}'
+          ..fields['evento_id'] = foto.eventoId
+          ..fields['tipo'] = foto.tipo
+          ..files.add(
+            http.MultipartFile(
+              'archivo',
+              archivo.openRead(),
+              archivo.lengthSync(),
+              filename: '${foto.id}.jpg',
+            ),
+          );
+    final http.Response respuesta;
+    try {
+      respuesta = await _enviar(
+        () async => http.Response.fromStream(await _http.send(peticion)),
+        tiempoMaximo: tiempoMaximoFoto,
       );
-    final respuesta = await _enviar(
-      () async => http.Response.fromStream(await _http.send(peticion)),
-      tiempoMaximo: tiempoMaximoFoto,
-    );
+    } on ErrorApi {
+      abortar.complete();
+      rethrow;
+    }
     if (respuesta.statusCode != 200 && respuesta.statusCode != 201) {
       throw _error(respuesta, conToken: true);
     }

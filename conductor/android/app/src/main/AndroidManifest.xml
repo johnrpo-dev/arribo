@@ -49,8 +49,13 @@
 
          In particular, this is used by the Flutter engine in io.flutter.plugin.text.ProcessTextPlugin.
          Además: el marcador del teléfono (tel:) y los enlaces de Google Maps y Waze (https), que la
-         app abre con url_launcher (Android 11 o superior exige declararlos). -->
+         app abre con url_launcher (Android 11 o superior exige declararlos), y la cámara del
+         sistema, con la que se toman las fotos de evidencia (image_picker). La app no pide el
+         permiso de cámara: la foto la toma la app de cámara del celular. -->
     <queries>
+        <intent>
+            <action android:name="android.media.action.IMAGE_CAPTURE"/>
+        </intent>
         <intent>
             <action android:name="android.intent.action.PROCESS_TEXT"/>
             <data android:mimeType="text/plain"/>
