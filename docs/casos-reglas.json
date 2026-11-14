@@ -1,0 +1,798 @@
+{
+  "descripcion": "Casos compartidos de las reglas que la app del conductor copia del servidor. La regla vive en backend/nucleo/; la app la repite en conductor/lib/asignaciones/ (estados.dart, capacidad.dart, identificacion.dart) y conductor/lib/fotos/foto.dart. Los recorren backend/tests/nucleo/test_casos_compartidos.py y conductor/test/casos_compartidos_test.dart. Si una regla cambia en nucleo/, su prueba falla hasta que este archivo cambie, y entonces falla la de la app hasta que cambie su copia.",
+  "estados": {
+    "todos": [
+      "pendiente_asignar",
+      "asignado",
+      "en_camino",
+      "recogido",
+      "entregado",
+      "novedad",
+      "cancelado"
+    ],
+    "destinos_desde_la_app": [
+      "en_camino",
+      "recogido",
+      "entregado",
+      "novedad"
+    ],
+    "transiciones": [
+      {
+        "estado": "pendiente_asignar",
+        "destino": "pendiente_asignar",
+        "permitida": false,
+        "desde_la_app": false
+      },
+      {
+        "estado": "pendiente_asignar",
+        "destino": "asignado",
+        "permitida": true,
+        "desde_la_app": false
+      },
+      {
+        "estado": "pendiente_asignar",
+        "destino": "en_camino",
+        "permitida": false,
+        "desde_la_app": false
+      },
+      {
+        "estado": "pendiente_asignar",
+        "destino": "recogido",
+        "permitida": false,
+        "desde_la_app": false
+      },
+      {
+        "estado": "pendiente_asignar",
+        "destino": "entregado",
+        "permitida": false,
+        "desde_la_app": false
+      },
+      {
+        "estado": "pendiente_asignar",
+        "destino": "novedad",
+        "permitida": false,
+        "desde_la_app": false
+      },
+      {
+        "estado": "pendiente_asignar",
+        "destino": "cancelado",
+        "permitida": true,
+        "desde_la_app": false
+      },
+      {
+        "estado": "asignado",
+        "destino": "pendiente_asignar",
+        "permitida": false,
+        "desde_la_app": false
+      },
+      {
+        "estado": "asignado",
+        "destino": "asignado",
+        "permitida": false,
+        "desde_la_app": false
+      },
+      {
+        "estado": "asignado",
+        "destino": "en_camino",
+        "permitida": true,
+        "desde_la_app": true,
+        "queda": {
+          "estado": "en_camino",
+          "estado_previo": null
+        }
+      },
+      {
+        "estado": "asignado",
+        "destino": "recogido",
+        "permitida": false,
+        "desde_la_app": false
+      },
+      {
+        "estado": "asignado",
+        "destino": "entregado",
+        "permitida": false,
+        "desde_la_app": false
+      },
+      {
+        "estado": "asignado",
+        "destino": "novedad",
+        "permitida": true,
+        "desde_la_app": true,
+        "queda": {
+          "estado": "novedad",
+          "estado_previo": "asignado"
+        }
+      },
+      {
+        "estado": "asignado",
+        "destino": "cancelado",
+        "permitida": true,
+        "desde_la_app": false
+      },
+      {
+        "estado": "en_camino",
+        "destino": "pendiente_asignar",
+        "permitida": false,
+        "desde_la_app": false
+      },
+      {
+        "estado": "en_camino",
+        "destino": "asignado",
+        "permitida": false,
+        "desde_la_app": false
+      },
+      {
+        "estado": "en_camino",
+        "destino": "en_camino",
+        "permitida": false,
+        "desde_la_app": false
+      },
+      {
+        "estado": "en_camino",
+        "destino": "recogido",
+        "permitida": true,
+        "desde_la_app": true,
+        "queda": {
+          "estado": "recogido",
+          "estado_previo": null
+        }
+      },
+      {
+        "estado": "en_camino",
+        "destino": "entregado",
+        "permitida": false,
+        "desde_la_app": false
+      },
+      {
+        "estado": "en_camino",
+        "destino": "novedad",
+        "permitida": true,
+        "desde_la_app": true,
+        "queda": {
+          "estado": "novedad",
+          "estado_previo": "en_camino"
+        }
+      },
+      {
+        "estado": "en_camino",
+        "destino": "cancelado",
+        "permitida": true,
+        "desde_la_app": false
+      },
+      {
+        "estado": "recogido",
+        "destino": "pendiente_asignar",
+        "permitida": false,
+        "desde_la_app": false
+      },
+      {
+        "estado": "recogido",
+        "destino": "asignado",
+        "permitida": false,
+        "desde_la_app": false
+      },
+      {
+        "estado": "recogido",
+        "destino": "en_camino",
+        "permitida": false,
+        "desde_la_app": false
+      },
+      {
+        "estado": "recogido",
+        "destino": "recogido",
+        "permitida": false,
+        "desde_la_app": false
+      },
+      {
+        "estado": "recogido",
+        "destino": "entregado",
+        "permitida": true,
+        "desde_la_app": true,
+        "queda": {
+          "estado": "entregado",
+          "estado_previo": null
+        }
+      },
+      {
+        "estado": "recogido",
+        "destino": "novedad",
+        "permitida": true,
+        "desde_la_app": true,
+        "queda": {
+          "estado": "novedad",
+          "estado_previo": "recogido"
+        }
+      },
+      {
+        "estado": "recogido",
+        "destino": "cancelado",
+        "permitida": true,
+        "desde_la_app": false
+      },
+      {
+        "estado": "entregado",
+        "destino": "pendiente_asignar",
+        "permitida": false,
+        "desde_la_app": false
+      },
+      {
+        "estado": "entregado",
+        "destino": "asignado",
+        "permitida": false,
+        "desde_la_app": false
+      },
+      {
+        "estado": "entregado",
+        "destino": "en_camino",
+        "permitida": false,
+        "desde_la_app": false
+      },
+      {
+        "estado": "entregado",
+        "destino": "recogido",
+        "permitida": false,
+        "desde_la_app": false
+      },
+      {
+        "estado": "entregado",
+        "destino": "entregado",
+        "permitida": false,
+        "desde_la_app": false
+      },
+      {
+        "estado": "entregado",
+        "destino": "novedad",
+        "permitida": false,
+        "desde_la_app": false
+      },
+      {
+        "estado": "entregado",
+        "destino": "cancelado",
+        "permitida": false,
+        "desde_la_app": false
+      },
+      {
+        "estado": "novedad",
+        "destino": "pendiente_asignar",
+        "permitida": false,
+        "desde_la_app": false
+      },
+      {
+        "estado": "novedad",
+        "destino": "asignado",
+        "permitida": false,
+        "desde_la_app": false
+      },
+      {
+        "estado": "novedad",
+        "destino": "en_camino",
+        "permitida": false,
+        "desde_la_app": false
+      },
+      {
+        "estado": "novedad",
+        "destino": "recogido",
+        "permitida": false,
+        "desde_la_app": false
+      },
+      {
+        "estado": "novedad",
+        "destino": "entregado",
+        "permitida": false,
+        "desde_la_app": false
+      },
+      {
+        "estado": "novedad",
+        "destino": "novedad",
+        "permitida": false,
+        "desde_la_app": false
+      },
+      {
+        "estado": "novedad",
+        "destino": "cancelado",
+        "permitida": true,
+        "desde_la_app": false
+      },
+      {
+        "estado": "cancelado",
+        "destino": "pendiente_asignar",
+        "permitida": false,
+        "desde_la_app": false
+      },
+      {
+        "estado": "cancelado",
+        "destino": "asignado",
+        "permitida": false,
+        "desde_la_app": false
+      },
+      {
+        "estado": "cancelado",
+        "destino": "en_camino",
+        "permitida": false,
+        "desde_la_app": false
+      },
+      {
+        "estado": "cancelado",
+        "destino": "recogido",
+        "permitida": false,
+        "desde_la_app": false
+      },
+      {
+        "estado": "cancelado",
+        "destino": "entregado",
+        "permitida": false,
+        "desde_la_app": false
+      },
+      {
+        "estado": "cancelado",
+        "destino": "novedad",
+        "permitida": false,
+        "desde_la_app": false
+      },
+      {
+        "estado": "cancelado",
+        "destino": "cancelado",
+        "permitida": false,
+        "desde_la_app": false
+      }
+    ],
+    "a_bordo": [
+      {
+        "estado": "pendiente_asignar",
+        "estado_previo": null,
+        "a_bordo": false
+      },
+      {
+        "estado": "asignado",
+        "estado_previo": null,
+        "a_bordo": false
+      },
+      {
+        "estado": "en_camino",
+        "estado_previo": null,
+        "a_bordo": false
+      },
+      {
+        "estado": "recogido",
+        "estado_previo": null,
+        "a_bordo": true
+      },
+      {
+        "estado": "entregado",
+        "estado_previo": null,
+        "a_bordo": false
+      },
+      {
+        "estado": "cancelado",
+        "estado_previo": null,
+        "a_bordo": false
+      },
+      {
+        "estado": "novedad",
+        "estado_previo": "asignado",
+        "a_bordo": false
+      },
+      {
+        "estado": "novedad",
+        "estado_previo": "en_camino",
+        "a_bordo": false
+      },
+      {
+        "estado": "novedad",
+        "estado_previo": "recogido",
+        "a_bordo": true
+      }
+    ]
+  },
+  "capacidad": [
+    {
+      "nombre": "grúa de un puesto vacía: puede recoger",
+      "capacidad": 1,
+      "otros": [],
+      "bloquea": false,
+      "faltan_por_entregar": []
+    },
+    {
+      "nombre": "grúa de un puesto con un vehículo recogido: bloquea y dice cuál falta",
+      "capacidad": 1,
+      "otros": [
+        {
+          "id": "ABC123",
+          "estado": "recogido",
+          "estado_previo": null
+        },
+        {
+          "id": "XYZ789",
+          "estado": "en_camino",
+          "estado_previo": null
+        }
+      ],
+      "bloquea": true,
+      "faltan_por_entregar": [
+        "ABC123"
+      ]
+    },
+    {
+      "nombre": "los que aún no se recogen no ocupan puesto",
+      "capacidad": 1,
+      "otros": [
+        {
+          "id": "ABC123",
+          "estado": "asignado",
+          "estado_previo": null
+        },
+        {
+          "id": "XYZ789",
+          "estado": "en_camino",
+          "estado_previo": null
+        }
+      ],
+      "bloquea": false,
+      "faltan_por_entregar": []
+    },
+    {
+      "nombre": "un vehículo entregado o cancelado ya no ocupa puesto",
+      "capacidad": 1,
+      "otros": [
+        {
+          "id": "ABC123",
+          "estado": "entregado",
+          "estado_previo": null
+        },
+        {
+          "id": "XYZ789",
+          "estado": "cancelado",
+          "estado_previo": null
+        }
+      ],
+      "bloquea": false,
+      "faltan_por_entregar": []
+    },
+    {
+      "nombre": "novedad de un vehículo ya recogido: sigue montado y bloquea",
+      "capacidad": 1,
+      "otros": [
+        {
+          "id": "ABC123",
+          "estado": "novedad",
+          "estado_previo": "recogido"
+        }
+      ],
+      "bloquea": true,
+      "faltan_por_entregar": [
+        "ABC123"
+      ]
+    },
+    {
+      "nombre": "novedad antes de recoger: no ocupa puesto",
+      "capacidad": 1,
+      "otros": [
+        {
+          "id": "ABC123",
+          "estado": "novedad",
+          "estado_previo": "en_camino"
+        }
+      ],
+      "bloquea": false,
+      "faltan_por_entregar": []
+    },
+    {
+      "nombre": "grúa de dos puestos con uno montado: admite el segundo",
+      "capacidad": 2,
+      "otros": [
+        {
+          "id": "ABC123",
+          "estado": "recogido",
+          "estado_previo": null
+        }
+      ],
+      "bloquea": false,
+      "faltan_por_entregar": []
+    },
+    {
+      "nombre": "grúa de dos puestos llena: bloquea el tercero y dice los dos que faltan",
+      "capacidad": 2,
+      "otros": [
+        {
+          "id": "ABC123",
+          "estado": "recogido",
+          "estado_previo": null
+        },
+        {
+          "id": "XYZ789",
+          "estado": "novedad",
+          "estado_previo": "recogido"
+        },
+        {
+          "id": "JKL456",
+          "estado": "asignado",
+          "estado_previo": null
+        }
+      ],
+      "bloquea": true,
+      "faltan_por_entregar": [
+        "ABC123",
+        "XYZ789"
+      ]
+    }
+  ],
+  "capacidad_invalida": [
+    0,
+    -1
+  ],
+  "identificacion": {
+    "placas": [
+      {
+        "texto": "abc-123",
+        "normalizada": "ABC123"
+      },
+      {
+        "texto": "ABC 123",
+        "normalizada": "ABC123"
+      },
+      {
+        "texto": " a.b.c_1/2 3 ",
+        "normalizada": "ABC123"
+      },
+      {
+        "texto": "abc123",
+        "normalizada": "ABC123"
+      },
+      {
+        "texto": "",
+        "normalizada": ""
+      },
+      {
+        "texto": " - ",
+        "normalizada": ""
+      },
+      {
+        "texto": null,
+        "normalizada": ""
+      }
+    ],
+    "vin": [
+      {
+        "texto": "1HGCM82633A004352",
+        "normalizado": "1HGCM82633A004352",
+        "valido": true
+      },
+      {
+        "texto": "1hg-cm826 33a004352",
+        "normalizado": "1HGCM82633A004352",
+        "valido": true
+      },
+      {
+        "texto": " 1hgcm82633a004352 ",
+        "normalizado": "1HGCM82633A004352",
+        "valido": true
+      },
+      {
+        "texto": "1HGCM82633A00435",
+        "normalizado": "1HGCM82633A00435",
+        "valido": false
+      },
+      {
+        "texto": "1HGCM82633A0043521",
+        "normalizado": "1HGCM82633A0043521",
+        "valido": false
+      },
+      {
+        "texto": "IHGCM82633A004352",
+        "normalizado": "IHGCM82633A004352",
+        "valido": false
+      },
+      {
+        "texto": "1HGCM82633AO04352",
+        "normalizado": "1HGCM82633AO04352",
+        "valido": false
+      },
+      {
+        "texto": "1HGCM82633A00435Q",
+        "normalizado": "1HGCM82633A00435Q",
+        "valido": false
+      },
+      {
+        "texto": "1HGCM82633A00435*",
+        "normalizado": "1HGCM82633A00435*",
+        "valido": false
+      },
+      {
+        "texto": "1HGCM82633A00435Ñ",
+        "normalizado": "1HGCM82633A00435Ñ",
+        "valido": false
+      },
+      {
+        "texto": "",
+        "normalizado": "",
+        "valido": false
+      },
+      {
+        "texto": null,
+        "normalizado": "",
+        "valido": false
+      }
+    ],
+    "vehiculo": [
+      {
+        "placa": "ABC123",
+        "vin": null,
+        "tipo": "traslado",
+        "completa": true
+      },
+      {
+        "placa": null,
+        "vin": "1HGCM82633A004352",
+        "tipo": "traslado",
+        "completa": true
+      },
+      {
+        "placa": "ABC123",
+        "vin": "1HGCM82633A004352",
+        "tipo": "evento",
+        "completa": true
+      },
+      {
+        "placa": null,
+        "vin": null,
+        "tipo": "traslado",
+        "completa": false
+      },
+      {
+        "placa": " - ",
+        "vin": "  ",
+        "tipo": "evento",
+        "completa": false
+      },
+      {
+        "placa": "",
+        "vin": "",
+        "tipo": "traslado",
+        "completa": false
+      },
+      {
+        "placa": "ABC123",
+        "vin": null,
+        "tipo": "desvare",
+        "completa": true
+      },
+      {
+        "placa": null,
+        "vin": "1HGCM82633A004352",
+        "tipo": "desvare",
+        "completa": false
+      },
+      {
+        "placa": null,
+        "vin": null,
+        "tipo": "desvare",
+        "completa": false
+      }
+    ],
+    "exigida": [
+      {
+        "configurado": "asignar",
+        "momento": "asignar",
+        "exigida": true
+      },
+      {
+        "configurado": "asignar",
+        "momento": "recoger",
+        "exigida": true
+      },
+      {
+        "configurado": "recoger",
+        "momento": "asignar",
+        "exigida": false
+      },
+      {
+        "configurado": "recoger",
+        "momento": "recoger",
+        "exigida": true
+      }
+    ]
+  },
+  "evidencia": {
+    "tamano_maximo_bytes": 5242880,
+    "tamanos": [
+      {
+        "bytes": 1,
+        "excede": false
+      },
+      {
+        "bytes": 5242880,
+        "excede": false
+      },
+      {
+        "bytes": 5242881,
+        "excede": true
+      }
+    ],
+    "jpeg": [
+      {
+        "primeros_bytes": [
+          255,
+          216,
+          255,
+          224,
+          0,
+          16
+        ],
+        "es_jpeg": true
+      },
+      {
+        "primeros_bytes": [
+          255,
+          216,
+          255,
+          225
+        ],
+        "es_jpeg": true
+      },
+      {
+        "primeros_bytes": [
+          255,
+          216,
+          255
+        ],
+        "es_jpeg": true
+      },
+      {
+        "primeros_bytes": [
+          137,
+          80,
+          78,
+          71
+        ],
+        "es_jpeg": false
+      },
+      {
+        "primeros_bytes": [
+          255,
+          216
+        ],
+        "es_jpeg": false
+      },
+      {
+        "primeros_bytes": [],
+        "es_jpeg": false
+      }
+    ],
+    "acompana": [
+      {
+        "tipo": "recogida",
+        "destino": "recogido",
+        "acompana": true
+      },
+      {
+        "tipo": "recogida",
+        "destino": "entregado",
+        "acompana": false
+      },
+      {
+        "tipo": "entrega",
+        "destino": "entregado",
+        "acompana": true
+      },
+      {
+        "tipo": "entrega",
+        "destino": "recogido",
+        "acompana": false
+      },
+      {
+        "tipo": "soporte",
+        "destino": "entregado",
+        "acompana": false
+      },
+      {
+        "tipo": "recogida",
+        "destino": "en_camino",
+        "acompana": false
+      }
+    ],
+    "tipos_desde_la_app": [
+      "entrega",
+      "recogida"
+    ]
+  }
+}
