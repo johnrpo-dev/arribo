@@ -1,4 +1,4 @@
-﻿# Progreso de la fase 1a
+# Progreso de la fase 1a
 
 Se actualiza al final de cada tarea: qué se hizo, qué se decidió y cómo probarlo a mano.
 Los escalamientos de nivel de agente se registran en la sección del final, con su motivo.
