@@ -324,7 +324,8 @@ class Solicitud(models.Model):
             return str(self.estado_registro)
         estados = []
         if self.pk is not None:
-            estados = [Estado(valor) for valor in self.servicios.values_list("estado", flat=True)]
+            # servicios.all(): aprovecha los servicios precargados (lista de solicitudes).
+            estados = [Estado(servicio.estado) for servicio in self.servicios.all()]
         return str(estado_solicitud(estados))
 
     @property

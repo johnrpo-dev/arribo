@@ -1,0 +1,11 @@
+<form method="get" action="{% url 'solicitudes' %}" class="formulario" role="search">
+  {% if filtro %}<input type="hidden" name="filtro" value="{{ filtro }}">{% endif %}
+  <div class="campo">
+    <label for="buscar-solicitud">Buscar solicitud</label>
+    <input type="search" id="buscar-solicitud" name="q" value="{{ texto|default:'' }}" aria-describedby="buscar-solicitud-ayuda">
+    <p class="ayuda" id="buscar-solicitud-ayuda">Teléfono o nombre del cliente, placa, VIN, número de solicitud o referencia externa.</p>
+  </div>
+  <div class="acciones">
+    <button type="submit" class="boton boton--secundario">Buscar</button>
+  </div>
+</form>

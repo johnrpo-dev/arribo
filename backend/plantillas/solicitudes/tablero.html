@@ -1,0 +1,146 @@
+{% extends "base.html" %}
+{% block titulo %}Tablero{% endblock %}
+{% block contenido %}
+<h1 class="titulo-pagina">Hola, {{ user.get_short_name|default:user.get_username }}</h1>
+
+<div class="acciones">
+  <a class="boton boton--principal" href="{% url 'nueva_solicitud' %}">Nueva solicitud</a>
+  <a class="boton boton--secundario" href="{% url 'solicitudes' %}">Ver todas las solicitudes</a>
+</div>
+
+{% include "solicitudes/parcial_buscar.html" with filtro="" texto="" %}
+
+<section class="bloque" aria-labelledby="t-por-asignar">
+  <h2 class="titulo-seccion" id="t-por-asignar">Por asignar{% if por_asignar %} ({{ por_asignar|length }}){% endif %}</h2>
+  {% if por_asignar %}
+  <p class="ayuda">Primero los inmediatos, del más antiguo al más reciente; luego los programados, por hora.</p>
+  <div class="tabla-contenedor">
+    <table class="tabla">
+      <thead>
+        <tr>
+          <th scope="col">Cuándo</th>
+          <th scope="col">Solicitud</th>
+          <th scope="col">Cliente</th>
+          <th scope="col">Vehículo</th>
+          <th scope="col">Trayecto</th>
+          <th scope="col"><span class="texto-secundario">Acción</span></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for servicio in por_asignar %}
+        {% with s=servicio.solicitud %}
+        <tr>
+          <td>{% if s.programada_para %}<time datetime="{{ s.programada_para|date:'c' }}">{{ s.programada_para|date:"d/m/Y H:i" }}</time>{% else %}<strong>Inmediato</strong>{% endif %}</td>
+          <td class="cifra">{{ s.pk }}</td>
+          <td>{{ s.solicitante.nombre }}</td>
+          <td>{{ servicio.vehiculo }}</td>
+          <td>{% if servicio.regreso_de_id %}Regreso{% else %}Ida{% endif %} · {{ s.get_tipo_display }}</td>
+          <td><a class="boton boton--principal" href="{% url 'detalle_solicitud' s.pk %}#t-asignar" aria-label="Asignar el servicio N.º {{ servicio.pk }} de la solicitud {{ s.pk }}">Asignar</a></td>
+        </tr>
+        {% endwith %}
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="vacio"><p>No hay servicios por asignar.</p></div>
+  {% endif %}
+</section>
+
+<section class="bloque" aria-labelledby="t-borradores">
+  <h2 class="titulo-seccion" id="t-borradores">Borradores{% if borradores %} ({{ borradores|length }}){% endif %}</h2>
+  {% if borradores %}
+  <p class="ayuda">Solicitudes guardadas a las que les falta algo para poder asignarlas.</p>
+  <div class="tabla-contenedor">
+    <table class="tabla">
+      <thead>
+        <tr>
+          <th scope="col">Solicitud</th>
+          <th scope="col">Registrada</th>
+          <th scope="col">Cliente</th>
+          <th scope="col">Qué falta</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for b in borradores %}
+        <tr>
+          <th scope="row" class="cifra"><a href="{% url 'detalle_solicitud' b.solicitud.pk %}" aria-label="Abrir el borrador {{ b.solicitud.pk }}">{{ b.solicitud.pk }}</a></th>
+          <td><time datetime="{{ b.solicitud.creada_en|date:'c' }}">{{ b.solicitud.creada_en|date:"d/m/Y H:i" }}</time></td>
+          <td>{{ b.solicitud.solicitante.nombre }}</td>
+          <td>{% if b.falta %}Falta {{ b.falta }}{% else %}<strong>Nada: lista para abrir</strong>{% endif %}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="vacio"><p>No hay borradores.</p></div>
+  {% endif %}
+</section>
+
+<section class="bloque" aria-labelledby="t-alertas">
+  <h2 class="titulo-seccion" id="t-alertas">Alertas sin resolver{% if alertas %} ({{ alertas|length }}){% endif %}</h2>
+  {% if alertas %}
+  <p class="ayuda">Avisos de la app de los conductores que alguien debe revisar.</p>
+  <div class="tabla-contenedor">
+    <table class="tabla">
+      <thead>
+        <tr>
+          <th scope="col">Desde</th>
+          <th scope="col">Tipo</th>
+          <th scope="col">Qué pasó</th>
+          <th scope="col">Solicitud</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for alerta, solicitud_id in alertas %}
+        <tr>
+          <td><time datetime="{{ alerta.creada_en|date:'c' }}">{{ alerta.creada_en|date:"d/m/Y H:i" }}</time></td>
+          <td>{{ alerta.get_tipo_display }}</td>
+          <td>{{ alerta.mensaje }}</td>
+          <td>{% if solicitud_id %}<a href="{% url 'detalle_solicitud' solicitud_id %}">{{ solicitud_id }}</a>{% else %}—{% endif %}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="vacio"><p>No hay alertas sin resolver.</p></div>
+  {% endif %}
+</section>
+
+<section class="bloque" aria-labelledby="t-en-curso">
+  <h2 class="titulo-seccion" id="t-en-curso">En curso por conductor</h2>
+  {% if en_curso %}
+  {% for ronda in en_curso %}
+  <h3 class="titulo-seccion">{{ ronda.conductor|default:"Sin conductor" }}{% if ronda.servicios.0.grua %} · grúa {{ ronda.servicios.0.grua.placa }}{% endif %}</h3>
+  <div class="tabla-contenedor">
+    <table class="tabla">
+      <thead>
+        <tr>
+          <th scope="col">Orden</th>
+          <th scope="col">Solicitud</th>
+          <th scope="col">Cliente</th>
+          <th scope="col">Vehículo</th>
+          <th scope="col">Estado</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for servicio in ronda.servicios %}
+        <tr>
+          <td class="cifra">{{ forloop.counter }}</td>
+          <td class="cifra"><a href="{% url 'detalle_solicitud' servicio.solicitud_id %}" aria-label="Abrir la solicitud {{ servicio.solicitud_id }}">{{ servicio.solicitud_id }}</a></td>
+          <td>{{ servicio.solicitud.solicitante.nombre }}</td>
+          <td>{{ servicio.vehiculo }}</td>
+          <td><span class="estado estado--{{ servicio.estado }}">{{ servicio.get_estado_display }}</span></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endfor %}
+  {% else %}
+  <div class="vacio"><p>Ningún conductor tiene servicios en curso.</p></div>
+  {% endif %}
+</section>
+{% endblock %}
