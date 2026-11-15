@@ -7,6 +7,24 @@ Formato: fecha, tarea, pregunta, qué se asumió mientras tanto (si se asumió a
 
 ## Abiertas
 
+- **2026-11-15, 1a-08b. ¿Qué grúas se ofrecen al darle o cambiarle la grúa a un conductor?**
+  Asumido: todas las grúas activas, también las fuera de servicio (marcadas así en la lista); las
+  inactivas no se ofrecen. Una grúa que ya tiene otro conductor no se puede elegir: la pantalla dice
+  quién la tiene y pide cambiársela primero. Si una grúa fuera de servicio no debe poder asignarse, se
+  quita de la lista y se agrega la prueba.
+- **2026-11-15, 1a-08b. ¿Se guarda historial de quién creó, desactivó o cambió de rol o de PIN a una
+  persona?** La regla "historial de cambios por registro" no tiene todavía un patrón en la flota (solo
+  la configuración y el cobro guardan historial). Asumido: no se creó un sistema nuevo; las
+  asignaciones conductor–grúa sí quedan como historial (se cierran, no se borran). Si hace falta, se
+  agrega un historial de personal como el de configuración (quién, cuándo, valor anterior).
+- **2026-11-15, 1a-08b. ¿Quién puede cambiar la cuenta con acceso total (la del dueño)?** Asumido:
+  desde la pantalla nadie le cambia el rol ni la desactiva, y solo su dueño le cambia la contraseña.
+  Así un usuario con el rol administrador no puede tomar esa cuenta restableciéndole la contraseña.
+  Esa cuenta se sigue administrando en `/admin/`.
+- **2026-11-15, 1a-08b. ¿Se puede corregir el nombre o el celular de un conductor desde el panel?**
+  La tarea no lo pidió y no se hizo: hoy se corrige en `/admin/`. Cambiar el celular cambia con qué
+  entra a la app (su usuario interno no cambia). Si se quiere, se agrega "Editar datos" con su prueba.
+
 - **2026-11-12, 1a-02. ¿Se puede asignar un conductor a una grúa inactiva o fuera de servicio, o un
   conductor inactivo a una grúa?** Asumido: el modelo no lo bloquea; solo se impiden los traslapes.
   Si la respuesta es "no", se agrega la validación en la asignación y una prueba (y la tarea 1a-08 no
