@@ -700,8 +700,8 @@ def test_dos_envios_simultaneos_del_mismo_aviso_lo_mandan_una_sola_vez(
     salidas = en_paralelo(lambda: notificaciones.enviar(aviso.pk),
                           lambda: notificaciones.enviar(aviso.pk))
 
-    assert sorted(salidas, key=str) == [ENVIADA, None] or sorted(salidas, key=str) == [None,
-                                                                                      ENVIADA]
+    # Uno lo envía; el otro encuentra la fila bloqueada y no hace nada.
+    assert (salidas.count(ENVIADA), salidas.count(None)) == (1, 1)
     assert len(envios) == 1
     assert NotificacionPush.objects.get().estado == ENVIADA
 
