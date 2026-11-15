@@ -68,6 +68,12 @@ Toda tarea termina con `uv run pytest -q` y `uv run ruff check .` en verde, más
   Verificar: registrar una solicitud, salir y encontrarla desde el inicio y con la búsqueda; asignarla
   y verla en curso en el inicio; registrar un documento vencido y ver al conductor bloqueado.
 
+- [x] **1a-08d Restablecer datos de prueba** (0,5 h). Depende de: 08c. Pedida por el dueño.
+  En Configuración, solo administrador: borra todo lo operativo (y los usuarios salvo quien restablece
+  y los superusuarios), conserva configuración y tipos de documento; pide escribir BORRAR. Apagado en
+  producción (`ARRIBO_PERMITIR_RESTABLECER`).
+  Verificar: restablecer y ver el inicio y Flota vacíos, con el administrador intacto.
+
 ## Conductor
 
 - [x] **1a-09 API: ingreso y asignaciones** (2 h). Depende de: 08.

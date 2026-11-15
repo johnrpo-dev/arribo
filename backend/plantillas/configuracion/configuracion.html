@@ -80,4 +80,14 @@
     <button type="submit" class="boton boton--principal">Guardar configuración</button>
   </div>
 </form>
+
+{% if puede_restablecer %}
+<section class="bloque" aria-labelledby="t-restablecer">
+  <h2 class="titulo-seccion" id="t-restablecer">Datos de prueba</h2>
+  <p class="ayuda">Borra solicitudes, clientes, conductores, grúas, documentos, cobros, alertas y usuarios para empezar de cero. Se conservan esta configuración, los tipos de documento y su usuario. Solo existe mientras se prueba: en el servidor de la empresa está apagado.</p>
+  <div class="acciones">
+    <a class="boton boton--peligro" href="{% url 'restablecer' %}">Restablecer datos de prueba…</a>
+  </div>
+</section>
+{% endif %}
 {% endblock %}

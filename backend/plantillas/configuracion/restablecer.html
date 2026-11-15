@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block titulo %}Restablecer datos de prueba{% endblock %}
+{% block contenido %}
+<h1 class="titulo-pagina">Restablecer datos de prueba</h1>
+
+<p class="aviso aviso--advertencia">Esto borra todo lo que se ha registrado y no se puede deshacer.</p>
+
+<section class="bloque" aria-labelledby="t-se-borra">
+  <h2 class="titulo-seccion" id="t-se-borra">Se borra</h2>
+  <ul>
+    {% for nombre, cantidad in resumen %}<li>{{ nombre }}: {{ cantidad }}</li>{% endfor %}
+    <li>Fotos de los servicios y archivos de documentos</li>
+  </ul>
+  <p class="ayuda">Se conservan la configuración, los tipos de documento, su usuario ({{ request.user.get_username }}) y los superusuarios. Los conductores tendrán que volver a ingresar en la app. Los números de solicitud vuelven a empezar en 1.</p>
+</section>
+
+<form method="post" class="formulario" novalidate>
+  {% csrf_token %}
+  <div class="campo{% if error %} campo--error{% endif %}">
+    <label for="confirmacion">Para confirmar, escriba {{ palabra }}</label>
+    <input type="text" id="confirmacion" name="confirmacion" autocomplete="off" required>
+    {% if error %}<p class="campo-error">{{ error }}</p>{% endif %}
+  </div>
+  <div class="acciones">
+    <button type="submit" class="boton boton--peligro">Borrar todo</button>
+    <a class="boton boton--secundario" href="{% url 'configuracion' %}">No, volver</a>
+  </div>
+</form>
+{% endblock %}

@@ -1186,6 +1186,30 @@ y redundante. Las reglas de negocio no cambiaron; esto es navegación y pantalla
      su página dice "No recibe servicios nuevos" y la lista lo muestra "Vencido". Renueve la licencia
      (fecha futura) para dejarlo como estaba.
 
+### 1a-08d Restablecer datos de prueba (15 de noviembre de 2026)
+
+Pedido del dueño: "un botón para restablecer de fábrica la app ya que los datos que pongo o creo son
+de prueba".
+
+- En **Configuración**, al final, "Restablecer datos de prueba…" (solo administrador). La pantalla
+  muestra cuánto se borra y pide escribir BORRAR. Borra solicitudes, servicios, eventos, fotos,
+  clientes, cobros, alertas, grúas, conductores, documentos registrados (y sus archivos), sesiones de
+  la app y notificaciones, y los usuarios salvo quien restablece y los superusuarios. Conserva la
+  configuración con su historial y los tipos de documento. Los números vuelven a empezar en 1.
+  Cierra las sesiones del panel de los demás.
+- Es la única excepción a "nada se borra": `configuracion/restablecer.py` usa TRUNCATE (los eventos y
+  los historiales no se dejan borrar por los modelos, a propósito). Quien cambió la configuración no
+  se puede borrar (su historial se conserva) y se desactiva.
+- Interruptor `ARRIBO_PERMITIR_RESTABLECER`: vacío = activo con `ARRIBO_DEBUG=1` y **apagado en
+  producción**; con él apagado no hay botón y la URL da 404. Documentado en `.env.example`.
+- Pruebas: `tests/configuracion/test_restablecer.py` (15). Recorrido en el navegador contra la base
+  aparte `arribo_recorrido`: Configuración → Restablecer → BORRAR → inicio vacío con el aviso; Flota
+  vacía y el usuario administrador intacto.
+- El admin de Django sigue en `/admin/` (solo superusuarios); el panel nunca lo enlazó.
+- Cómo probar (2 minutos): entrar con su superusuario, Configuración → "Restablecer datos de
+  prueba…", leer los conteos, escribir BORRAR y "Borrar todo": el inicio queda vacío. Luego crear de
+  nuevo grúa y conductor en Flota y personal; en el celular, volver a ingresar.
+
 ## Escalamientos
 
 Ninguno todavía.

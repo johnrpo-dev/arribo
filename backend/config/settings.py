@@ -99,6 +99,12 @@ REST_FRAMEWORK = {
 # repositorio (es una credencial). Vacía = el servidor funciona igual y no envía avisos push.
 ARRIBO_FIREBASE_CREDENCIALES = os.environ.get("ARRIBO_FIREBASE_CREDENCIALES", "").strip()
 
+# Botón "Restablecer datos de prueba" en Configuración. Por defecto activo en desarrollo y apagado
+# en producción (ARRIBO_DEBUG=0); se puede forzar con 1 o 0.
+ARRIBO_PERMITIR_RESTABLECER = (
+    os.environ.get("ARRIBO_PERMITIR_RESTABLECER", "").strip() or ("1" if DEBUG else "0")
+) == "1"
+
 LOGIN_URL = "ingresar"
 LOGIN_REDIRECT_URL = "inicio"
 LOGOUT_REDIRECT_URL = "ingresar"
