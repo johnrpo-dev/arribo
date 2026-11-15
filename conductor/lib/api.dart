@@ -341,6 +341,19 @@ class ClienteApi {
     throw _error(respuesta, conToken: true);
   }
 
+  /// `PUT /push/` (1a-14): registra el token de push de este celular en su sesión. 204 sin cuerpo.
+  Future<void> registrarPush(String token, String tokenPush) async {
+    final respuesta = await _enviar(
+      () => _http.put(
+        _ruta('push/'),
+        headers: _cabeceras(token: token, conCuerpo: true),
+        body: jsonEncode({'token': tokenPush}),
+      ),
+    );
+    if (respuesta.statusCode == 204) return;
+    throw _error(respuesta, conToken: true);
+  }
+
   /// `GET /asignaciones/`. Con [etag], el servidor responde 304 si nada cambió.
   Future<RespuestaAsignaciones> asignaciones(String token, {String? etag}) async {
     final respuesta = await _enviar(

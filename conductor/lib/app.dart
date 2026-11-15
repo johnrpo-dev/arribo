@@ -1,5 +1,7 @@
 // La app: tema, idioma y qué pantalla se ve según la sesión.
 
+import 'dart:async';
+
 import 'package:material_ui/material_ui.dart';
 
 import 'api.dart';
@@ -12,6 +14,7 @@ import 'comunes.dart';
 import 'fotos/camara.dart';
 import 'ingreso/pantalla_ingreso.dart';
 import 'ingreso/sesion.dart';
+import 'push.dart';
 import 'tema.dart';
 
 class ArriboApp extends StatefulWidget {
@@ -23,6 +26,7 @@ class ArriboApp extends StatefulWidget {
     this.camara,
     this.servidor = servidorConfigurado,
     this.reloj = DateTime.now,
+    this.avisosTocados,
   });
 
   final Sesion sesion;
@@ -34,6 +38,10 @@ class ArriboApp extends StatefulWidget {
   final String servidor;
   final DateTime Function() reloj;
 
+  /// Las notificaciones push que el conductor toca (1a-14): cada una lleva a la lista y la
+  /// refresca. null sin Firebase (y en las pruebas que no lo usan).
+  final Stream<MensajePush>? avisosTocados;
+
   @override
   State<ArriboApp> createState() => _ArriboAppState();
 }
@@ -42,17 +50,29 @@ class _ArriboAppState extends State<ArriboApp> {
   final _navegador = GlobalKey<NavigatorState>();
   late EstadoSesion _estadoAnterior = widget.sesion.estado;
   late final Camara _camara = widget.camara ?? CamaraDelSistema();
+  StreamSubscription<MensajePush>? _avisos;
 
   @override
   void initState() {
     super.initState();
     widget.sesion.addListener(_alCambiarLaSesion);
+    _avisos = widget.avisosTocados?.listen(_alTocarUnAviso);
   }
 
   @override
   void dispose() {
     widget.sesion.removeListener(_alCambiarLaSesion);
+    unawaited(_avisos?.cancel());
     super.dispose();
+  }
+
+  /// El conductor tocó una notificación: se cierran las pantallas abiertas encima de la lista y
+  /// se pide la lista al servidor. El servicio del aviso aparece en ella (o desaparece, si era
+  /// "retirado"). Sin sesión no hace nada: queda el ingreso.
+  void _alTocarUnAviso(MensajePush aviso) {
+    if (widget.sesion.estado != EstadoSesion.activa) return;
+    _navegador.currentState?.popUntil((ruta) => ruta.isFirst);
+    unawaited(widget.lista.actualizar());
   }
 
   /// Al cerrarse la sesión (también por un 401) se cierran las pantallas abiertas encima de la

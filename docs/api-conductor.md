@@ -1,11 +1,12 @@
-# API de la app del conductor (contrato versión 1, revisión 1.1)
+# API de la app del conductor (contrato versión 1, revisión 1.2)
 
 Contrato entre el servidor (`backend/api/`) y la app Flutter (`conductor/`). Lo usan la sincronización
 (1a-10), las pantallas de la app (1a-11 a 1a-13) y el push (1a-14). Si el código y este documento no
 coinciden, es un error: se corrige uno de los dos en la misma tarea.
 
 Implementado en la 1a-09: ingreso, cierre de sesión, lista y detalle de asignaciones.
-Implementado en la 1a-10: envío de eventos y subida de fotos. Pendiente: el push (1a-14).
+Implementado en la 1a-10: envío de eventos y subida de fotos.
+Implementado en la 1a-14: registro del token de push, avisos push y "visto por el conductor".
 
 Revisiones (cambios compatibles: no cambian `"version": 1` ni la ruta `/api/v1/`):
 
@@ -13,6 +14,7 @@ Revisiones (cambios compatibles: no cambian `"version": 1` ni la ruta `/api/v1/`
 |---|---|---|
 | 1.0 | 1a-09, 1a-10 | Ingreso, asignaciones, eventos y fotos |
 | 1.1 | 1a-13b | El evento `recogido` acepta `placa` y `vin` digitados por el conductor (ver "Placa o VIN digitados al recoger") |
+| 1.2 | 1a-14 | `PUT /api/v1/push/` registra el token de push del celular; `POST /salir/` lo borra; la lista y el detalle dejan los servicios "vistos por el conductor" (ver "Avisos push") |
 
 ## Reglas generales
 
@@ -152,6 +154,11 @@ Errores: 400 `datos_invalidos`, 401 `credenciales_invalidas` o `conductor_no_hab
 celular queda revocado (los de otros celulares del mismo conductor siguen). Repetirlo da 401
 `sesion_invalida`; la app puede tomarlo como sesión ya cerrada.
 
+Desde la revisión 1.2, cerrar sesión también borra el token de push de ese celular en el servidor:
+deja de recibir avisos. Lo mismo pasa cuando el administrador revoca el token o el conductor vuelve a
+ingresar en el mismo celular. La app, además, borra su token de Firebase al cerrar sesión (ver
+"Avisos push").
+
 ## Asignaciones
 
 `GET /api/v1/asignaciones/` — con `Authorization`.
@@ -248,6 +255,20 @@ If-None-Match: "3f2a9c0e5b7d41a8c6e2f0b9d4a7c1e3"
 
 404 `no_encontrado` si el servicio no existe, es de otro conductor o ya no está en su ronda (terminado,
 devuelto a la cola o reasignado). El 404 es idéntico en los tres casos.
+
+### Visto por el conductor
+
+Desde la revisión 1.2. Un servicio queda "visto por el conductor" la primera vez que su app lo baja:
+una respuesta de la lista o del detalle que lo incluye, **también si es 304** (la app ya lo tenía). La
+app no manda nada aparte. El servidor guarda la hora de esa primera vez (no la cambia en las
+siguientes) y logística la ve en el detalle de la solicitud ("visto" con la hora, o "sin ver"). Al
+reasignar el servicio o devolverlo a la cola vuelve a "sin ver". La hora no viaja en la respuesta, ni
+cambia el `ETag`.
+
+Se eligió así, y no con un acuse que mande la app, porque no se puede perder (no necesita cola en el
+celular) y no añade nada al contrato. Lo que significa: la app del conductor tiene el servicio en su
+lista, no que el conductor haya mirado la pantalla. La app refresca la lista al abrirse, al volver a
+primer plano, al llegar un aviso y después de sincronizar eventos.
 
 ## Enviar eventos
 
@@ -496,6 +517,62 @@ Errores:
 
 Un `<uuid>` mal formado en la ruta responde el 404 de Django (en HTML), como cualquier ruta que no existe.
 
-## Reservado para la 1a-14
+## Avisos push
 
-Registro del token de Firebase del celular para el push (por ejemplo `POST /api/v1/push/`). Lo define esa tarea.
+Desde la revisión 1.2 (1a-14). Al asignar o reasignar un servicio, el servidor manda un aviso por
+Firebase Cloud Messaging (FCM) a cada celular con sesión abierta y token de push del conductor; al
+reasignar, también al conductor anterior. Un aviso que no sale no deshace la asignación: el servidor lo
+reintenta unas veces, hasta por menos de una hora, y la app de todas formas ve el servicio al refrescar
+la lista.
+
+### Registrar el token de push
+
+`PUT /api/v1/push/` — con `Authorization`.
+
+```json
+{"token": "dGhpcyBpcyBhbiBGQ00gdG9rZW4..."}
+```
+
+Respuesta **204** sin cuerpo. El token queda ligado a la sesión de este celular (su token de la API):
+
+| Campo | Obligatorio | Formato |
+|---|---|---|
+| `token` | sí | El token que Firebase le dio a la app en este celular. Texto de 1 a 1000 caracteres, sin espacios |
+
+- La app lo registra después de ingresar, al abrir con sesión guardada y cada vez que Firebase lo
+  cambia (`onTokenRefresh`). Registrar el mismo token otra vez no hace daño.
+- Si ese token estaba en otra sesión (un celular prestado en el que el otro conductor no cerró sesión
+  con señal), se quita de allá: cada aviso le llega solo a quien tiene la sesión en el celular.
+- Si FCM responde que el token ya no existe (app desinstalada o datos borrados), el servidor lo
+  desactiva. La sesión sigue; la app vuelve a registrar el que tenga la próxima vez.
+- No hay `DELETE`: el token se borra al cerrar sesión (`POST /salir/`).
+
+Errores: 400 `datos_invalidos` (`campos.token`) o `json_invalido`, 401 (los de siempre), 405
+`metodo_no_permitido`, 415 `tipo_no_soportado`.
+
+### Qué lleva un aviso
+
+Solo el número del servicio y un texto fijo; ningún valor de cobro, cliente, dirección, placa ni dato
+personal. Es un mensaje con notificación (Android lo muestra aunque la app esté cerrada) y datos:
+
+```json
+{
+  "notification": {"title": "Nuevo servicio asignado",
+                   "body": "Servicio N.º 41. Abra Arribo para ver el detalle."},
+  "data": {"tipo": "asignado", "servicio_id": "41"},
+  "android": {"priority": "HIGH"}
+}
+```
+
+| `data.tipo` | Cuándo | Título |
+|---|---|---|
+| `asignado` | Le asignaron o le reasignaron el servicio | "Nuevo servicio asignado" |
+| `retirado` | Se lo reasignaron a otro conductor | "Servicio reasignado" |
+
+`servicio_id` viaja como texto (FCM solo admite textos en `data`). Qué hace la app:
+
+- **Con la app abierta**: Android no muestra la notificación; la app refresca la lista.
+- **Al tocar la notificación** (app en segundo plano o cerrada): la app abre la lista y la refresca.
+  Si el servicio ya no está (por ejemplo, el aviso era `retirado`), simplemente no aparece.
+- Un aviso puede llegar tarde, repetido o nunca (sin señal, ahorro de batería). La lista del servidor
+  es siempre la verdad: el aviso solo hace que la app la pida antes.

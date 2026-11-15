@@ -238,6 +238,33 @@ Formato: fecha, tarea, pregunta, qué se asumió mientras tanto (si se asumió a
   sin placa muestra solo la placa. Se escriben en mayúsculas, sin autocorrección; la app los
   normaliza al marcar y dice qué está mal (VIN de 17 sin I, O ni Q; placa de 1 a 10). Decisión de
   pantalla que el dueño puede cambiar.
+- **2026-11-15, 1a-14. ¿Quién recibe aviso push y cuándo?** Asumido: al asignar, el conductor
+  asignado ("Nuevo servicio asignado"); al reasignar, el nuevo y también el anterior ("Servicio
+  reasignado: ya no está a su cargo"), para que no salga a buscar un vehículo que ya no le toca. Al
+  cancelar un servicio o devolverlo a la cola (resolver una novedad con "reasignar") no hay aviso:
+  el conductor lo ve desaparecer cuando la app refresca la lista. Si se quiere aviso también en esos
+  casos, `solicitudes` envía la misma señal desde la cancelación y desde `resolver_novedad`, con un
+  tipo de aviso nuevo y su prueba.
+- **2026-11-15, 1a-14. ¿Cómo debe sonar y verse la notificación?** Asumido: el canal por defecto
+  de Firebase, que suena y aparece en la barra con el sonido del celular, pero no se despliega encima
+  de la pantalla. No hay canal propio ni sonido distinto. Si debe ser emergente o tener un sonido
+  propio (por ejemplo, para oírlo en la cabina), la app crea su propio canal de importancia alta.
+  Es una decisión de pantalla.
+- **2026-11-15, 1a-14. ¿Qué ícono lleva la notificación en la barra de estado?** Asumido: ninguno
+  propio. Android pide un ícono de una sola tinta; sin él usa el de la app, que puede verse como un
+  cuadro gris. Hace falta el dibujo (silueta blanca sobre transparente) para ponerlo en
+  `AndroidManifest.xml`. Es una decisión de diseño.
+- **2026-11-15, 1a-14. ¿Qué se le muestra al conductor que niega el permiso de notificaciones?**
+  Desde Android 13 la app lo pide al iniciar sesión. Si lo niega, los avisos no se ven, aunque con
+  la app abierta la lista se refresca igual. Asumido: la app no muestra nada ni lo vuelve a pedir
+  (Android deja pedirlo solo dos veces). Si se quiere, la lista puede mostrar un aviso con un botón
+  a los Ajustes del celular. Es una decisión de pantalla.
+- **2026-11-15, 1a-14. ¿"Visto por el conductor" basta con que la app haya bajado el servicio?**
+  Asumido: sí. Queda visto la primera vez que la lista o el detalle lo traen al celular, también con
+  304. La app refresca sola al abrirse, al volver a primer plano, al llegar un aviso y después de
+  enviar eventos, así que puede quedar "visto" sin que el conductor haya mirado la pantalla. Si se
+  necesita "lo abrió", la app tendría que mandar un acuse al abrir el detalle, con otra ruta en el
+  contrato y su cola sin señal.
 
 ## Resueltas
 

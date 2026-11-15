@@ -292,6 +292,63 @@ void main() {
     });
   });
 
+  group('registrar push', () {
+    test('manda el token de push en JSON con PUT y el token de la sesión; acepta el 204', () async {
+      final servidor = ServidorFalso((_) async => http.Response('', 204));
+
+      await servidor.api().registrarPush('token-ana', 'fcm:APA91b-1');
+
+      final peticion = servidor.peticiones.single;
+      expect(peticion.metodo, 'PUT');
+      expect(peticion.url.toString(), 'http://servidor.prueba/api/v1/push/');
+      expect(peticion.cabeceras['Authorization'], 'Bearer token-ana');
+      expect(peticion.cabeceras['Content-Type'], startsWith('application/json'));
+      expect(peticion.json, {'token': 'fcm:APA91b-1'});
+    });
+
+    test('un 401 es sesión cerrada', () async {
+      final servidor = ServidorFalso(
+        (_) async => errorDelContrato(401, 'sesion_invalida', 'Su sesión ya no es válida.'),
+      );
+
+      await expectLater(
+        servidor.api().registrarPush('token-ana', 'fcm-1'),
+        throwsA(isA<SesionCerrada>()),
+      );
+    });
+
+    test('un token rechazado es error del contrato con el campo', () async {
+      final servidor = ServidorFalso(
+        (_) async => errorDelContrato(
+          400,
+          'datos_invalidos',
+          'Revise los datos enviados.',
+          extra: {
+            'campos': {
+              'token': ['El token de push no lleva espacios.'],
+            },
+          },
+        ),
+      );
+
+      await expectLater(
+        servidor.api().registrarPush('token-ana', 'con espacio'),
+        throwsA(
+          isA<ErrorDeContrato>().having((e) => e.campos.keys, 'campos', ['token']),
+        ),
+      );
+    });
+
+    test('sin señal es error de red', () async {
+      final servidor = ServidorFalso((_) async => sinSenal());
+
+      await expectLater(
+        servidor.api().registrarPush('token-ana', 'fcm-1'),
+        throwsA(isA<ErrorDeRed>()),
+      );
+    });
+  });
+
   test('la dirección del servidor admite barra final', () {
     expect(
       ClienteApi(servidor: 'https://arribo.ejemplo.co/', cliente: http.Client()).servidor,

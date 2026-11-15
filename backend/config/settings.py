@@ -86,6 +86,10 @@ REST_FRAMEWORK = {
     "EXCEPTION_HANDLER": "api.errores.manejar_excepcion",
 }
 
+# Push al conductor (1a-14): ruta completa al JSON de la cuenta de servicio de Firebase, fuera del
+# repositorio (es una credencial). Vacía = el servidor funciona igual y no envía avisos push.
+ARRIBO_FIREBASE_CREDENCIALES = os.environ.get("ARRIBO_FIREBASE_CREDENCIALES", "").strip()
+
 LOGIN_URL = "ingresar"
 LOGIN_REDIRECT_URL = "inicio"
 LOGOUT_REDIRECT_URL = "ingresar"

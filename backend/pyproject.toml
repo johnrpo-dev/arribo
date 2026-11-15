@@ -9,6 +9,8 @@ dependencies = [
     "psycopg[binary]>=3.3,<3.4",
     "dj-database-url>=2",
     "python-dotenv>=1",
+    "google-auth>=2.62.2",           # token de la cuenta de servicio para la API HTTP v1 de FCM
+    "requests>=2.34.2",              # cliente HTTP del push (y transporte de google-auth)
 ]
 
 [dependency-groups]

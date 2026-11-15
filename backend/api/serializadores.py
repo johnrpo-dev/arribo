@@ -15,6 +15,8 @@ from nucleo.identificacion import TelefonoInvalido, normalizar_telefono
 from nucleo.ingreso import PinInvalido, validar_pin
 from nucleo.trayecto import hora_programada, puntos_del_servicio
 
+from .models import LARGO_MAXIMO_TOKEN_PUSH
+
 
 def fecha_utc(valor):
     """ISO 8601 en UTC con Z, como "2026-11-13T19:30:00Z"; None queda None."""
@@ -50,6 +52,17 @@ class IngresoSerializer(serializers.Serializer):
             validar_pin(valor)
         except PinInvalido as error:
             raise serializers.ValidationError(str(error)) from error
+        return valor
+
+
+class TokenPushSerializer(serializers.Serializer):
+    """PUT /push/: el token que Firebase le dio a la app en este celular."""
+
+    token = serializers.CharField(max_length=LARGO_MAXIMO_TOKEN_PUSH)
+
+    def validate_token(self, valor):
+        if any(caracter.isspace() for caracter in valor):
+            raise serializers.ValidationError("El token de push no lleva espacios.")
         return valor
 
 

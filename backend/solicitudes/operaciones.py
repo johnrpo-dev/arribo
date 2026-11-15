@@ -18,6 +18,8 @@ los datos, se llama al núcleo y se guarda lo que decide.
 
 Cuando un servicio queda Entregado (desde el panel o la app) se envía `senales.servicio_entregado`
 en la misma transacción; `cobros` la escucha para crear la línea de cobro sin que esta app lo importe.
+Al asignar o reasignar se envía `senales.servicio_asignado`, también en la transacción; `api` la
+escucha para encolar los avisos push a los conductores (1a-14).
 """
 import logging
 import uuid
@@ -26,6 +28,7 @@ from dataclasses import dataclass
 
 from django.db import IntegrityError, transaction
 from django.db.models import F
+from django.utils import timezone
 
 from configuracion.models import configuracion_vigente
 from flota.models import Conductor, Grua, grua_vigente
@@ -74,6 +77,7 @@ from .models import (
 from .senales import (
     evento_del_conductor_guardado,
     evento_del_conductor_rechazado,
+    servicio_asignado,
     servicio_entregado,
 )
 
@@ -121,20 +125,24 @@ def asignar(servicio, conductor, *, actor, motivo=None) -> EventoEstado:
             _exigir_identificacion(bloqueado)
         _pasar_al_conductor(bloqueado, conductor)
         evento = _guardar_desde_el_panel(bloqueado, nuevo, actor=actor, motivo=motivo)
+        servicio_asignado.send(sender=Servicio, servicio=bloqueado, conductor_anterior=None)
     _refrescar(servicio)
     return evento
 
 
 def reasignar(servicio, conductor, *, actor, motivo=None) -> EventoEstado:
     """Pasar el servicio a otro conductor antes de recoger el vehículo (queda Asignado, con la
-    grúa vigente del nuevo conductor y al final de su ronda)."""
+    grúa vigente del nuevo conductor y al final de su ronda). Los dos conductores reciben aviso
+    push: el nuevo, de que lo tiene; el anterior, de que ya no es suyo."""
     with transaction.atomic():
         bloqueado = _bloquear(servicio)
         nuevo = reasignar_en_nucleo(bloqueado.como_nucleo())
         if bloqueado.conductor_id == _pk(conductor):
             raise MismoConductor("El servicio ya es de ese conductor: elija otro para reasignar.")
+        anterior = bloqueado.conductor
         _pasar_al_conductor(bloqueado, conductor)
         evento = _guardar_desde_el_panel(bloqueado, nuevo, actor=actor, motivo=motivo)
+        servicio_asignado.send(sender=Servicio, servicio=bloqueado, conductor_anterior=anterior)
     _refrescar(servicio)
     return evento
 
@@ -165,6 +173,25 @@ def ronda_de(conductor) -> list[Servicio]:
 def consulta_ronda(conductor):
     """Como `ronda_de`, pero sin evaluar: quien la usa agrega sus `select_related` (la API)."""
     return _ronda(_pk(conductor))
+
+
+def marcar_vistos(conductor, servicio_ids: Iterable[int]) -> int:
+    """La app del conductor descargó estos servicios (su lista o un detalle): los que siguen en su
+    ronda y no estaban vistos quedan vistos ahora. Devuelve cuántos se marcaron.
+
+    No es un cambio de estado (no deja evento) y no bloquea filas: es un solo UPDATE que vuelve a
+    exigir el conductor. Si el servicio se reasignó mientras tanto, PostgreSQL revisa la condición
+    sobre la fila ya reasignada y no lo marca a nombre del conductor que lo perdió.
+    """
+    ids = list(servicio_ids)
+    if not ids:
+        return 0
+    return Servicio.objects.filter(
+        pk__in=ids,
+        conductor_id=_pk(conductor),
+        estado__in=VALORES_EN_RONDA,
+        visto_por_conductor_en__isnull=True,
+    ).update(visto_por_conductor_en=timezone.now())
 
 
 def cambiar_estado(servicio, destino, *, actor, motivo=None, nombre_quien=None) -> EventoEstado:
@@ -687,6 +714,7 @@ def _pasar_al_conductor(servicio: Servicio, conductor):
         raise ConductorBloqueado(f"{conductor} no puede recibir servicios: {' '.join(motivos)}")
     servicio.conductor = conductor
     servicio.grua = grua
+    servicio.visto_por_conductor_en = None  # el nuevo conductor todavía no lo ha visto
     servicio.orden_ronda = siguiente_orden(
         _ronda(conductor.pk).exclude(pk=servicio.pk).values_list("orden_ronda", flat=True)
     )
@@ -737,6 +765,7 @@ def _cambiar(servicio: Servicio, nuevo: ServicioNucleo, *, actor=None):
         servicio.conductor = None
         servicio.grua = None
         servicio.orden_ronda = None  # vuelve a la cola: deja la ronda
+        servicio.visto_por_conductor_en = None
     servicio._guardar_cambio_operativo()
     if queda_entregado:
         servicio_entregado.send(sender=Servicio, servicio=servicio, actor=actor)

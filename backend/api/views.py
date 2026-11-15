@@ -1,6 +1,6 @@
 """Vistas de la API del conductor (`/api/v1/`). Delgadas: validan la entrada, llaman a
-`api/ingreso.py`, `api/asignaciones.py`, `api/sincronizacion.py` o `solicitudes/evidencias.py` y
-responden con la forma de `docs/api-conductor.md`.
+`api/ingreso.py`, `api/asignaciones.py`, `api/sincronizacion.py`, `api/notificaciones.py` o
+`solicitudes/` y responden con la forma de `docs/api-conductor.md`.
 """
 import hashlib
 
@@ -13,14 +13,16 @@ from rest_framework.views import APIView
 
 from configuracion.models import configuracion_vigente
 from solicitudes import evidencias
+from solicitudes.operaciones import marcar_vistos
 
-from . import errores, ingreso, sincronizacion
+from . import errores, ingreso, notificaciones, sincronizacion
 from .asignaciones import asignaciones_de
 from .contrato import VERSION
 from .evidencias import FotoEnMultipart, FotoSerializer
 from .serializadores import (
     IngresoSerializer,
     ServicioDelConductorSerializer,
+    TokenPushSerializer,
     conductor_para_la_app,
     configuracion_para_la_app,
 )
@@ -56,11 +58,26 @@ class Salir(APIView):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
+class Push(APIView):
+    """PUT: registra (o cambia) el token de push de este celular. 204 sin cuerpo. El token se borra
+    solo al cerrar sesión (POST /salir/) o cuando Firebase dice que ya no existe."""
+
+    def put(self, request):
+        entrada = TokenPushSerializer(data=request.data)
+        entrada.is_valid(raise_exception=True)
+        notificaciones.registrar_token_push(request.auth, entrada.validated_data["token"])
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
 class Asignaciones(APIView):
-    """GET: los servicios no terminales del conductor, en orden de ronda, con ETag."""
+    """GET: los servicios no terminales del conductor, en orden de ronda, con ETag. Los que la app
+    baja por primera vez quedan "vistos por el conductor" (también si la respuesta es 304)."""
 
     def get(self, request):
-        servicios = asignaciones_de(request.auth.conductor)
+        conductor = request.auth.conductor
+        servicios = list(asignaciones_de(conductor))
+        # Una sola consulta más, y solo si hay alguno sin ver.
+        marcar_vistos(conductor, [s.pk for s in servicios if s.visto_por_conductor_en is None])
         return _responder_con_etag(request, {
             "version": VERSION,
             "configuracion": configuracion_para_la_app(configuracion_vigente()),
@@ -72,9 +89,12 @@ class Asignacion(APIView):
     """GET: uno de sus servicios no terminales; 404 si no existe, es de otro o ya terminó."""
 
     def get(self, request, servicio_id):
-        servicio = asignaciones_de(request.auth.conductor).filter(pk=servicio_id).first()
+        conductor = request.auth.conductor
+        servicio = asignaciones_de(conductor).filter(pk=servicio_id).first()
         if servicio is None:
             raise errores.ServicioNoEncontrado()
+        if servicio.visto_por_conductor_en is None:
+            marcar_vistos(conductor, [servicio.pk])
         return _responder_con_etag(request, {
             "version": VERSION,
             "configuracion": configuracion_para_la_app(configuracion_vigente()),

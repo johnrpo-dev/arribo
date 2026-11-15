@@ -42,6 +42,7 @@
           <th scope="col">Trayecto</th>
           <th scope="col">Referencia</th>
           <th scope="col">Conductor</th>
+          <th scope="col">Visto por el conductor</th>
           <th scope="col">Estado</th>
         </tr>
       </thead>
@@ -53,6 +54,7 @@
           <td>{% if servicio.regreso_de_id %}Regreso del N.º {{ servicio.regreso_de_id }} (destino a origen){% else %}Ida{% endif %}</td>
           <td>{{ servicio.referencia_externa|default:"—" }}</td>
           <td>{% if servicio.conductor %}{{ servicio.conductor }}{% if servicio.grua %} ({{ servicio.grua.placa }}){% endif %}{% else %}<span class="texto-secundario">Sin asignar</span>{% endif %}</td>
+          <td>{% if not servicio.conductor_id %}—{% elif servicio.visto_por_conductor_en %}<time datetime="{{ servicio.visto_por_conductor_en|date:'c' }}">{{ servicio.visto_por_conductor_en|date:"d/m/Y H:i" }}</time>{% else %}<span class="texto-secundario">Sin ver</span>{% endif %}</td>
           <td><span class="estado estado--{{ servicio.estado }}">{{ servicio.get_estado_display }}</span></td>
         </tr>
         {% endfor %}

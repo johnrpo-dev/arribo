@@ -451,5 +451,6 @@ def test_la_lista_hace_las_mismas_pocas_consultas_con_2_o_con_8_servicios(
     with django_assert_max_num_queries(len(con_pocos)):
         assert len(sesion.get(URL).json()["servicios"]) == 8
 
-    # Token (con su grupo), último uso, configuración y servicios.
-    assert len(con_pocos) <= 4
+    # Token (con su grupo), último uso, configuración, servicios y, como eran nuevos para la app,
+    # un solo UPDATE que los deja vistos por el conductor (1a-14).
+    assert len(con_pocos) <= 5
