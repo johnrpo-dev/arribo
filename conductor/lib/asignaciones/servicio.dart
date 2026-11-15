@@ -160,6 +160,28 @@ class Servicio {
     required String estado,
     required String? estadoPrevio,
     required bool aBordo,
+  }) => _copia(estado: estado, estadoPrevio: estadoPrevio, aBordo: aBordo, vehiculo: vehiculo);
+
+  /// El mismo servicio con la placa y el VIN dados donde al vehículo le faltan (los que el
+  /// conductor digitó en un Recogido sin enviar). Nunca cambia uno que ya tenga.
+  Servicio conIdentificacion({required String placa, required String vin}) => _copia(
+    estado: estado,
+    estadoPrevio: estadoPrevio,
+    aBordo: aBordo,
+    vehiculo: Vehiculo(
+      placa: vehiculo.placa ?? (placa.isEmpty ? null : placa),
+      vin: vehiculo.vin ?? (vin.isEmpty ? null : vin),
+      marca: vehiculo.marca,
+      linea: vehiculo.linea,
+      color: vehiculo.color,
+    ),
+  );
+
+  Servicio _copia({
+    required String estado,
+    required String? estadoPrevio,
+    required bool aBordo,
+    required Vehiculo vehiculo,
   }) => Servicio(
     id: id,
     solicitudId: solicitudId,

@@ -39,7 +39,8 @@ Formato: fecha, tarea, pregunta, qué se asumió mientras tanto (si se asumió a
   dato del vehículo (placa, VIN, marca, línea o color); la placa o el VIN no se exigen al registrar,
   sino al recoger (y en 1a-07 según la configuración). Así, un desvare sin placa puede quedar
   abierto y se bloquea al marcar Recogido. Si el desvare debe exigir placa ya al registrar, se agrega
-  a `faltantes_para_abrir` con su prueba.
+  a `faltantes_para_abrir` con su prueba. (Desde la 1a-13b, con "placa/VIN al recoger", el
+  conductor la digita al recoger en vez de quedar bloqueado.)
 - **2026-11-12, 1a-06. ¿Un contacto nuevo queda ligado al cliente solicitante?** Asumido: no; el
   contacto se guarda sin cliente y se reutiliza si ya existe uno con el mismo nombre y teléfono.
   Si debe quedar ligado (por ejemplo, para sugerir los contactos del cliente), se asigna al crear.
@@ -188,13 +189,6 @@ Formato: fecha, tarea, pregunta, qué se asumió mientras tanto (si se asumió a
   nombre. Es un límite técnico del servidor, no una opción del cliente. Se pueden ver desde el
   historial (solo administrador). Si hace falta otro formato o más tamaño, cambia
   `TIPOS_DE_ARCHIVO` o `TAMANO_MAXIMO_ARCHIVO` en `nucleo/documentos.py`.
-- **2026-11-14, 1a-13. ¿El conductor digita la placa o el VIN cuando el vehículo llegó sin
-  ellos?** El contrato no tiene dónde enviarlos (el evento no lleva esos campos) y el servidor
-  deja en conflicto un Recogido sin identificación. Asumido: la app bloquea "Marcar Recogido",
-  dice qué falta y que llame a logística para que lo registren; después actualiza la lista y ya
-  deja. Sin señal, ese vehículo no se puede marcar Recogido. Si debe digitarlo él, se agregan
-  `placa` y `vin` al evento de Recogido en el contrato y el servidor los valida con
-  `nucleo/identificacion.py`; la app ya tiene la misma regla copiada (`identificacion.dart`).
 - **2026-11-14, 1a-13. ¿El servidor debe exigir también el mínimo de fotos y el nombre de quien
   entrega o recibe?** Hoy solo los exige la app: el servidor guarda el Recogido o el Entregado con
   lo que llegue (las fotos llegan después, por su propia cola). Asumido: nada más. Si se quiere
@@ -218,7 +212,42 @@ Formato: fecha, tarea, pregunta, qué se asumió mientras tanto (si se asumió a
   contacto registrado). Si se quiere ahorrar el tecleo, la pantalla puede proponer el nombre del
   contacto de origen o de destino y dejarlo corregir.
 
+- **2026-11-14, 1a-13b. ¿Qué pasa con "placa/VIN al asignar" y un vehículo que llega al Recogido
+  sin identificar?** (no debería pasar: no se pudo asignar sin ella, pero puede pasar si alguien la
+  borró después o si la configuración cambió con servicios ya asignados). Asumido: la app no la
+  pide; bloquea el Recogido y dice que llame a logística, como antes de la 1a-13b. Una
+  configuración que esta versión de la app no conozca se trata como "al recoger" (pide digitarla).
+  El servidor acepta lo digitado con cualquier configuración. Si con "al asignar" también debe
+  poder digitarla, se cambia `seDigitaAlRecoger` en `conductor/lib/asignaciones/requisitos.dart`.
+- **2026-11-14, 1a-13b. ¿Qué es una placa válida?** Asumido: de 1 a 10 letras o dígitos después de
+  normalizar (lo que cabe en el vehículo), sin revisar el formato colombiano (AAA123, AAA12A):
+  hay placas de otros países, diplomáticas y de remolques. La app no deja marcar con una más
+  larga; si llega al servidor, el Recogido se aplica, no se guarda y abre la alerta. Si debe
+  exigirse el formato colombiano, se cambia `validar_placa` en `nucleo/identificacion.py`, su
+  copia en la app y los casos de `docs/casos-reglas.json`.
+- **2026-11-14, 1a-13b. ¿Qué hace logística con "Placa o VIN digitado por revisar"?** La alerta
+  sale cuando lo digitado no quedó en el vehículo: el vehículo ya tenía otro dato (no se
+  sobreescribe), el dato es de otro vehículo (placa y VIN son únicos) o no tiene el formato. El
+  Recogido se aplica igual y lo digitado queda en el evento. Asumido: logística revisa y corrige la
+  placa o el VIN del vehículo en `/admin/` (Solicitudes → Vehículos) y cierra la alerta; el panel
+  todavía no tiene pantalla de alertas. Si dos solicitudes resultan ser el mismo vehículo, unirlas
+  queda para después.
+- **2026-11-14, 1a-13b. ¿Dónde y cómo se piden la placa y el VIN en la pantalla del Recogido?**
+  Asumido: arriba, bajo el vehículo, en "Identificación del vehículo", con un texto que dice qué
+  falta. Un traslado o un evento sin placa ni VIN muestra los dos campos (basta uno); un desvare
+  sin placa muestra solo la placa. Se escriben en mayúsculas, sin autocorrección; la app los
+  normaliza al marcar y dice qué está mal (VIN de 17 sin I, O ni Q; placa de 1 a 10). Decisión de
+  pantalla que el dueño puede cambiar.
+
 ## Resueltas
+
+- **2026-11-14, 1a-13 → resuelta en 1a-13b. ¿El conductor digita la placa o el VIN cuando el
+  vehículo llegó sin ellos?** Decisión: sí, con "placa/VIN al recoger" (la configuración de
+  fábrica). En 1a-13 la app bloqueaba el Recogido y pedía llamar a logística, y sin señal el
+  vehículo no se podía recoger. Ahora el evento Recogido lleva `placa` y `vin` opcionales
+  (contrato 1.1): el servidor guarda en el vehículo lo que le falte, nunca sobreescribe uno
+  distinto, nunca rechaza el Recogido por lo digitado y abre la alerta "Placa o VIN digitado por
+  revisar" cuando algo no encaja. Decisión del orquestador.
 
 - **2026-11-12, 1a-04 → resuelta en 1a-04. ¿El conductor puede cancelar un servicio desde la app?**
   Decisión: no. La app solo tiene los botones En camino, Recogido, Entregado y Novedad, y el servidor

@@ -153,6 +153,17 @@ const List<List<String>> migraciones = [
     'ALTER TABLE fotos_pendientes ADD COLUMN visto_en TEXT',
     'CREATE INDEX fotos_pendientes_evento ON fotos_pendientes (evento_id)',
   ],
+  // Versión 4 (1a-13b): la placa o el VIN que el conductor digita al recoger un vehículo que
+  // llegó sin ellos.
+  [
+    // Como van escritos en la pantalla del Recogido: si Android mata la app, al volver siguen ahí.
+    "ALTER TABLE pasos_en_curso ADD COLUMN placa_digitada TEXT NOT NULL DEFAULT ''",
+    "ALTER TABLE pasos_en_curso ADD COLUMN vin_digitado TEXT NOT NULL DEFAULT ''",
+    // Normalizados, en el evento Recogido que los lleva al servidor (contrato 1.1). null si no
+    // digitó nada.
+    'ALTER TABLE eventos_pendientes ADD COLUMN placa TEXT',
+    'ALTER TABLE eventos_pendientes ADD COLUMN vin TEXT',
+  ],
 ];
 
 /// Nombre del archivo de la base en la carpeta de bases de datos de la app.

@@ -13,7 +13,8 @@ los datos, se llama al núcleo y se guarda lo que decide.
   rechazan lo que el conductor hizo: si no encaja, el evento se guarda como conflicto con su
   motivo, el servicio sigue igual y se avisa con `senales.evento_del_conductor_guardado` (`alertas`
   abre la alerta a logística). Solo se rechaza lo que no se puede guardar: un id ya usado con
-  otro contenido o un servicio que no existe.
+  otro contenido o un servicio que no existe. Un Recogido puede traer la placa o el VIN que el
+  conductor digitó (1a-13b): completan el vehículo y lo que no encaje queda por revisar.
 
 Cuando un servicio queda Entregado (desde el panel o la app) se envía `senales.servicio_entregado`
 en la misma transacción; `cobros` la escucha para crear la línea de cobro sin que esta app lo importe.
@@ -42,10 +43,17 @@ from nucleo.estados import reasignar as reasignar_en_nucleo
 from nucleo.estados import resolver_novedad as resolver_novedad_en_nucleo
 from nucleo.evidencia import se_enlaza
 from nucleo.identificacion import (
+    CampoIdentificacion,
+    DatoPorRevisar,
     IdentificacionIncompleta,
     MomentoIdentificacion,
+    Revision,
+    completar_identificacion,
     identificacion_exigida,
+    normalizar_placa,
+    normalizar_vin,
     validar_identificacion,
+    validar_identificacion_al_recoger,
 )
 from nucleo.ronda import MovimientoInvalido, numerar, siguiente_orden
 from nucleo.ronda import mover as mover_en_nucleo
@@ -61,6 +69,7 @@ from .models import (
     ResultadoEvento,
     Servicio,
     Solicitud,
+    Vehiculo,
 )
 from .senales import (
     evento_del_conductor_guardado,
@@ -206,6 +215,10 @@ class EventoDelConductor(Evento):
     nombre_quien: str | None = None
     latitud: float | None = None
     longitud: float | None = None
+    # Solo en un Recogido (1a-13b): lo que el conductor digitó porque el vehículo llegó sin ello,
+    # normalizado. Vacío si no digitó nada o en otro destino.
+    placa: str = ""
+    vin: str = ""
 
 
 @dataclass(frozen=True)
@@ -242,6 +255,8 @@ def aplicar_evento_del_conductor(
     nombre_quien=None,
     latitud=None,
     longitud=None,
+    placa=None,
+    vin=None,
 ) -> Resultado:
     """Aplica un evento de la app una sola vez y devuelve aplicado, duplicado, conflicto o
     rechazado.
@@ -263,6 +278,8 @@ def aplicar_evento_del_conductor(
             nombre_quien=nombre_quien,
             latitud=latitud,
             longitud=longitud,
+            placa=placa,
+            vin=vin,
         )
     ).resumen
 
@@ -322,18 +339,25 @@ def _preparar(
     nombre_quien=None,
     latitud=None,
     longitud=None,
+    placa=None,
+    vin=None,
 ) -> EventoDelConductor:
+    destino = Estado(destino)
+    recoge = destino == Estado.RECOGIDO
     return EventoDelConductor(
         id=str(uuid.UUID(str(id))),
         servicio_id=str(_pk(servicio)),
         conductor_id=str(_pk(conductor)),
-        destino=Estado(destino),
+        destino=destino,
         secuencia=int(secuencia),
         hora_dispositivo=hora_dispositivo,
         motivo=motivo,
         nombre_quien=nombre_quien,
         latitud=latitud,
         longitud=longitud,
+        # Normalizadas como las guarda el vehículo; en otro destino se ignoran (contrato 1.1).
+        placa=normalizar_placa(placa) if recoge else "",
+        vin=normalizar_vin(vin) if recoge else "",
     )
 
 
@@ -382,9 +406,10 @@ def _aplicar_evento(evento: EventoDelConductor) -> Aplicacion:
     Un duplicado responde lo que quedó guardado la primera vez (no se vuelve a evaluar). Si el id
     ya guardado llega con otro contenido, no es un reenvío: se rechaza sin tocar nada.
 
-    El evento, el cambio de estado, la línea de cobro (al quedar Entregado), el enlace de las
-    fotos que lo esperaban y la alerta (conflicto o capacidad excedida) van en una sola
-    transacción.
+    El evento, el cambio de estado, la línea de cobro (al quedar Entregado), la placa o el VIN
+    digitados que completan el vehículo (al quedar Recogido), el enlace de las fotos que lo
+    esperaban y la alerta (conflicto, capacidad excedida o identificación por revisar) van en una
+    sola transacción.
     """
     evento_id = uuid.UUID(evento.id)
     if _ya_recibido(evento_id):
@@ -402,10 +427,10 @@ def _aplicar_evento(evento: EventoDelConductor) -> Aplicacion:
             if decision.resultado == Resultado.DUPLICADO:
                 return _repetido(evento)
             resultado, motivo = decision.resultado, decision.motivo
-            capacidad_excedida, montados = False, []
+            capacidad_excedida, montados, por_revisar = False, [], []
             if resultado == Resultado.APLICADO and evento.destino == Estado.RECOGIDO:
                 try:
-                    _exigir_identificacion(servicio)
+                    _exigir_identificacion_al_recoger(servicio, evento)
                 except IdentificacionIncompleta:
                     resultado, motivo = Resultado.CONFLICTO, Motivo.IDENTIFICACION_INCOMPLETA
                 else:
@@ -428,15 +453,22 @@ def _aplicar_evento(evento: EventoDelConductor) -> Aplicacion:
                 longitud=evento.longitud,
                 motivo=(evento.motivo or "").strip(),
                 nombre_quien=(evento.nombre_quien or "").strip(),
+                placa_digitada=evento.placa,
+                vin_digitado=evento.vin,
                 resultado=ResultadoEvento(resultado.value),
                 motivo_conflicto=motivo.value if motivo else "",
                 capacidad_excedida=capacidad_excedida,
             )
             if resultado == Resultado.APLICADO:
                 _cambiar(servicio, decision.servicio)
+                if evento.destino == Estado.RECOGIDO:
+                    por_revisar = _completar_vehiculo(servicio, evento)
             _enlazar_evidencias_en_espera(guardado)
             evento_del_conductor_guardado.send(
-                sender=EventoEstado, evento=guardado, montados=montados
+                sender=EventoEstado,
+                evento=guardado,
+                montados=montados,
+                identificacion_por_revisar=por_revisar,
             )
     except IntegrityError:
         # Otra petición guardó el mismo id mientras esta trabajaba: esta transacción ya se
@@ -495,6 +527,8 @@ def _rechazar(evento: EventoDelConductor, motivo: Motivo, *, conductor=None, ori
             "hora_dispositivo": str(evento.hora_dispositivo),
             "motivo": evento.motivo,
             "nombre_quien": evento.nombre_quien,
+            "placa": evento.placa,
+            "vin": evento.vin,
         },
         original=original,
     )
@@ -565,6 +599,71 @@ def _exigir_solicitud_asignable(servicio):
 def _exigir_identificacion(servicio):
     vehiculo = servicio.vehiculo
     validar_identificacion(vehiculo.placa, vehiculo.vin, servicio.solicitud.tipo)
+
+
+def _exigir_identificacion_al_recoger(servicio, evento: EventoDelConductor):
+    """Recogido de la app: cuenta también la placa o el VIN que el conductor digitó."""
+    vehiculo = servicio.vehiculo
+    validar_identificacion_al_recoger(
+        vehiculo.placa, vehiculo.vin, evento.placa, evento.vin, servicio.solicitud.tipo
+    )
+
+
+# La restricción de unicidad de la base que protege cada dato del vehículo.
+_UNICIDAD = {
+    CampoIdentificacion.PLACA: "vehiculo_placa_unica",
+    CampoIdentificacion.VIN: "vehiculo_vin_unico",
+}
+
+
+def _completar_vehiculo(servicio: Servicio, evento: EventoDelConductor) -> list[DatoPorRevisar]:
+    """Guarda en el vehículo la placa o el VIN que el conductor digitó y que le faltaban
+    (`nucleo.identificacion.completar_identificacion`). Devuelve lo que logística debe revisar.
+
+    Corre dentro de la transacción del evento, que nunca se tumba por esto:
+    - La fila del vehículo se bloquea antes de leerla: se compara con lo que tiene ahora (si el
+      panel le puso una placa mientras tanto, no se pisa: queda por revisar como distinta).
+    - Si otro vehículo ya tiene ese dato (placa y VIN son únicos), no se guarda y queda por
+      revisar. Se mira antes de guardar y, además, cada dato se guarda en su propio punto de
+      restauración (savepoint): si otro evento simultáneo acaba de guardar el mismo dato en otro
+      vehículo, la restricción de la base lo rechaza, se deshace solo ese cambio y el evento sigue.
+    """
+    if not (evento.placa or evento.vin):
+        return []
+    vehiculo_id = servicio.vehiculo_id
+    vehiculo = Vehiculo.objects.select_for_update().get(pk=vehiculo_id)
+    complemento = completar_identificacion(vehiculo.placa, vehiculo.vin, evento.placa, evento.vin)
+    por_revisar = list(complemento.por_revisar)
+    for campo in complemento.nuevos:
+        dato = getattr(complemento, campo.value)
+        otro = _vehiculo_con(campo, dato, excepto=vehiculo_id)
+        if otro is None:
+            try:
+                with transaction.atomic():
+                    Vehiculo.objects.filter(pk=vehiculo_id).update(**{campo.value: dato})
+                continue
+            except IntegrityError as error:
+                if _restriccion(error) != _UNICIDAD[campo]:
+                    raise
+            otro = _vehiculo_con(campo, dato, excepto=vehiculo_id)
+        por_revisar.append(
+            DatoPorRevisar(
+                campo, dato, Revision.DE_OTRO_VEHICULO, existente=str(otro or "otro vehículo")
+            )
+        )
+    # Quien sigue en la transacción (la alerta) ve el vehículo como quedó.
+    servicio.vehiculo.refresh_from_db(fields=["placa", "vin"])
+    return por_revisar
+
+
+def _vehiculo_con(campo: CampoIdentificacion, dato: str, *, excepto) -> Vehiculo | None:
+    return Vehiculo.objects.filter(**{campo.value: dato}).exclude(pk=excepto).first()
+
+
+def _restriccion(error: IntegrityError) -> str | None:
+    """El nombre de la restricción de PostgreSQL que rechazó la escritura."""
+    diagnostico = getattr(error.__cause__, "diag", None)
+    return getattr(diagnostico, "constraint_name", None)
 
 
 def _grua_vigente_o_error(conductor) -> Grua:

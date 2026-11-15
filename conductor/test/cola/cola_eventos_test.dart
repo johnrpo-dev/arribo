@@ -34,14 +34,36 @@ void main() {
     String destino, {
     Conductor conductor = ana,
     String? motivo,
+    String? placa,
+    String? vin,
     String? id,
   }) => cola.encolar(
     conductor: conductor,
     servicioId: servicio,
     destino: destino,
     motivo: motivo,
+    placa: placa,
+    vin: vin,
     id: id,
     hora: ahora,
+  );
+
+  /// El vehículo del servicio en la lista guardada: (placa, VIN).
+  Future<(Object?, Object?)> vehiculoGuardado(int servicio) async {
+    final fila = (await prueba.base.db.query(
+      'servicios',
+      where: 'id = ?',
+      whereArgs: [servicio],
+    )).single;
+    return (fila['vehiculo_placa'], fila['vehiculo_vin']);
+  }
+
+  /// El servicio llegó en la lista sin placa ni VIN.
+  Future<void> sinIdentificar(int servicio) => prueba.base.db.update(
+    'servicios',
+    {'vehiculo_placa': null, 'vehiculo_vin': null},
+    where: 'id = ?',
+    whereArgs: [servicio],
   );
 
   Future<String?> estadoGuardado(int servicio) async {
@@ -88,6 +110,8 @@ void main() {
         'hora_dispositivo': '2026-11-20T19:42:07.000Z',
         'motivo': 'Llanta pinchada',
         'nombre_quien': null,
+        'placa': null,
+        'vin': null,
         'latitud': null,
         'longitud': null,
       });
@@ -135,6 +159,89 @@ void main() {
       final evento = await tocar(41, 'en_camino', id: '0b7f1e2c-9a10-4b4e-9d55-7f0c2a643f7e');
 
       expect(evento.id, '0b7f1e2c-9a10-4b4e-9d55-7f0c2a643f7e');
+    });
+  });
+
+  group('placa o VIN digitados al recoger (1a-13b)', () {
+    setUp(() async {
+      await guardarLista({41: 'en_camino', 42: 'asignado'});
+      await sinIdentificar(41);
+    });
+
+    test('el Recogido los guarda normalizados y viajan en el evento', () async {
+      final evento = await tocar(41, 'recogido', placa: ' abc-123 ', vin: '1hgcm-82633 a004352');
+
+      final fila = (await prueba.base.db.query('eventos_pendientes')).single;
+      expect((fila['placa'], fila['vin']), ('ABC123', '1HGCM82633A004352'));
+      expect(evento.aJson(), containsPair('placa', 'ABC123'));
+      expect(evento.aJson(), containsPair('vin', '1HGCM82633A004352'));
+      // El aviso de un conflicto nombra el vehículo con la placa digitada.
+      expect(fila['vehiculo'], 'ABC123');
+    });
+
+    test('lo que no se digitó viaja vacío', () async {
+      final evento = await tocar(41, 'recogido', placa: 'ABC123', vin: '  ');
+
+      expect(evento.aJson(), containsPair('vin', null));
+      expect((await prueba.base.db.query('eventos_pendientes')).single['vin'], isNull);
+    });
+
+    test('en otro destino se ignoran, como en el servidor', () async {
+      final evento = await tocar(42, 'en_camino', placa: 'ABC123', vin: '1HGCM82633A004352');
+
+      expect((evento.placa, evento.vin), (null, null));
+      expect(evento.aJson(), containsPair('placa', null));
+    });
+
+    test('el Recogido sin enviar no cambia la lista guardada', () async {
+      await tocar(41, 'recogido', placa: 'ABC123');
+
+      expect(await vehiculoGuardado(41), (null, null));
+    });
+
+    test('aplicado, lo digitado queda en el vehículo de la lista donde le faltaba', () async {
+      final evento = await tocar(41, 'recogido', placa: 'ABC123', vin: '1HGCM82633A004352');
+      await prueba.base.db.update(
+        'servicios',
+        {'vehiculo_vin': 'JH4KA8260MC000000'},
+        where: 'id = ?',
+        whereArgs: [41],
+      );
+
+      await cola.registrarResultados(
+        [evento],
+        [ResultadoEvento(id: evento.id, resultado: 'aplicado')],
+        hora: ahora,
+      );
+
+      // La placa le faltaba; el VIN que ya tenía no se sobreescribe.
+      expect(await vehiculoGuardado(41), ('ABC123', 'JH4KA8260MC000000'));
+    });
+
+    test('en conflicto o pendiente por reintentar, el vehículo de la lista no cambia', () async {
+      final evento = await tocar(41, 'recogido', placa: 'ABC123');
+
+      await cola.registrarResultados(
+        [evento],
+        [ResultadoEvento(id: evento.id, resultado: 'reintentar')],
+        hora: ahora,
+      );
+      expect(await vehiculoGuardado(41), (null, null));
+
+      await cola.registrarResultados(
+        [evento],
+        [ResultadoEvento(id: evento.id, resultado: 'conflicto', motivo: 'servicio_cancelado')],
+        hora: ahora,
+      );
+      expect(await vehiculoGuardado(41), (null, null));
+
+      // Una respuesta tardía de "aplicado" a un evento ya resuelto tampoco lo cambia.
+      await cola.registrarResultados(
+        [evento],
+        [ResultadoEvento(id: evento.id, resultado: 'aplicado')],
+        hora: ahora,
+      );
+      expect(await vehiculoGuardado(41), (null, null));
     });
   });
 

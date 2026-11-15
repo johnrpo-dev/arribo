@@ -48,6 +48,8 @@ void main() {
             'hora_dispositivo': '2026-11-20T19:42:07.000Z',
             'motivo': null,
             'nombre_quien': null,
+            'placa': null,
+            'vin': null,
             'latitud': null,
             'longitud': null,
           },

@@ -9,8 +9,10 @@ Entregado y no se guarda el evento. Argumentos: `servicio` (ya guardado como Ent
 (el usuario del panel, o None si el cambio vino de la app del conductor). La escucha `cobros`.
 
 `evento_del_conductor_guardado`: cada vez que se guarda un evento de la app (aplicado o en
-conflicto), en la misma transacción que el evento. Argumentos: `evento` (el EventoEstado) y
-`montados` (los vehículos que la grúa ya llevaba, si el Recogido excedió la capacidad). La escucha
+conflicto), en la misma transacción que el evento. Argumentos: `evento` (el EventoEstado),
+`montados` (los vehículos que la grúa ya llevaba, si el Recogido excedió la capacidad) e
+`identificacion_por_revisar` (los `nucleo.identificacion.DatoPorRevisar` de la placa o el VIN que
+el conductor digitó al recoger y que no quedaron en el vehículo; vacío si no hay). La escucha
 `alertas`: si la alerta no se puede abrir, el evento no se guarda y el celular lo reenvía.
 
 `evento_del_conductor_rechazado`: un evento de la app que no se pudo guardar (id reutilizado con

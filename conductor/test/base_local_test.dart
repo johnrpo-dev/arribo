@@ -258,4 +258,58 @@ void main() {
       expect(await prueba.base.pendientesPorEnviar(), 1);
     });
   });
+
+  group('versión 4 (1a-13b)', () {
+    test('el paso en curso y la cola guardan la placa y el VIN digitados al recoger', () async {
+      expect(
+        (await columnas(prueba.base, 'pasos_en_curso')).keys,
+        containsAll(['placa_digitada', 'vin_digitado']),
+      );
+      expect(
+        (await columnas(prueba.base, 'eventos_pendientes')).keys,
+        containsAll(['placa', 'vin']),
+      );
+    });
+
+    test(
+      'un celular con la versión 3 sube a la 4 sin perder el paso en curso ni la cola',
+      () async {
+        await prueba.base.cerrar();
+        await File(prueba.ruta).delete();
+        final v3 = await BaseLocal.abrir(
+          fabricaDePrueba,
+          prueba.ruta,
+          migraciones: migraciones.take(3).toList(),
+        );
+        await v3.db.insert('pasos_en_curso', {
+          'conductor_id': 3,
+          'servicio_id': 41,
+          'destino': 'recogido',
+          'evento_id': 'paso-a',
+          'nombre_quien': 'Carlos',
+          'creado_en': '2026-11-20T19:42:07Z',
+        });
+        await v3.db.insert('eventos_pendientes', {
+          'id': 'a',
+          'conductor_id': 3,
+          'servicio_id': 42,
+          'destino': 'en_camino',
+          'secuencia': 5,
+          'hora_dispositivo': '2026-11-20T19:42:07Z',
+          'creado_en': '2026-11-20T19:42:07Z',
+        });
+        expect(await v3.db.getVersion(), 3);
+        await v3.cerrar();
+
+        prueba.base = await BaseLocal.abrir(fabricaDePrueba, prueba.ruta);
+
+        expect(await prueba.base.db.getVersion(), migraciones.length);
+        final paso = (await prueba.base.db.query('pasos_en_curso')).single;
+        expect(paso['nombre_quien'], 'Carlos');
+        expect((paso['placa_digitada'], paso['vin_digitado']), ('', ''));
+        final evento = (await prueba.base.db.query('eventos_pendientes')).single;
+        expect((evento['secuencia'], evento['placa'], evento['vin']), (5, null, null));
+      },
+    );
+  });
 }

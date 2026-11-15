@@ -2,7 +2,9 @@
 // servidor solo la refresca. Sin señal, el conductor ve lo último guardado y un aviso discreto.
 //
 // El estado de cada servicio es el que confirmó el servidor más los toques del conductor que aún no
-// se han enviado (la cola de eventos): un toque se ve de inmediato, marcado como pendiente.
+// se han enviado (la cola de eventos): un toque se ve de inmediato, marcado como pendiente. Lo
+// mismo la placa o el VIN que digitó en un Recogido sin enviar (1a-13b): el vehículo ya se ve con
+// ellos donde le faltaban.
 
 import 'dart:async';
 
@@ -19,6 +21,7 @@ import '../fotos/subidor_fotos.dart';
 import '../ingreso/sesion.dart';
 import 'almacen_asignaciones.dart';
 import 'estados.dart';
+import 'identificacion.dart';
 import 'requisitos.dart' as requisitos;
 import 'requisitos.dart' show BloqueoDeRecogida;
 import 'servicio.dart';
@@ -142,14 +145,40 @@ class ListaAsignaciones extends ChangeNotifier {
   BloqueoDeRecogida? bloqueoDeRecogida(Servicio servicio) =>
       requisitos.bloqueoDeRecogida(servicio, _servicios, configuracion: _configuracion);
 
+  /// Qué datos le pide digitar la pantalla del Recogido de [servicio] (placa, VIN), o null si
+  /// ninguno: el vehículo ya está identificado o la configuración es "al asignar".
+  ({bool placa, bool vin})? identificacionPorDigitar(Servicio servicio) =>
+      requisitos.identificacionPorDigitar(servicio, configuracion: _configuracion);
+
   /// Marca el Recogido o el Entregado que el conductor preparó en su pantalla: guarda el evento en
   /// la cola con el UUID del paso y, en la misma transacción, pasa sus fotos a la cola de subida.
   /// Antes vuelve a revisar todo lo que exige el paso (identificación y capacidad en un Recogido;
   /// mínimo de fotos y nombre en los dos). Si falta algo lanza [ToqueNoValido] y no guarda nada.
-  Future<EventoLocal> confirmarPaso(PasoEnCurso paso, {required String nombreQuien}) async {
+  ///
+  /// [placaDigitada] y [vinDigitado] son lo que el conductor escribió en un Recogido de un vehículo
+  /// sin identificar: solo viajan en el evento los datos que la pantalla le pidió.
+  Future<EventoLocal> confirmarPaso(
+    PasoEnCurso paso, {
+    required String nombreQuien,
+    String placaDigitada = '',
+    String vinDigitado = '',
+  }) async {
     final servicio = this.servicio(paso.servicioId);
     if (servicio == null) throw const ToqueNoValido('Este servicio ya no está en su lista.');
+    String? placa;
+    String? vin;
     if (paso.destino == Estado.recogido) {
+      final porDigitar = identificacionPorDigitar(servicio);
+      if (porDigitar != null) {
+        placa = porDigitar.placa ? placaDigitada : null;
+        vin = porDigitar.vin ? vinDigitado : null;
+        final faltan = requisitos.faltantesDeIdentificacion(
+          servicio,
+          placaDigitada: placa ?? '',
+          vinDigitado: vin ?? '',
+        );
+        if (faltan.isNotEmpty) throw ToqueNoValido(faltan.join(' '));
+      }
       final bloqueo = bloqueoDeRecogida(servicio);
       if (bloqueo != null) throw ToqueNoValido(bloqueo.mensaje);
     }
@@ -158,6 +187,8 @@ class ListaAsignaciones extends ChangeNotifier {
       servicioId: paso.servicioId,
       destino: paso.destino,
       nombreQuien: nombreQuien,
+      placa: placa,
+      vin: vin,
       id: paso.eventoId,
       alGuardar: (txn, evento) => fotos.almacen.confirmar(txn, evento, minimoFotos: minimoFotos),
     );
@@ -256,17 +287,39 @@ class ListaAsignaciones extends ChangeNotifier {
       return (servicios, pendientes);
     });
     final destinos = <int, List<String>>{};
+    final digitados = <int, EventoLocal>{};
     for (final evento in pendientes) {
       destinos.putIfAbsent(evento.servicioId, () => []).add(evento.destino);
+      if (evento.placa != null || evento.vin != null) digitados[evento.servicioId] = evento;
     }
     _servicios = [
       for (final servicio in servicios)
-        if (destinos[servicio.id] case final suyos?) _conPendientes(servicio, suyos) else servicio,
+        _conDigitado(switch (destinos[servicio.id]) {
+          final suyos? => _conPendientes(servicio, suyos),
+          null => servicio,
+        }, digitados[servicio.id]),
     ];
     _pendientes = {for (final MapEntry(:key, :value) in destinos.entries) key: value.length};
     _configuracion = await almacen.configuracion();
     _ultimaActualizacion = await almacen.ultimaActualizacion();
     await fotos.releer();
+  }
+
+  /// El vehículo con la placa o el VIN que el conductor digitó en un Recogido sin enviar, donde le
+  /// falten (como hará el servidor al aplicarlo).
+  static Servicio _conDigitado(Servicio servicio, EventoLocal? recogido) {
+    if (recogido == null) return servicio;
+    final complemento = completarIdentificacion(
+      placaGuardada: servicio.vehiculo.placa,
+      vinGuardado: servicio.vehiculo.vin,
+      placaDigitada: recogido.placa,
+      vinDigitado: recogido.vin,
+    );
+    if (complemento.nuevos.isEmpty) return servicio;
+    return servicio.conIdentificacion(
+      placa: complemento.nuevos.contains(CampoIdentificacion.placa) ? complemento.placa : '',
+      vin: complemento.nuevos.contains(CampoIdentificacion.vin) ? complemento.vin : '',
+    );
   }
 
   static Servicio _conPendientes(Servicio servicio, List<String> destinos) {

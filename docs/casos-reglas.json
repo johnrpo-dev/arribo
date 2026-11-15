@@ -1,5 +1,5 @@
 {
-  "descripcion": "Casos compartidos de las reglas que la app del conductor copia del servidor. La regla vive en backend/nucleo/; la app la repite en conductor/lib/asignaciones/ (estados.dart, capacidad.dart, identificacion.dart) y conductor/lib/fotos/foto.dart. Los recorren backend/tests/nucleo/test_casos_compartidos.py y conductor/test/casos_compartidos_test.dart. Si una regla cambia en nucleo/, su prueba falla hasta que este archivo cambie, y entonces falla la de la app hasta que cambie su copia.",
+  "descripcion": "Casos compartidos de las reglas que la app del conductor copia del servidor. La regla vive en backend/nucleo/; la app la repite en conductor/lib/asignaciones/ (estados.dart, capacidad.dart, identificacion.dart) y conductor/lib/fotos/foto.dart. Los recorren backend/tests/nucleo/test_casos_compartidos.py y conductor/test/casos_compartidos_test.dart. Las secciones identificacion.al_recoger e identificacion.completar tratan la placa o el VIN que el conductor digita al recoger (1a-13b). Si una regla cambia en nucleo/, su prueba falla hasta que este archivo cambie, y entonces falla la de la app hasta que cambie su copia.",
   "estados": {
     "todos": [
       "pendiente_asignar",
@@ -689,6 +689,392 @@
         "configurado": "recoger",
         "momento": "recoger",
         "exigida": true
+      }
+    ],
+    "largo_maximo_placa": 10,
+    "placa_valida": [
+      {
+        "placa": "ABC123",
+        "valida": true
+      },
+      {
+        "placa": "ABC12D",
+        "valida": true
+      },
+      {
+        "placa": "A",
+        "valida": true
+      },
+      {
+        "placa": "ABCDEFGHIJ",
+        "valida": true
+      },
+      {
+        "placa": "ABCDEFGHIJK",
+        "valida": false
+      },
+      {
+        "placa": "",
+        "valida": false
+      }
+    ],
+    "al_recoger": [
+      {
+        "nombre": "sin identificación, con placa digitada: completa",
+        "vehiculo": {
+          "placa": null,
+          "vin": null
+        },
+        "digitada": {
+          "placa": "abc-123",
+          "vin": null
+        },
+        "tipo": "traslado",
+        "completa": true
+      },
+      {
+        "nombre": "sin identificación, con VIN digitado: completa un traslado",
+        "vehiculo": {
+          "placa": null,
+          "vin": null
+        },
+        "digitada": {
+          "placa": null,
+          "vin": "1HGCM82633A004352"
+        },
+        "tipo": "traslado",
+        "completa": true
+      },
+      {
+        "nombre": "desvare sin placa, con solo el VIN digitado: incompleta",
+        "vehiculo": {
+          "placa": null,
+          "vin": null
+        },
+        "digitada": {
+          "placa": null,
+          "vin": "1HGCM82633A004352"
+        },
+        "tipo": "desvare",
+        "completa": false
+      },
+      {
+        "nombre": "desvare con placa digitada: completa",
+        "vehiculo": {
+          "placa": null,
+          "vin": null
+        },
+        "digitada": {
+          "placa": "ABC123",
+          "vin": null
+        },
+        "tipo": "desvare",
+        "completa": true
+      },
+      {
+        "nombre": "desvare con VIN guardado y placa digitada: completa",
+        "vehiculo": {
+          "placa": null,
+          "vin": "1HGCM82633A004352"
+        },
+        "digitada": {
+          "placa": "ABC123",
+          "vin": null
+        },
+        "tipo": "desvare",
+        "completa": true
+      },
+      {
+        "nombre": "sin nada guardado ni digitado: incompleta",
+        "vehiculo": {
+          "placa": null,
+          "vin": null
+        },
+        "digitada": {
+          "placa": null,
+          "vin": null
+        },
+        "tipo": "traslado",
+        "completa": false
+      },
+      {
+        "nombre": "lo digitado que queda vacío al normalizar no cuenta",
+        "vehiculo": {
+          "placa": " - ",
+          "vin": ""
+        },
+        "digitada": {
+          "placa": " - ",
+          "vin": "  "
+        },
+        "tipo": "evento",
+        "completa": false
+      },
+      {
+        "nombre": "vehículo con placa: no hace falta digitar",
+        "vehiculo": {
+          "placa": "ABC123",
+          "vin": null
+        },
+        "digitada": {
+          "placa": null,
+          "vin": null
+        },
+        "tipo": "desvare",
+        "completa": true
+      },
+      {
+        "nombre": "un VIN digitado mal formado cuenta para recoger (el servidor aplica y avisa; la app no deja enviarlo)",
+        "vehiculo": {
+          "placa": null,
+          "vin": null
+        },
+        "digitada": {
+          "placa": null,
+          "vin": "1HGCM82633A00435"
+        },
+        "tipo": "traslado",
+        "completa": true
+      }
+    ],
+    "completar": [
+      {
+        "nombre": "sin placa: se guarda la digitada, normalizada",
+        "vehiculo": {
+          "placa": null,
+          "vin": null
+        },
+        "digitada": {
+          "placa": "abc-123",
+          "vin": null
+        },
+        "queda": {
+          "placa": "ABC123",
+          "vin": ""
+        },
+        "nuevos": [
+          "placa"
+        ],
+        "por_revisar": []
+      },
+      {
+        "nombre": "sin placa ni VIN: se guardan los dos",
+        "vehiculo": {
+          "placa": null,
+          "vin": null
+        },
+        "digitada": {
+          "placa": "ABC123",
+          "vin": "1hgcm82633a004352"
+        },
+        "queda": {
+          "placa": "ABC123",
+          "vin": "1HGCM82633A004352"
+        },
+        "nuevos": [
+          "placa",
+          "vin"
+        ],
+        "por_revisar": []
+      },
+      {
+        "nombre": "con placa y sin VIN: se agrega el VIN",
+        "vehiculo": {
+          "placa": "ABC123",
+          "vin": ""
+        },
+        "digitada": {
+          "placa": null,
+          "vin": "1HGCM82633A004352"
+        },
+        "queda": {
+          "placa": "ABC123",
+          "vin": "1HGCM82633A004352"
+        },
+        "nuevos": [
+          "vin"
+        ],
+        "por_revisar": []
+      },
+      {
+        "nombre": "el mismo dato escrito de otra forma: nada cambia",
+        "vehiculo": {
+          "placa": "ABC123",
+          "vin": "1HGCM82633A004352"
+        },
+        "digitada": {
+          "placa": "abc 123",
+          "vin": "1hgcm82633a004352"
+        },
+        "queda": {
+          "placa": "ABC123",
+          "vin": "1HGCM82633A004352"
+        },
+        "nuevos": [],
+        "por_revisar": []
+      },
+      {
+        "nombre": "placa distinta a la guardada: no se sobreescribe",
+        "vehiculo": {
+          "placa": "ABC123",
+          "vin": ""
+        },
+        "digitada": {
+          "placa": "XYZ789",
+          "vin": null
+        },
+        "queda": {
+          "placa": "ABC123",
+          "vin": ""
+        },
+        "nuevos": [],
+        "por_revisar": [
+          {
+            "campo": "placa",
+            "digitado": "XYZ789",
+            "revision": "distinto",
+            "existente": "ABC123"
+          }
+        ]
+      },
+      {
+        "nombre": "VIN distinto al guardado: no se sobreescribe",
+        "vehiculo": {
+          "placa": "",
+          "vin": "1HGCM82633A004352"
+        },
+        "digitada": {
+          "placa": null,
+          "vin": "WVWZZZ1JZXW000001"
+        },
+        "queda": {
+          "placa": "",
+          "vin": "1HGCM82633A004352"
+        },
+        "nuevos": [],
+        "por_revisar": [
+          {
+            "campo": "vin",
+            "digitado": "WVWZZZ1JZXW000001",
+            "revision": "distinto",
+            "existente": "1HGCM82633A004352"
+          }
+        ]
+      },
+      {
+        "nombre": "VIN de 16 caracteres: no se guarda",
+        "vehiculo": {
+          "placa": null,
+          "vin": null
+        },
+        "digitada": {
+          "placa": null,
+          "vin": "1HGCM82633A00435"
+        },
+        "queda": {
+          "placa": "",
+          "vin": ""
+        },
+        "nuevos": [],
+        "por_revisar": [
+          {
+            "campo": "vin",
+            "digitado": "1HGCM82633A00435",
+            "revision": "invalido",
+            "existente": ""
+          }
+        ]
+      },
+      {
+        "nombre": "VIN con O: no se guarda",
+        "vehiculo": {
+          "placa": null,
+          "vin": null
+        },
+        "digitada": {
+          "placa": null,
+          "vin": "1HGCM82633AO04352"
+        },
+        "queda": {
+          "placa": "",
+          "vin": ""
+        },
+        "nuevos": [],
+        "por_revisar": [
+          {
+            "campo": "vin",
+            "digitado": "1HGCM82633AO04352",
+            "revision": "invalido",
+            "existente": ""
+          }
+        ]
+      },
+      {
+        "nombre": "placa que no cabe: no se guarda",
+        "vehiculo": {
+          "placa": null,
+          "vin": null
+        },
+        "digitada": {
+          "placa": "ABC-DEF-GHI-JK",
+          "vin": null
+        },
+        "queda": {
+          "placa": "",
+          "vin": ""
+        },
+        "nuevos": [],
+        "por_revisar": [
+          {
+            "campo": "placa",
+            "digitado": "ABCDEFGHIJK",
+            "revision": "invalido",
+            "existente": ""
+          }
+        ]
+      },
+      {
+        "nombre": "un VIN inválido no impide guardar la placa",
+        "vehiculo": {
+          "placa": null,
+          "vin": null
+        },
+        "digitada": {
+          "placa": "ABC123",
+          "vin": "MALO"
+        },
+        "queda": {
+          "placa": "ABC123",
+          "vin": ""
+        },
+        "nuevos": [
+          "placa"
+        ],
+        "por_revisar": [
+          {
+            "campo": "vin",
+            "digitado": "MALO",
+            "revision": "invalido",
+            "existente": ""
+          }
+        ]
+      },
+      {
+        "nombre": "nada digitado: el vehículo queda como estaba",
+        "vehiculo": {
+          "placa": "ABC123",
+          "vin": ""
+        },
+        "digitada": {
+          "placa": null,
+          "vin": " - "
+        },
+        "queda": {
+          "placa": "ABC123",
+          "vin": ""
+        },
+        "nuevos": [],
+        "por_revisar": []
       }
     ]
   },

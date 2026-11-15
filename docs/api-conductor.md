@@ -1,4 +1,4 @@
-# API de la app del conductor (contrato versión 1)
+# API de la app del conductor (contrato versión 1, revisión 1.1)
 
 Contrato entre el servidor (`backend/api/`) y la app Flutter (`conductor/`). Lo usan la sincronización
 (1a-10), las pantallas de la app (1a-11 a 1a-13) y el push (1a-14). Si el código y este documento no
@@ -6,6 +6,13 @@ coinciden, es un error: se corrige uno de los dos en la misma tarea.
 
 Implementado en la 1a-09: ingreso, cierre de sesión, lista y detalle de asignaciones.
 Implementado en la 1a-10: envío de eventos y subida de fotos. Pendiente: el push (1a-14).
+
+Revisiones (cambios compatibles: no cambian `"version": 1` ni la ruta `/api/v1/`):
+
+| Revisión | Tarea | Cambio |
+|---|---|---|
+| 1.0 | 1a-09, 1a-10 | Ingreso, asignaciones, eventos y fotos |
+| 1.1 | 1a-13b | El evento `recogido` acepta `placa` y `vin` digitados por el conductor (ver "Placa o VIN digitados al recoger") |
 
 ## Reglas generales
 
@@ -15,8 +22,9 @@ Implementado en la 1a-10: envío de eventos y subida de fotos. Pendiente: el pus
   sigue siendo JSON). Las rutas terminan en `/`.
 - **Versión del contrato:** toda respuesta con cuerpo trae `"version": 1`. Sube solo si un cambio
   rompe a una app ya instalada (quitar o renombrar un campo, cambiar su tipo o su significado).
-  Agregar un campo no la cambia: **la app ignora los campos que no conoce**. Una versión nueva
-  tendría su propio prefijo (`/api/v2/`).
+  Agregar un campo no la cambia: **la app ignora los campos que no conoce** y el servidor no exige
+  los campos nuevos de una petición. Esos cambios suben solo la revisión de este documento (1.1,
+  1.2...). Una versión nueva tendría su propio prefijo (`/api/v2/`).
 - **Fechas:** ISO 8601 en UTC con `Z`, por ejemplo `"2026-11-20T19:30:00Z"`. Pueden traer fracciones
   de segundo. La app las muestra en hora de Colombia (America/Bogota, UTC−5, sin horario de verano).
 - **Vacíos:** un texto opcional sin dato llega como `null`, nunca como `""`.
@@ -256,6 +264,8 @@ devuelto a la cola o reasignado). El 404 es idéntico en los tres casos.
       "hora_dispositivo": "2026-11-20T19:42:07Z",
       "motivo": null,
       "nombre_quien": null,
+      "placa": null,
+      "vin": null,
       "latitud": null,
       "longitud": null
     }
@@ -272,6 +282,7 @@ devuelto a la cola o reasignado). El 404 es idéntico en los tres casos.
 | `hora_dispositivo` | no | Hora del celular al tocar, ISO 8601 con `Z` u offset (sin zona se toma como hora de Colombia). Se guarda junto con la hora de sincronización del servidor |
 | `motivo` | en `novedad` | Texto. Una novedad sin motivo se guarda como conflicto |
 | `nombre_quien` | no | Quien entrega o recibe el vehículo, en `recogido` y `entregado` (1a-13) |
+| `placa`, `vin` | no | Solo en `recogido` (1.1): la placa y el VIN que el conductor digitó porque el vehículo llegó sin ellos. Texto o `null`; en otro destino se ignoran. Ver "Placa o VIN digitados al recoger" |
 | `latitud`, `longitud` | no | Números (fase 1b) |
 
 - **El conductor del evento es el del token**, no un campo del cuerpo. Por eso cada evento se envía
@@ -279,8 +290,47 @@ devuelto a la cola o reasignado). El 404 es idéntico en los tres casos.
 - **Tope:** 100 eventos por lote. Con más, 400 `datos_invalidos` y no se aplica ninguno: la app envía
   los 100 más antiguos y sigue con el resto en otro lote.
 - **Datos secundarios ilegibles no tumban el evento.** Si `hora_dispositivo`, `latitud`, `longitud`,
-  `motivo` o `nombre_quien` vienen con un valor que no se puede leer, el evento se guarda con ese
-  dato vacío. Solo `id`, `servicio_id`, `destino` y `secuencia` son indispensables.
+  `motivo`, `nombre_quien`, `placa` o `vin` vienen con un valor que no se puede leer (por ejemplo, un
+  objeto o una lista en vez de texto), el evento se guarda con ese dato vacío; un número en un campo
+  de texto se lee como texto. Solo `id`, `servicio_id`, `destino` y `secuencia` son indispensables.
+
+### Placa o VIN digitados al recoger
+
+Desde la revisión 1.1. Con la configuración "placa/VIN al recoger" un vehículo puede llegar al
+Recogido sin placa ni VIN (o un desvare sin placa). En vez de bloquear al conductor, la app le pide
+digitarlos en la pantalla de Recogido y los manda en el mismo evento, por la cola, también sin señal.
+
+**Formato.** `placa` y `vin` son texto o `null`. El servidor los normaliza como
+`nucleo/identificacion.py` (la app ya los manda así): placa en mayúsculas y solo letras y dígitos
+(`"abc-123"` → `"ABC123"`); VIN en mayúsculas y sin espacios ni guiones. Vacío después de normalizar
+es lo mismo que `null`. La app manda solo los datos que el vehículo no tiene.
+
+**Validación (la hace la app antes de guardar el evento; los casos están en `docs/casos-reglas.json`,
+`identificacion.placa_valida`, `al_recoger` y `completar`):**
+- Placa: de 1 a 10 letras o dígitos (lo que cabe en el vehículo).
+- VIN: exactamente 17 letras o dígitos, sin I, O ni Q. No se valida el dígito verificador.
+- Placa o VIN, al menos uno entre lo que tiene el vehículo y lo digitado; un desvare exige la placa.
+
+**Qué hace el servidor** (`nucleo.identificacion`, en la misma transacción del evento):
+- Para decidir si el Recogido encaja, cuenta lo que tiene el vehículo y, donde le falte, lo
+  digitado (`validar_identificacion_al_recoger`). Si ni así hay placa o VIN (o un desvare queda sin
+  placa), es conflicto `identificacion_incompleta`, como antes.
+- **Lo físico no se rechaza.** Si el Recogido encaja, se aplica aunque lo digitado no se pueda
+  guardar en el vehículo. La placa y el VIN digitados quedan siempre guardados en el evento
+  (normalizados), se aplique o no.
+- Al aplicarse, lo digitado completa el vehículo (`completar_identificacion`): si el vehículo no
+  tiene ese dato y es válido, se guarda en el vehículo y la app lo ve en la siguiente lista. Si ya
+  tiene uno igual, nada cambia.
+- **Lo que no encaja abre una alerta a logística** ("Placa o VIN digitado por revisar", sobre el
+  evento) y no tumba el evento ni el lote: un dato distinto al que ya tiene el vehículo (no se
+  sobreescribe), un dato inválido que llegue pese a la app (no se guarda) o un dato que ya es de
+  otro vehículo (placa y VIN son únicos; no se guarda). Una sola alerta por evento con todo lo que
+  hay que revisar.
+- Un evento en conflicto no toca el vehículo: lo digitado queda solo en el evento.
+- Un reenvío (`duplicado`) no repite nada: ni guarda otra vez ni vuelve a abrir la alerta.
+
+**Respuesta:** la de siempre. El resultado del Recogido (`aplicado` o `conflicto`) no cambia porque
+lo digitado se haya guardado o quede por revisar; la app no recibe nada distinto.
 
 ### Orden
 
@@ -368,7 +418,7 @@ Motivos (`motivo`; `detalle` es su texto en español):
 | `conflicto` | `novedad_abierta` | El servicio tiene una novedad que logística no ha resuelto |
 | `conflicto` | `novedad_sin_motivo` | `novedad` sin `motivo` |
 | `conflicto` | `destino_no_permitido` | Un estado que no se marca desde la app (por ejemplo `cancelado`) |
-| `conflicto` | `identificacion_incompleta` | `recogido` de un vehículo sin placa ni VIN (o un desvare sin placa) |
+| `conflicto` | `identificacion_incompleta` | `recogido` de un vehículo sin placa ni VIN (o un desvare sin placa), sin que el evento los traiga digitados |
 | `rechazado` | `id_reutilizado` | El `id` ya está guardado con otro servicio, destino, secuencia o conductor. No se aplica, no reemplaza al guardado ni se guarda como conflicto nuevo |
 | `rechazado` | `servicio_desconocido` | `servicio_id` no existe (un evento no se puede guardar sin servicio) |
 | `rechazado` | `datos_invalidos` | Falta o no se puede leer `id`, `servicio_id`, `destino` o `secuencia`, o el elemento no es un objeto |
@@ -381,8 +431,11 @@ con alerta, porque puede ser algo que el conductor hizo de verdad.
 ### Atomicidad
 
 Cada evento va en su propia transacción con todos sus efectos: el cambio de estado, la línea de
-cobro cuando el servicio queda Entregado, el enlace de las fotos que lo esperaban y la alerta de
-conflicto o de capacidad. O queda todo, o no queda nada y la respuesta de ese evento es `reintentar`.
+cobro cuando el servicio queda Entregado, la placa o el VIN digitados que completan el vehículo al
+quedar Recogido, el enlace de las fotos que lo esperaban y la alerta de conflicto, de capacidad o
+de identificación por revisar. O queda todo, o no queda nada y la respuesta de ese evento es
+`reintentar`. Que lo digitado choque con la placa o el VIN de otro vehículo no es una falla: el
+evento se aplica igual y queda la alerta.
 Un evento que falla no deshace los anteriores ni detiene los de **otros** servicios; los posteriores
 del **mismo** servicio en ese lote responden `reintentar` sin evaluarse, porque dependen de él.
 

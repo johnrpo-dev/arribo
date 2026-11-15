@@ -6,6 +6,7 @@ el celular lo reenvía. Un conflicto nunca queda guardado sin su alerta.
 from django.utils import timezone
 
 from nucleo.estados import Estado
+from nucleo.identificacion import LARGO_MAXIMO_PLACA, CampoIdentificacion, Revision
 from nucleo.sincronizacion import DETALLE, Motivo
 from solicitudes.models import ETIQUETAS_ESTADO, ResultadoEvento
 
@@ -31,16 +32,68 @@ def _toque(evento) -> str:
     )
 
 
-def alertar_por_evento_guardado(sender, evento, montados=(), **kwargs):
+def _digitado(evento) -> str:
+    """" Al recogerlo digitó la placa ABC123 y el VIN …." o vacío si no digitó nada."""
+    datos = [
+        texto
+        for texto in (
+            f"la placa {evento.placa_digitada}" if evento.placa_digitada else "",
+            f"el VIN {evento.vin_digitado}" if evento.vin_digitado else "",
+        )
+        if texto
+    ]
+    return f" Al recogerlo digitó {' y '.join(datos)}." if datos else ""
+
+
+_NOMBRE_DEL_DATO = {CampoIdentificacion.PLACA: "la placa", CampoIdentificacion.VIN: "el VIN"}
+_FORMATO = {
+    CampoIdentificacion.PLACA: f"de 1 a {LARGO_MAXIMO_PLACA} letras o dígitos",
+    CampoIdentificacion.VIN: "17 letras o dígitos, sin I, O ni Q",
+}
+
+
+def _por_revisar(dato) -> str:
+    """Un dato digitado que no quedó en el vehículo, en una frase para logística."""
+    nombre = _NOMBRE_DEL_DATO[dato.campo]
+    if dato.revision == Revision.DISTINTO:
+        return (
+            f"digitó {nombre} {dato.digitado}, pero el vehículo ya tenía {dato.existente} "
+            "(se dejó la que tenía)"
+        )
+    if dato.revision == Revision.DE_OTRO_VEHICULO:
+        return (
+            f"digitó {nombre} {dato.digitado}, que ya es de otro vehículo ({dato.existente}); "
+            "no se guardó"
+        )
+    return (
+        f"digitó {nombre} {dato.digitado!r}, que no es válido ({_FORMATO[dato.campo]}); "
+        "no se guardó"
+    )
+
+
+def alertar_por_evento_guardado(
+    sender, evento, montados=(), identificacion_por_revisar=(), **kwargs
+):
     """Un evento en conflicto abre "conflicto de sincronización"; un Recogido aplicado con la grúa
-    llena abre "capacidad excedida". Las dos apuntan al evento."""
+    llena abre "capacidad excedida"; un Recogido aplicado cuya placa o VIN digitados no quedaron en
+    el vehículo abre "placa o VIN digitado por revisar". Las tres apuntan al evento."""
     if evento.resultado == ResultadoEvento.CONFLICTO:
         motivo = DETALLE.get(evento.motivo_conflicto, "No encajó con el estado del servicio.")
         abrir_alerta(
             TipoAlerta.CONFLICTO_SINCRONIZACION,
             evento,
-            f"{_toque(evento)} y no se aplicó: {motivo} El evento quedó guardado en el historial "
-            "del servicio; revise qué pasó y corrija el estado si hace falta.",
+            f"{_toque(evento)} y no se aplicó: {motivo}{_digitado(evento)} El evento quedó "
+            "guardado en el historial del servicio; revise qué pasó y corrija el estado si hace "
+            "falta.",
+        )
+    if identificacion_por_revisar:
+        abrir_alerta(
+            TipoAlerta.IDENTIFICACION_POR_REVISAR,
+            evento,
+            f"{_toque(evento)}. El Recogido se aplicó, pero el conductor "
+            f"{'; además, '.join(map(_por_revisar, identificacion_por_revisar))}. Revise el "
+            f"vehículo ({evento.servicio.vehiculo}) y corrija su placa o su VIN en el admin si "
+            "hace falta.",
         )
     if evento.capacidad_excedida:
         grua = evento.servicio.grua

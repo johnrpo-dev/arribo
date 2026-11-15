@@ -6,7 +6,8 @@ secuencia, idempotencia, conflictos, capacidad, línea de cobro, alertas) es de
 
 Lo que el conductor hizo no se pierde por un dato raro del celular: de un evento solo son
 indispensables su id, el servicio, el destino y la secuencia. La hora del celular, la ubicación y
-los textos que no se puedan leer se guardan vacíos en vez de rechazar el evento.
+los textos (también la placa y el VIN digitados) que no se puedan leer se guardan vacíos en vez de
+rechazar el evento.
 """
 import logging
 import math
@@ -62,6 +63,9 @@ class EventoSerializer(serializers.Serializer):
     hora_dispositivo = _Hora(required=False, allow_null=True, default=None)
     motivo = _Texto(required=False, allow_null=True, allow_blank=True, default=None)
     nombre_quien = _Texto(required=False, allow_null=True, allow_blank=True, default=None)
+    # Solo cuentan en un Recogido (contrato 1.1); las normaliza `solicitudes.operaciones`.
+    placa = _Texto(required=False, allow_null=True, allow_blank=True, default=None)
+    vin = _Texto(required=False, allow_null=True, allow_blank=True, default=None)
     latitud = _Numero(required=False, allow_null=True, default=None)
     longitud = _Numero(required=False, allow_null=True, default=None)
 

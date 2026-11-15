@@ -32,6 +32,8 @@ class EventoLocal {
     this.vehiculo,
     this.motivo,
     this.nombreQuien,
+    this.placa,
+    this.vin,
     this.estadoEnvio = EstadoEnvio.pendiente,
     this.resultadoMotivo,
     this.resultadoDetalle,
@@ -66,6 +68,11 @@ class EventoLocal {
   /// Quien entrega o recibe el vehículo (1a-13).
   final String? nombreQuien;
 
+  /// Solo en un Recogido: la placa y el VIN que el conductor digitó porque el vehículo llegó sin
+  /// ellos, normalizados (1a-13b, contrato 1.1). null si no digitó ese dato.
+  final String? placa;
+  final String? vin;
+
   final String estadoEnvio;
 
   /// El `motivo` y el `detalle` con que respondió el servidor (en un conflicto o un rechazo).
@@ -93,6 +100,8 @@ class EventoLocal {
     'hora_dispositivo': horaDispositivo.toUtc().toIso8601String(),
     'motivo': motivo,
     'nombre_quien': nombreQuien,
+    'placa': placa,
+    'vin': vin,
     'latitud': null,
     'longitud': null,
   };
@@ -108,6 +117,8 @@ class EventoLocal {
     'hora_dispositivo': horaDispositivo.toUtc().toIso8601String(),
     'motivo': motivo,
     'nombre_quien': nombreQuien,
+    'placa': placa,
+    'vin': vin,
     'estado_envio': estadoEnvio,
     'resultado_motivo': resultadoMotivo,
     'resultado_detalle': resultadoDetalle,
@@ -127,6 +138,8 @@ class EventoLocal {
     horaDispositivo: DateTime.parse(fila['hora_dispositivo']! as String).toUtc(),
     motivo: fila['motivo'] as String?,
     nombreQuien: fila['nombre_quien'] as String?,
+    placa: fila['placa'] as String?,
+    vin: fila['vin'] as String?,
     estadoEnvio: fila['estado_envio']! as String,
     resultadoMotivo: fila['resultado_motivo'] as String?,
     resultadoDetalle: fila['resultado_detalle'] as String?,

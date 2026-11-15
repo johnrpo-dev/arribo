@@ -13,9 +13,10 @@ import 'pantalla_paso.dart';
 import 'requisitos.dart';
 import 'servicio.dart';
 
-/// Todo Recogido y todo Entregado pasan por aquí. Un Recogido se bloquea si al vehículo le falta
-/// la placa o el VIN, o si la grúa va llena (se le muestra al conductor qué vehículo le falta
-/// marcar como Entregado). Si no hay bloqueo, abre la pantalla de fotos y nombre, que es la que
+/// Todo Recogido y todo Entregado pasan por aquí. Un Recogido se bloquea si la grúa va llena (se le
+/// muestra al conductor qué vehículo le falta marcar como Entregado) o, con la configuración
+/// "placa/VIN al asignar", si al vehículo le falta la placa o el VIN (con "al recoger" los digita
+/// en la pantalla del paso). Si no hay bloqueo, abre la pantalla de fotos y nombre, que es la que
 /// guarda el evento. La ruta es restaurable: sobrevive a que Android mate la app con la cámara
 /// abierta.
 Future<void> abrirRecogidoOEntregado(

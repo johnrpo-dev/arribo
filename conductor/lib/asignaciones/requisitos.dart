@@ -1,7 +1,10 @@
 // Lo que exige la app antes de guardar un Recogido o un Entregado.
 //
 // - Recogido: el vehículo identificado (placa o VIN; un desvare, placa) y un puesto libre en la
-//   grúa. Las dos reglas son copia del servidor (identificacion.dart y capacidad.dart).
+//   grúa. Las dos reglas son copia del servidor (identificacion.dart y capacidad.dart). Con la
+//   configuración "placa/VIN al recoger", si al vehículo le falta, el conductor la digita en la
+//   pantalla del Recogido y viaja en el evento (1a-13b); con "al asignar" no se pide: logística
+//   ya debió registrarla y, si falta, el Recogido se bloquea.
 // - Recogido y Entregado: el mínimo de fotos de la configuración de la empresa y el nombre de
 //   quien entrega o recibe el vehículo. Esta regla es de la app: el servidor guarda el evento con
 //   las fotos y el nombre que lleguen.
@@ -34,8 +37,7 @@ BloqueoDeRecogida? bloqueoDeRecogida(
   Iterable<Servicio> ronda, {
   required ConfiguracionApp? configuracion,
 }) {
-  final momento = configuracion?.momentoPlacaVin ?? MomentoIdentificacion.alRecoger;
-  if (identificacionExigida(momento, MomentoIdentificacion.alRecoger)) {
+  if (!seDigitaAlRecoger(configuracion)) {
     final falta = identificacionFaltante(
       placa: servicio.vehiculo.placa,
       vin: servicio.vehiculo.vin,
@@ -46,7 +48,7 @@ BloqueoDeRecogida? bloqueoDeRecogida(
         titulo: 'Falta identificar el vehículo',
         mensaje:
             '$falta Llame a logística para que registren ese dato en el servicio y después '
-            'actualice la lista. La app todavía no permite digitarlo.',
+            'actualice la lista.',
       );
     }
   }
@@ -66,6 +68,57 @@ BloqueoDeRecogida? bloqueoDeRecogida(
     );
   }
   return null;
+}
+
+/// ¿El conductor puede digitar la placa o el VIN que le falten al vehículo al recogerlo? Sí,
+/// salvo con la configuración "al asignar": ahí logística la registra antes de asignar. Sin
+/// configuración guardada vale la de fábrica ("al recoger").
+bool seDigitaAlRecoger(ConfiguracionApp? configuracion) =>
+    (configuracion?.momentoPlacaVin ?? MomentoIdentificacion.alRecoger) !=
+    MomentoIdentificacion.alAsignar;
+
+/// Qué datos le pide digitar la pantalla del Recogido, o null si no le pide ninguno (el vehículo
+/// ya está identificado o la configuración es "al asignar"). Un desvare pide solo la placa, que
+/// es la que exige; un traslado o un evento sin placa ni VIN piden los dos (basta uno).
+({bool placa, bool vin})? identificacionPorDigitar(
+  Servicio servicio, {
+  required ConfiguracionApp? configuracion,
+}) {
+  if (!seDigitaAlRecoger(configuracion)) return null;
+  final vehiculo = servicio.vehiculo;
+  final falta = identificacionFaltante(
+    placa: vehiculo.placa,
+    vin: vehiculo.vin,
+    tipo: servicio.tipo,
+  );
+  if (falta == null) return null;
+  return (placa: true, vin: servicio.tipo != 'desvare');
+}
+
+/// Lo que le falta a la placa o al VIN digitados en la pantalla del Recogido, en frases para el
+/// conductor. Vacía si con lo digitado el vehículo queda identificado y cada dato digitado tiene
+/// el formato correcto.
+List<String> faltantesDeIdentificacion(
+  Servicio servicio, {
+  required String placaDigitada,
+  required String vinDigitado,
+}) {
+  final placa = normalizarPlaca(placaDigitada);
+  final vin = normalizarVin(vinDigitado);
+  final falta = identificacionFaltanteAlRecoger(
+    placaGuardada: servicio.vehiculo.placa,
+    vinGuardado: servicio.vehiculo.vin,
+    placaDigitada: placa,
+    vinDigitado: vin,
+    tipo: servicio.tipo,
+  );
+  return [
+    ?falta,
+    if (placa.isNotEmpty && !placaValida(placa))
+      'La placa debe tener de 1 a $largoMaximoPlaca letras o dígitos.',
+    if (vin.isNotEmpty && !vinValido(vin))
+      'El VIN debe tener $largoVin letras o dígitos, sin I, O ni Q.',
+  ];
 }
 
 String _nombreDe(Servicio servicio) =>

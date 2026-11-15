@@ -1,9 +1,10 @@
 """Las reglas que la app del conductor copia cumplen los casos de `docs/casos-reglas.json`.
 
-La app repite en Dart la máquina de estados, la capacidad, la identificación del vehículo y los
-límites de las fotos. Ese archivo es el contrato entre las dos copias: lo recorren estas pruebas y
-`conductor/test/casos_compartidos_test.dart`. Si una regla cambia aquí, estas pruebas fallan hasta
-que el archivo cambie; y con el archivo cambiado falla la prueba de la app hasta que cambie su copia.
+La app repite en Dart la máquina de estados, la capacidad, la identificación del vehículo (también
+la placa o el VIN digitados al recoger) y los límites de las fotos. Ese archivo es el contrato entre
+las dos copias: lo recorren estas pruebas y `conductor/test/casos_compartidos_test.dart`. Si una
+regla cambia aquí, estas pruebas fallan hasta que el archivo cambie; y con el archivo cambiado falla
+la prueba de la app hasta que cambie su copia.
 """
 import json
 from pathlib import Path
@@ -27,12 +28,17 @@ from nucleo.evidencia import (
     excede_el_tamano,
 )
 from nucleo.identificacion import (
+    LARGO_MAXIMO_PLACA,
     IdentificacionIncompleta,
+    PlacaInvalida,
     VinInvalido,
+    completar_identificacion,
     identificacion_exigida,
     normalizar_placa,
     normalizar_vin,
     validar_identificacion,
+    validar_identificacion_al_recoger,
+    validar_placa,
     validar_vin,
 )
 from nucleo.sincronizacion import DESTINOS_DESDE_LA_APP
@@ -148,6 +154,56 @@ def test_identificacion_del_vehiculo_completa_o_no_como_dice_el_archivo(caso):
 @pytest.mark.parametrize("caso", IDENTIFICACION["exigida"], ids=_nombre)
 def test_momento_en_que_se_exige_la_identificacion_como_dice_el_archivo(caso):
     assert identificacion_exigida(caso["configurado"], caso["momento"]) == caso["exigida"]
+
+
+def test_largo_maximo_de_la_placa_como_dice_el_archivo():
+    assert LARGO_MAXIMO_PLACA == IDENTIFICACION["largo_maximo_placa"]
+
+
+@pytest.mark.parametrize("caso", IDENTIFICACION["placa_valida"], ids=_nombre)
+def test_placa_valida_como_dice_el_archivo(caso):
+    if caso["valida"]:
+        validar_placa(caso["placa"])
+    else:
+        with pytest.raises(PlacaInvalida):
+            validar_placa(caso["placa"])
+
+
+@pytest.mark.parametrize("caso", IDENTIFICACION["al_recoger"], ids=_nombre)
+def test_identificacion_al_recoger_con_lo_digitado_como_dice_el_archivo(caso):
+    argumentos = (
+        caso["vehiculo"]["placa"],
+        caso["vehiculo"]["vin"],
+        caso["digitada"]["placa"],
+        caso["digitada"]["vin"],
+        caso["tipo"],
+    )
+    if caso["completa"]:
+        validar_identificacion_al_recoger(*argumentos)
+    else:
+        with pytest.raises(IdentificacionIncompleta):
+            validar_identificacion_al_recoger(*argumentos)
+
+
+@pytest.mark.parametrize("caso", IDENTIFICACION["completar"], ids=_nombre)
+def test_lo_digitado_al_recoger_completa_el_vehiculo_como_dice_el_archivo(caso):
+    complemento = completar_identificacion(
+        caso["vehiculo"]["placa"],
+        caso["vehiculo"]["vin"],
+        caso["digitada"]["placa"],
+        caso["digitada"]["vin"],
+    )
+    assert {"placa": complemento.placa, "vin": complemento.vin} == caso["queda"]
+    assert [campo.value for campo in complemento.nuevos] == caso["nuevos"]
+    assert [
+        {
+            "campo": dato.campo.value,
+            "digitado": dato.digitado,
+            "revision": dato.revision.value,
+            "existente": dato.existente,
+        }
+        for dato in complemento.por_revisar
+    ] == caso["por_revisar"]
 
 
 # ---------- fotos ----------

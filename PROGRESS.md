@@ -899,6 +899,76 @@ La tarea 1a-16 se partió en dos: 1a-16a (modelo de línea de cobro con sus rest
   8. Opcional, tamaño real de una foto: después del paso 6, mirar cuánto pesa un archivo de
      `backend\media\evidencias\`: debe estar muy por debajo de 5 MB (se esperan unos cientos de KB).
 
+### 1a-13b Placa o VIN digitados al recoger (14 de noviembre de 2026)
+- Hecho (defecto de la 1a-13): con la configuración de fábrica ("placa/VIN al recoger"), un
+  vehículo sin placa ni VIN bloqueaba "Marcar Recogido" y pedía llamar a logística; sin señal no
+  se podía recoger. Ahora la pantalla del Recogido pide digitar la placa o el VIN (un desvare, la
+  placa), lo digitado se guarda mientras escribe (sobrevive a que Android mate la app), viaja en el
+  evento por la cola y la lista y el detalle muestran el vehículo con esa placa enseguida, también
+  sin señal. Con "placa/VIN al asignar" no se pide: el Recogido se sigue bloqueando como antes.
+- Contrato 1.1 (`docs/api-conductor.md`, primero): el evento Recogido acepta `placa` y `vin`
+  opcionales, normalizados como `nucleo/identificacion.py`. En otro destino se ignoran. Un dato
+  ilegible (un objeto o una lista) se guarda vacío sin tumbar el evento; un número se lee como
+  texto. La respuesta no cambia. La versión del contrato en el cuerpo sigue siendo 1: es un cambio
+  compatible (una app 1.0 no los manda y el servidor sigue igual).
+- Decidido (regla, en `nucleo/identificacion.py` con sus casos compartidos):
+  `validar_identificacion_al_recoger` cuenta lo digitado donde al vehículo le falte, aunque esté mal
+  formado (el conductor lo leyó del vehículo que montó); `completar_identificacion` dice qué se
+  guarda: lo que el vehículo no tenía y es válido; nunca sobreescribe uno distinto; lo distinto o
+  inválido queda por revisar. Placa válida: de 1 a 10 letras o dígitos (`validar_placa`).
+- Decidido (servidor, `solicitudes/operaciones.py`): el Recogido nunca se rechaza por lo digitado.
+  Se aplica, lo digitado queda en el evento (`placa_digitada`, `vin_digitado`, migración 0005) y
+  lo que no quedó en el vehículo abre la alerta nueva "Placa o VIN digitado por revisar" (una por
+  evento, migración 0002 de `alertas`): dato distinto, inválido o que ya es de otro vehículo. La
+  fila del vehículo se bloquea antes de comparar; cada dato se guarda en su propio punto de
+  restauración, así que un choque con la unicidad de la base (otro Recogido simultáneo guardó la
+  misma placa en otro vehículo) deshace solo ese dato y el evento sigue. Un Recogido sin
+  identificación y sin nada digitado sigue siendo conflicto `identificacion_incompleta`, y un
+  conflicto no toca el vehículo. El reenvío del mismo evento no repite nada.
+- Decidido (app): `identificacionPorDigitar` decide qué campos se muestran (traslado o evento sin
+  placa ni VIN: los dos, basta uno; desvare sin placa: solo la placa). Al marcar se revisa con la
+  copia de la regla: falta, VIN de 17 sin I, O ni Q, placa de 1 a 10. Migración 4 de la base
+  local (`pasos_en_curso.placa_digitada`/`vin_digitado`, `eventos_pendientes.placa`/`vin`). La
+  lista superpone lo digitado de un Recogido pendiente sobre el vehículo, donde le falte; al
+  aplicarse, se escribe en la lista guardada hasta que se vuelva a pedir.
+- Lo que el servidor no revalida (mínimo de fotos, nombre de quien entrega o recibe) quedó igual.
+- Pruebas que cambiaron porque codificaban el defecto: en `requisitos_test.dart` y
+  `pantalla_paso_test.dart`, "sin placa ni VIN no se puede recoger, llame a logística" y "al
+  recoger se exige siempre, también con al asignar" pasan a "pide digitarla" con "al recoger" y
+  "se bloquea" con "al asignar"; "la identificación se revisa antes que la capacidad" ahora es con
+  "al asignar". En `cola_eventos_test.dart` y `api_eventos_test.dart`, el JSON del evento incluye
+  `placa` y `vin` (null), como dice el contrato 1.1.
+- Verificado: en `backend/`, `uv run pytest -q` (1743 pruebas), `uv run ruff check .`,
+  `manage.py makemigrations --check` sin cambios y `manage.py migrate` aplicado en la base local.
+  Pruebas nuevas contra PostgreSQL: placa digitada guardada, distinta no se pisa y alerta, de otro
+  vehículo da aplicado más alerta sin romper el lote, inválida da aplicado más alerta, duplicado
+  sin efectos repetidos, sin valores de cobro, y dos Recogidos simultáneos con la misma placa (uno
+  la guarda, el otro alerta). Comprobado quitando a propósito el punto de restauración: fallan la
+  prueba de unicidad y la de concurrencia. En `conductor/`, `flutter analyze` sin problemas,
+  `flutter test` (418 pruebas) y `flutter build apk --debug` compila. Comprobado quitando a
+  propósito la superposición en la lista y el guardado al aplicarse: fallan sus pruebas. **No se
+  probó en el celular.**
+- Preguntas abiertas nuevas: cuatro en `QUESTIONS.md` ("al asignar" con un vehículo sin
+  identificar, qué es una placa válida, qué hace logística con la alerta, dónde se piden en la
+  pantalla). La de la 1a-13 sobre digitar la placa pasó a resueltas.
+- Cómo probar (5 minutos, con el Motorola por USB; es el punto 9c de `docs/prueba-sin-senal.md`):
+  1. Desde `backend/`: `uv run python manage.py migrate` y `uv run python manage.py runserver`.
+     Confirmar en Configuración que el momento de placa/VIN es "al recoger". Registrar un
+     traslado sin placa ni VIN y asignarlo a Ana. En otra ventana, `adb.exe reverse tcp:8000
+     tcp:8000` y, desde `conductor/`, `flutter run`.
+  2. En la app, "Marcar En camino" y confirmar. Activar el modo avión y quitar el reverse
+     (`adb.exe reverse --remove-all`). "Marcar Recogido": aparecen "Identificación del vehículo",
+     Placa y VIN. Tomar las fotos y escribir el nombre sin placa: "Marcar Recogido" dice "El
+     vehículo necesita placa o VIN (al menos uno).".
+  3. Escribir la placa "abc-123" y marcar: el detalle y la lista muestran ABC123 y "Pendiente por
+     enviar".
+  4. Devolver la señal (`adb.exe reverse tcp:8000 tcp:8000`, quitar el modo avión) y deslizar la
+     lista: en `/admin/` → Solicitudes → Vehículos ese vehículo tiene la placa ABC123 y en Eventos
+     de estado el Recogido muestra la placa digitada.
+  5. Opcional: repetir con un segundo traslado y digitar la placa de un vehículo ya registrado: el
+     Recogido se aplica, el vehículo sigue sin placa y en `/admin/` → Alertas aparece "Placa o VIN
+     digitado por revisar" con lo que digitó.
+
 ## Escalamientos
 
 Ninguno todavía.

@@ -19,6 +19,7 @@ import 'package:uuid/uuid.dart';
 
 import '../api.dart';
 import '../asignaciones/estados.dart';
+import '../asignaciones/identificacion.dart';
 import '../base_local.dart';
 import 'evento.dart';
 
@@ -48,6 +49,9 @@ class ColaEventos {
   /// [id] permite a quien llama fijar el UUID antes (las fotos de un Recogido o de un Entregado se
   /// atan al evento desde que se toman); si no llega, se genera aquí.
   ///
+  /// [placa] y [vin] son lo que el conductor digitó al recoger un vehículo que llegó sin ellos: se
+  /// guardan normalizados y solo en un Recogido (en otro destino se ignoran, como en el servidor).
+  ///
   /// [alGuardar] se ejecuta dentro de la misma transacción, con el evento ya insertado: lo usa la
   /// cola de fotos para comprobar los requisitos del paso y pasar sus fotos a la cola de subida. Si
   /// lanza, no se guarda nada (ni el evento ni la secuencia).
@@ -58,10 +62,15 @@ class ColaEventos {
     required DateTime hora,
     String? motivo,
     String? nombreQuien,
+    String? placa,
+    String? vin,
     String? id,
     Future<void> Function(Transaction txn, EventoLocal evento)? alGuardar,
   }) async {
     final motivoLimpio = _limpio(motivo);
+    final recoge = destino == Estado.recogido;
+    final placaDigitada = recoge ? _limpio(normalizarPlaca(placa)) : null;
+    final vinDigitado = recoge ? _limpio(normalizarVin(vin)) : null;
     if (!destinosDesdeLaApp.contains(destino)) {
       throw const ToqueNoValido('Ese cambio de estado no se hace desde la app.');
     }
@@ -95,12 +104,17 @@ class ColaEventos {
         conductorId: conductor.id,
         conductorNombre: conductor.nombre,
         servicioId: servicioId,
-        vehiculo: (servicio['vehiculo_placa'] ?? servicio['vehiculo_vin']) as String?,
+        vehiculo:
+            (servicio['vehiculo_placa'] ?? servicio['vehiculo_vin']) as String? ??
+            placaDigitada ??
+            vinDigitado,
         destino: destino,
         secuencia: secuencia,
         horaDispositivo: ahora,
         motivo: motivoLimpio,
         nombreQuien: _limpio(nombreQuien),
+        placa: placaDigitada,
+        vin: vinDigitado,
         creadoEn: ahora,
       );
       await txn.insert('eventos_pendientes', evento.aFila());
@@ -187,6 +201,9 @@ class ColaEventos {
   /// - `aplicado`, `conflicto` y `rechazado` son definitivos: el evento deja de estar pendiente y
   ///   guarda el motivo y el detalle. Venga o no marcado como duplicado, es lo mismo.
   /// - `reintentar` (o un resultado que esta versión no conoce) lo deja pendiente, tal cual.
+  /// - Un Recogido aplicado con la placa o el VIN digitados los deja en el vehículo de la lista
+  ///   local, donde le falten (lo mismo que hizo el servidor), para que se sigan viendo hasta que
+  ///   la lista se vuelva a pedir.
   /// - El estado del servicio que manda el servidor corrige el de la lista local, solo si a ese
   ///   servicio no le quedan eventos pendientes. Si ya no está en la ronda del conductor, se quita
   ///   de la lista. Al corregir se olvida el ETag de la lista: la próxima consulta la trae completa
@@ -205,6 +222,7 @@ class ColaEventos {
     return base.db.transaction((txn) async {
       var resueltos = 0;
       final remotos = <int, EstadoRemoto>{};
+      final aplicados = <EventoLocal>[];
       for (final (posicion, evento) in lote.indexed) {
         final resultado = resultados[posicion];
         final remoto = resultado.servicio;
@@ -216,7 +234,7 @@ class ColaEventos {
           _ => null,
         };
         if (estadoEnvio == null) continue;
-        resueltos += await txn.update(
+        final cambio = await txn.update(
           'eventos_pendientes',
           {
             'estado_envio': estadoEnvio,
@@ -227,12 +245,17 @@ class ColaEventos {
           where: "id = ? AND estado_envio = 'pendiente'",
           whereArgs: [evento.id],
         );
+        resueltos += cambio;
+        if (cambio > 0 && estadoEnvio == EstadoEnvio.aplicado) aplicados.add(evento);
       }
 
       // La lista guardada es del último conductor que ingresó. Si la respuesta es de eventos de
       // otro (llegó después de que cambiara la sesión), no se toca esa lista.
       final dueno = (await base.leerJson(Clave.conductor, en: txn))?['id'];
       if (dueno != conductorId) return resueltos;
+      for (final evento in aplicados) {
+        await _completarVehiculo(txn, evento);
+      }
       var corregidos = 0;
       for (final remoto in remotos.values) {
         final quedan = await pendientes(conductorId, servicioId: remoto.id, limite: 1, en: txn);
@@ -257,6 +280,34 @@ class ColaEventos {
       return resueltos;
     });
   }
+}
+
+/// Lo digitado al recoger, en el vehículo de la lista local donde le falte (nunca sobreescribe).
+Future<void> _completarVehiculo(Transaction txn, EventoLocal evento) async {
+  if (evento.destino != Estado.recogido || (evento.placa == null && evento.vin == null)) return;
+  final filas = await txn.query(
+    'servicios',
+    columns: ['vehiculo_placa', 'vehiculo_vin'],
+    where: 'id = ?',
+    whereArgs: [evento.servicioId],
+  );
+  if (filas.isEmpty) return;
+  final complemento = completarIdentificacion(
+    placaGuardada: filas.first['vehiculo_placa'] as String?,
+    vinGuardado: filas.first['vehiculo_vin'] as String?,
+    placaDigitada: evento.placa,
+    vinDigitado: evento.vin,
+  );
+  if (complemento.nuevos.isEmpty) return;
+  await txn.update(
+    'servicios',
+    {
+      for (final campo in complemento.nuevos)
+        'vehiculo_$campo': campo == CampoIdentificacion.placa ? complemento.placa : complemento.vin,
+    },
+    where: 'id = ?',
+    whereArgs: [evento.servicioId],
+  );
 }
 
 String? _limpio(String? texto) {

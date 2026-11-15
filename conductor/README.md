@@ -132,6 +132,10 @@ nombrarlo en un aviso), `archivo_borrado_en` (cuándo se borró el JPEG del celu
 de confirmada la subida) y `visto_en` (cuándo el conductor dio por visto el aviso de una foto
 rechazada).
 
+Versión 4 (1a-13b): `placa_digitada` y `vin_digitado` en `pasos_en_curso` (como van escritos en la
+pantalla del Recogido; vacíos si no se pidieron) y `placa` y `vin` en `eventos_pendientes`
+(normalizados, solo en un Recogido; null si no se digitaron).
+
 `BaseLocal.pendientesPorEnviar()` cuenta eventos y fotos pendientes (de todos, o de un conductor):
 mientras el conductor de la sesión tenga alguno, la app no le cierra la sesión (el servidor toma como
 conductor del evento al dueño del token). Las fotos en borrador y las rechazadas no cuentan.
@@ -181,10 +185,20 @@ Reglas que no se rompen:
 archivo cambie; con el archivo cambiado, falla la de la app hasta que cambie su copia.
 
 **Antes de abrir la pantalla** (`abrirRecogidoOEntregado`), un Recogido se bloquea, diciendo por
-qué, si al vehículo le falta la placa o el VIN (un desvare exige placa) o si la grúa ya lleva tantos
-vehículos montados como puestos; en ese caso lista los que falta marcar como Entregado. "Montado" se
-calcula con lo que ve el conductor: lo confirmado más sus toques sin enviar, así que funciona sin
-señal. El contrato no deja que el conductor digite la placa: la registra logística.
+qué, si la grúa ya lleva tantos vehículos montados como puestos (lista los que falta marcar como
+Entregado) o, con la configuración "placa/VIN al asignar", si al vehículo le falta la placa o el VIN
+(un desvare exige placa): que llame a logística. "Montado" se calcula con lo que ve el conductor: lo
+confirmado más sus toques sin enviar, así que funciona sin señal.
+
+**Placa o VIN digitados (1a-13b).** Con "placa/VIN al recoger" (la de fábrica), un vehículo sin
+placa ni VIN (o un desvare sin placa) no bloquea: la pantalla del Recogido pide digitarlos
+(`identificacionPorDigitar` en `requisitos.dart`; un desvare pide solo la placa). Se guardan como van
+escritos en el paso en curso y, al marcar, se revisan con la copia de la regla
+(`faltantesDeIdentificacion`: falta, VIN de 17 sin I, O ni Q, placa de 1 a 10) y viajan
+normalizados en el evento (`placa`, `vin`; contrato 1.1). La lista y el detalle muestran el vehículo
+con lo digitado mientras el evento está pendiente; cuando el servidor lo aplica, queda en la lista
+guardada donde le faltaba, hasta que la lista se vuelva a pedir. Lo que el servidor haga con ello
+(guardarlo o abrir una alerta a logística) está en `docs/api-conductor.md`.
 
 **La pantalla** (`pantalla_paso.dart`) pide las fotos y el nombre de quien entrega (Recogido) o
 recibe (Entregado). Todo queda en la base a medida que avanza: el paso se crea al abrirla, con el

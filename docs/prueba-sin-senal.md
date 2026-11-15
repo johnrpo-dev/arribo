@@ -64,6 +64,16 @@ camino y su vehículo debe tener placa o VIN.
    actividades". Abrir "Marcar Entregado" en el primer servicio, tomar una foto, escribir medio
    nombre y tocar "Tomar foto" otra vez; tomar la foto y aceptarla. Esperado: la app vuelve a la
    misma pantalla con las dos fotos y el nombre como iba. Desactivar la opción al terminar.
+9c. [ ] **Vehículo sin placa, sin señal.** Con "Placa/VIN al recoger" en Configuración (la de
+   fábrica), registrar en el panel un traslado sin placa ni VIN, asignarlo a Ana y, en la app,
+   marcarlo En camino. Activar el modo avión y tocar "Marcar Recogido". Esperado: se abre la
+   pantalla de fotos con "Identificación del vehículo" y los campos Placa y VIN. Con las fotos y el
+   nombre pero sin placa ni VIN, "Marcar Recogido" no deja y dice "El vehículo necesita placa o VIN
+   (al menos uno).". Escribir una placa y marcar: vuelve al detalle con la placa arriba y
+   "Pendiente por enviar"; la lista también la muestra. Quitar el modo avión: en el panel el
+   vehículo queda con esa placa. Repetir con la placa de otro vehículo ya registrado: el Recogido
+   se aplica igual, el vehículo sigue sin placa y en `/admin/` → Alertas aparece "Placa o VIN
+   digitado por revisar".
 
 ## Conflictos
 

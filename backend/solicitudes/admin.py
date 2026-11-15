@@ -107,6 +107,8 @@ class EventoEstadoInline(SoloLecturaInline):
         "conductor",
         "motivo",
         "nombre_quien",
+        "placa_digitada",
+        "vin_digitado",
         "secuencia",
         "hora_dispositivo",
     )
@@ -143,7 +145,14 @@ class EventoEstadoAdmin(SoloLecturaAdmin):
         "conductor",
     )
     list_filter = ("resultado", "origen", "destino", "capacidad_excedida")
-    search_fields = ("id", "servicio__vehiculo__placa", "conductor__nombre", "motivo")
+    search_fields = (
+        "id",
+        "servicio__vehiculo__placa",
+        "conductor__nombre",
+        "motivo",
+        "placa_digitada",
+        "vin_digitado",
+    )
     date_hierarchy = "hora_sincronizacion"
 
 
