@@ -1,0 +1,29 @@
+<section class="bloque" aria-labelledby="t-documentos">
+  <h2 class="titulo-seccion" id="t-documentos">Documentos</h2>
+  {% if vencidos %}
+  <p class="aviso aviso--error"><strong>{% if es_grua %}Quien maneje esta grúa no recibe servicios nuevos{% else %}No recibe servicios nuevos{% endif %}</strong> mientras tenga vencido: {{ vencidos|join:"; " }}. Lo que ya tiene en curso sigue.</p>
+  {% endif %}
+  {% if documentos %}
+  <p class="ayuda">Un documento sirve hasta el día en que vence, inclusive. Para registrar uno o renovarlo, pulse su estado: el nuevo reemplaza al anterior, que queda en el historial.</p>
+  <div class="tabla-contenedor">
+    <table class="tabla">
+      <thead>
+        <tr>
+          <th scope="col">Documento</th>
+          <th scope="col">Estado</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for e in documentos %}
+        <tr>
+          <th scope="row">{{ e.tipo.nombre }}</th>
+          <td>{% if es_grua %}{% url 'documento_de_grua' sujeto.pk e.tipo.pk as enlace %}{% else %}{% url 'documento_de_conductor' sujeto.pk e.tipo.pk as enlace %}{% endif %}{% include "documentos/parcial_celda.html" %}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="vacio"><p>No hay tipos de documento activos para {% if es_grua %}grúas{% else %}conductores{% endif %}. Se crean en <a href="{% url 'tipos_documento' %}">Tipos de documento</a>.</p></div>
+  {% endif %}
+</section>

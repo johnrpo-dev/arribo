@@ -1,0 +1,128 @@
+{% extends "base.html" %}
+{% block titulo %}Flota y personal{% endblock %}
+{% block contenido %}
+<h1 class="titulo-pagina">Flota y personal</h1>
+<p class="ayuda">Aquí se crean los conductores, las grúas y los usuarios de oficina. Los documentos de cada conductor y de cada grúa se ven y se registran en su página: pulse su nombre o su placa. Nada se borra: quien ya no trabaja aquí se desactiva.</p>
+
+{% if vencidos %}
+<p class="aviso aviso--error">{% if vencidos == 1 %}Hay 1 documento vencido{% else %}Hay {{ vencidos }} documentos vencidos{% endif %}. Un conductor con un documento vencido, o cuya grúa tenga uno vencido, no recibe servicios nuevos; lo que ya tiene en curso sigue.</p>
+{% endif %}
+{% if por_vencer %}
+<p class="aviso aviso--advertencia">{% if por_vencer == 1 %}Hay 1 documento por vencer{% else %}Hay {{ por_vencer }} documentos por vencer{% endif %}.</p>
+{% endif %}
+
+<section class="bloque" aria-labelledby="t-conductores">
+  <h2 class="titulo-seccion" id="t-conductores">Conductores</h2>
+  {% if conductores %}
+  <div class="tabla-contenedor">
+    <table class="tabla">
+      <thead>
+        <tr>
+          <th scope="col">Nombre</th>
+          <th scope="col">Celular</th>
+          <th scope="col">Grúa</th>
+          <th scope="col">Documentos</th>
+          <th scope="col">App</th>
+          <th scope="col">Activo</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for conductor, grua, acceso, documentos in conductores %}
+        <tr>
+          <th scope="row"><a href="{% url 'conductor_personal' conductor.pk %}">{{ conductor.nombre }}</a></th>
+          <td class="cifra">{{ conductor.celular }}</td>
+          <td>{% if grua %}{{ grua.placa }}{% else %}<span class="texto-secundario">Sin grúa</span>{% endif %}</td>
+          <td>{% include "flota/parcial_resumen.html" with resumen=documentos %}</td>
+          <td>{% if acceso == "Puede entrar" %}{{ acceso }}{% else %}<span class="texto-secundario">{{ acceso }}</span>{% endif %}</td>
+          <td>{% if conductor.activo %}Sí{% else %}<span class="texto-secundario">No</span>{% endif %}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="vacio"><p>No hay conductores registrados.</p></div>
+  {% endif %}
+  <div class="acciones">
+    <a class="boton boton--principal" href="{% url 'nuevo_conductor' %}">Nuevo conductor</a>
+  </div>
+</section>
+
+<section class="bloque" aria-labelledby="t-gruas">
+  <h2 class="titulo-seccion" id="t-gruas">Grúas</h2>
+  {% if gruas %}
+  <div class="tabla-contenedor">
+    <table class="tabla">
+      <thead>
+        <tr>
+          <th scope="col">Placa</th>
+          <th scope="col">Descripción</th>
+          <th scope="col">Capacidad</th>
+          <th scope="col">Estado</th>
+          <th scope="col">Documentos</th>
+          <th scope="col">Activa</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for grua, documentos in gruas %}
+        <tr>
+          <th scope="row"><a href="{% url 'editar_grua' grua.pk %}">{{ grua.placa }}</a></th>
+          <td>{{ grua.descripcion|default:"—" }}</td>
+          <td>{{ grua.get_capacidad_display }}</td>
+          <td>{{ grua.get_estado_operativo_display }}</td>
+          <td>{% include "flota/parcial_resumen.html" with resumen=documentos %}</td>
+          <td>{% if grua.activa %}Sí{% else %}<span class="texto-secundario">No</span>{% endif %}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="vacio"><p>No hay grúas registradas.</p></div>
+  {% endif %}
+  <div class="acciones">
+    <a class="boton boton--principal" href="{% url 'nueva_grua' %}">Nueva grúa</a>
+  </div>
+</section>
+
+<section class="bloque" aria-labelledby="t-usuarios">
+  <h2 class="titulo-seccion" id="t-usuarios">Usuarios de oficina</h2>
+  {% if usuarios %}
+  <div class="tabla-contenedor">
+    <table class="tabla">
+      <thead>
+        <tr>
+          <th scope="col">Nombre</th>
+          <th scope="col">Usuario</th>
+          <th scope="col">Rol</th>
+          <th scope="col">Activo</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for u, rol in usuarios %}
+        <tr>
+          <th scope="row"><a href="{% url 'usuario_personal' u.pk %}">{{ u.get_full_name|default:u.get_username }}</a></th>
+          <td>{{ u.get_username }}</td>
+          <td>{{ rol }}</td>
+          <td>{% if u.is_active %}Sí{% else %}<span class="texto-secundario">No</span>{% endif %}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="vacio"><p>No hay usuarios de oficina.</p></div>
+  {% endif %}
+  <div class="acciones">
+    <a class="boton boton--principal" href="{% url 'nuevo_usuario' %}">Nuevo usuario</a>
+  </div>
+</section>
+
+<section class="bloque" aria-labelledby="t-tipos">
+  <h2 class="titulo-seccion" id="t-tipos">Tipos de documento</h2>
+  <p class="ayuda">Qué documentos se exigen a los conductores y a las grúas, y con cuántos días de anticipación se avisa. Estado de los documentos al {{ hoy|date:"d/m/Y" }}.</p>
+  <div class="acciones">
+    <a class="boton boton--secundario" href="{% url 'tipos_documento' %}">Tipos de documento</a>
+  </div>
+</section>
+{% endblock %}

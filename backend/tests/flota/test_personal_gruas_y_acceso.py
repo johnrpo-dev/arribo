@@ -5,7 +5,7 @@ from flota.models import Conductor, Grua
 
 pytestmark = pytest.mark.django_db
 
-URL_NUEVA = "/personal/gruas/nueva/"
+URL_NUEVA = "/flota/gruas/nueva/"
 
 
 def datos_grua(**otros):
@@ -43,7 +43,7 @@ def test_la_capacidad_es_1_o_2(client, administrador):
 
 def test_editar_grua_y_cambiar_su_estado(client, administrador, grua1):
     respuesta = client.post(
-        f"/personal/gruas/{grua1.pk}/",
+        f"/flota/gruas/{grua1.pk}/",
         datos_grua(placa="GRU001", capacidad="1", estado_operativo="fuera_de_servicio",
                    activa=""),
     )
@@ -63,14 +63,14 @@ def rutas(ana, crear_usuario):
     lina = crear_usuario("logistica", username="lina")
     grua = Grua.objects.get(placa="GRU001")
     return [
-        "/personal/",
-        "/personal/conductores/nuevo/",
-        f"/personal/conductores/{ana.pk}/",
-        f"/personal/conductores/{ana.pk}/desactivar/",
-        "/personal/usuarios/nuevo/",
-        f"/personal/usuarios/{lina.pk}/",
-        "/personal/gruas/nueva/",
-        f"/personal/gruas/{grua.pk}/",
+        "/flota/",
+        "/flota/conductores/nuevo/",
+        f"/flota/conductores/{ana.pk}/",
+        f"/flota/conductores/{ana.pk}/desactivar/",
+        "/flota/usuarios/nuevo/",
+        f"/flota/usuarios/{lina.pk}/",
+        "/flota/gruas/nueva/",
+        f"/flota/gruas/{grua.pk}/",
     ]
 
 
@@ -95,7 +95,7 @@ def test_logistica_y_facturacion_reciben_403(client, crear_usuario, rutas, ana, 
     for ruta in rutas:
         assert client.get(ruta).status_code == 403, ruta
     for accion in ACCIONES_POST:
-        ruta = "/personal/" + accion.format(c=ana.pk, u=otro.pk)
+        ruta = "/flota/" + accion.format(c=ana.pk, u=otro.pk)
         assert client.post(ruta).status_code == 403, ruta
     ana.refresh_from_db()
     assert ana.activo
@@ -124,7 +124,7 @@ def test_las_acciones_solo_aceptan_post(client, administrador, ana):
     for accion in ACCIONES_POST:
         if "desactivar" in accion and "conductores" in accion:
             continue  # su GET es la confirmación
-        ruta = "/personal/" + accion.format(c=ana.pk, u=administrador.pk)
+        ruta = "/flota/" + accion.format(c=ana.pk, u=administrador.pk)
         assert client.get(ruta).status_code == 405, ruta
     ana.refresh_from_db()
     assert ana.activo
@@ -132,7 +132,7 @@ def test_las_acciones_solo_aceptan_post(client, administrador, ana):
 
 def test_ninguna_pantalla_tiene_boton_de_borrar(client, administrador, rutas, ana_app):
     Conductor.objects.create(nombre="Flaco", celular="3204445566", activo=False)
-    for ruta in [*rutas, f"/personal/usuarios/{administrador.pk}/"]:
+    for ruta in [*rutas, f"/flota/usuarios/{administrador.pk}/"]:
         contenido = client.get(ruta).content.decode().lower()
         for palabra in ("borrar", "eliminar", "delete"):
             assert palabra not in contenido, (ruta, palabra)
@@ -140,7 +140,7 @@ def test_ninguna_pantalla_tiene_boton_de_borrar(client, administrador, rutas, an
 
 def test_la_pantalla_no_habla_de_grupos_ni_permisos(client, administrador, rutas, crear_usuario):
     dueno = crear_usuario(superusuario=True, username="john")
-    for ruta in [*rutas, f"/personal/usuarios/{dueno.pk}/"]:
+    for ruta in [*rutas, f"/flota/usuarios/{dueno.pk}/"]:
         contenido = client.get(ruta).content.decode().lower()
         for palabra in ("grupo", "permiso", "staff", "superusuario"):
             assert palabra not in contenido, (ruta, palabra)

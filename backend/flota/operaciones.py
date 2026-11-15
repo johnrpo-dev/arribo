@@ -1,4 +1,4 @@
-"""Operaciones de la pantalla "Personal y grúas" (1a-08b): conductores, usuarios de oficina y grúas.
+"""Operaciones de la pantalla "Flota y personal" (1a-08b; unida en 1a-08c): conductores, usuarios de oficina y grúas.
 
 Cada operación corre en una transacción: si algo falla, no queda nada a medias (ni un usuario sin
 ficha de conductor, ni una asignación cerrada sin la nueva). Nada se borra: se desactiva.
@@ -15,7 +15,7 @@ conductor entra solo con celular y PIN, nunca al panel.
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
 from django.core.exceptions import ValidationError
-from django.db import transaction
+from django.db import IntegrityError, transaction
 from django.db.models import Exists, OuterRef, Q
 from django.utils import timezone
 
@@ -176,6 +176,33 @@ def crear_conductor(*, nombre: str, celular: str, pin: str, grua=None) -> Conduc
     if grua is not None:
         _abrir_asignacion(conductor, grua, timezone.now())
     return conductor
+
+
+def editar_datos_conductor(conductor, *, nombre: str, celular: str) -> Conductor:
+    """Cambia el nombre y el celular del conductor. El celular se normaliza y es único: si ya es de
+    otro conductor, OperacionInvalida y no cambia nada. El nombre del usuario de la app (que es de
+    este conductor) se actualiza con él; su nombre de usuario interno y su PIN no cambian, ni se
+    cierran sus sesiones: desde el próximo ingreso entra con el celular nuevo."""
+    try:
+        with transaction.atomic():
+            bloqueado = _bloquear(conductor)
+            bloqueado.nombre = nombre.strip()
+            bloqueado.celular = celular
+            try:
+                bloqueado.full_clean(exclude=["usuario"])
+            except ValidationError as error:
+                raise OperacionInvalida(_mensajes(error)) from error
+            bloqueado.save(update_fields=["nombre", "celular"])
+            usuario = bloqueado.usuario
+            if es_usuario_de_conductor(usuario):
+                usuario.first_name = bloqueado.nombre[: Usuario._meta.get_field("first_name").max_length]
+                usuario.save(update_fields=["first_name"])
+    except IntegrityError as error:
+        # Otra persona le puso ese celular a otro conductor mientras tanto.
+        raise OperacionInvalida(
+            "Otro conductor ya tiene ese celular. No se guardó el cambio."
+        ) from error
+    return bloqueado
 
 
 @transaction.atomic

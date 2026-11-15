@@ -1,4 +1,4 @@
-"""Formularios de Flota y documentos: registrar un documento y crear o editar un tipo."""
+"""Formularios de documentos (sección Flota y personal): registrar un documento y crear o editar un tipo."""
 from typing import ClassVar
 
 from django import forms

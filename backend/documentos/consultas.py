@@ -164,3 +164,34 @@ def documentos_por_vencer(fecha: date) -> list[EstadoDeTipo]:
     return sorted(
         avisos, key=lambda e: (e.documento.como_nucleo().ultimo_dia_valido, e.descripcion)
     )
+
+
+# --- Resumen para la lista de Flota y personal ---------------------------------------------------
+
+# Del más grave al más leve: el resumen de una grúa o un conductor es el primero que tenga.
+# Vencido bloquea asignaciones; falta y por vencer no bloquean, pero hay que atenderlos.
+GRAVEDAD = (EstadoDocumento.VENCIDO, EstadoDocumento.FALTA, EstadoDocumento.POR_VENCER)
+TEXTO_RESUMEN = {
+    EstadoDocumento.VENCIDO: "Vencido",
+    EstadoDocumento.FALTA: "Falta",
+    EstadoDocumento.POR_VENCER: "Por vencer",
+}
+
+
+@dataclass(frozen=True)
+class Resumen:
+    """Cómo están, en conjunto, los documentos de una grúa o un conductor."""
+
+    texto: str  # "Vencido", "Falta", "Por vencer" o "Al día"
+    clase: str  # etiqueta de estado de arribo.css
+    documentos: tuple[str, ...]  # nombres de los tipos en ese estado (vacío si al día)
+
+
+def resumen(estados: Iterable[EstadoDeTipo]) -> Resumen:
+    """El estado más grave entre los documentos (vigente y "aún no aplica" cuentan como al día)."""
+    estados = list(estados)
+    for grave in GRAVEDAD:
+        nombres = tuple(e.tipo.nombre for e in estados if e.estado == grave)
+        if nombres:
+            return Resumen(TEXTO_RESUMEN[grave], CLASE_DE_ESTADO[grave], nombres)
+    return Resumen("Al día", CLASE_DE_ESTADO[EstadoDocumento.VIGENTE], ())

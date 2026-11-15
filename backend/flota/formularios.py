@@ -1,4 +1,4 @@
-"""Formularios de "Personal y grúas". Validan lo que escribe la persona de oficina con las reglas que
+"""Formularios de "Flota y personal". Validan lo que escribe la persona de oficina con las reglas que
 ya existen (PIN en `nucleo/ingreso.py`, celular en `nucleo/identificacion.py`, contraseña con los
 validadores de Django) y muestran los errores en español junto a cada campo."""
 from typing import ClassVar
@@ -66,7 +66,9 @@ class _CampoGrua(forms.ModelChoiceField):
         return texto
 
 
-class FormularioNuevoConductor(_ConPin):
+class _DatosConductor(forms.Form):
+    """Nombre y celular. El celular se normaliza y no puede ser de otro conductor."""
+
     nombre = forms.CharField(label="Nombre", max_length=Conductor._meta.get_field("nombre").max_length)
     celular = forms.CharField(
         label="Celular",
@@ -74,6 +76,36 @@ class FormularioNuevoConductor(_ConPin):
         widget=forms.TextInput(attrs={"inputmode": "tel", "autocomplete": "off"}),
         help_text="Con el que el conductor entra a la app.",
     )
+
+    def __init__(self, *args, conductor=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.conductor = conductor
+
+    def clean_nombre(self):
+        nombre = self.cleaned_data["nombre"].strip()
+        if not nombre:
+            raise forms.ValidationError("Escriba el nombre del conductor.")
+        return nombre
+
+    def clean_celular(self):
+        try:
+            celular = normalizar_telefono(self.cleaned_data["celular"])
+        except TelefonoInvalido as error:
+            raise forms.ValidationError(str(error)) from error
+        otros = Conductor.objects.filter(celular=celular)
+        if self.conductor is not None:
+            otros = otros.exclude(pk=self.conductor.pk)
+        otro = otros.first()
+        if otro is not None:
+            raise forms.ValidationError(f"Ya hay un conductor con el celular {celular}: {otro}.")
+        return celular
+
+
+class FormularioDatosConductor(_DatosConductor):
+    pass
+
+
+class FormularioNuevoConductor(_ConPin, _DatosConductor):
     grua = _CampoGrua(
         label="Grúa",
         queryset=Grua.objects.none(),
@@ -87,22 +119,6 @@ class FormularioNuevoConductor(_ConPin):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields["grua"].queryset = _opciones_de_grua()
-
-    def clean_nombre(self):
-        nombre = self.cleaned_data["nombre"].strip()
-        if not nombre:
-            raise forms.ValidationError("Escriba el nombre del conductor.")
-        return nombre
-
-    def clean_celular(self):
-        try:
-            celular = normalizar_telefono(self.cleaned_data["celular"])
-        except TelefonoInvalido as error:
-            raise forms.ValidationError(str(error)) from error
-        otro = Conductor.objects.filter(celular=celular).first()
-        if otro is not None:
-            raise forms.ValidationError(f"Ya hay un conductor con el celular {celular}: {otro}.")
-        return celular
 
 
 class FormularioPin(_ConPin):
