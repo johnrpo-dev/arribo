@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% block titulo %}Solicitudes{% endblock %}
+{% block contenido %}
+<h1 class="titulo-pagina">Solicitudes</h1>
+
+<div class="acciones">
+  <a class="boton boton--principal" href="{% url 'nueva_solicitud' %}">Nueva solicitud</a>
+</div>
+
+{% include "solicitudes/parcial_buscar.html" %}
+
+<nav class="acciones" aria-label="Filtros">
+  {% for clave, nombre in filtros.items %}
+  <a class="boton {% if clave == filtro %}boton--principal{% else %}boton--secundario{% endif %}" href="?filtro={{ clave }}{% if texto %}&amp;q={{ texto|urlencode }}{% endif %}"{% if clave == filtro %} aria-current="page"{% endif %}>{{ nombre }}</a>
+  {% endfor %}
+</nav>
+
+{% if texto %}<p class="ayuda">Resultados de «{{ texto }}» en {{ nombre_filtro }}. <a href="?filtro={{ filtro }}">Quitar la búsqueda</a></p>{% endif %}
+
+{% if filas %}
+<div class="tabla-contenedor">
+  <table class="tabla">
+    <thead>
+      <tr>
+        <th scope="col">N.º</th>
+        <th scope="col">Registrada</th>
+        <th scope="col">Cliente</th>
+        <th scope="col">Tipo</th>
+        <th scope="col">Vehículos</th>
+        <th scope="col">Conductor</th>
+        <th scope="col">Cuándo</th>
+        <th scope="col">Estado</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for fila in filas %}
+      {% with s=fila.solicitud %}
+      <tr>
+        <th scope="row" class="cifra"><a href="{% url 'detalle_solicitud' s.pk %}" aria-label="Abrir la solicitud {{ s.pk }}">{{ s.pk }}</a></th>
+        <td><time datetime="{{ s.creada_en|date:'c' }}">{{ s.creada_en|date:"d/m/Y H:i" }}</time></td>
+        <td>{{ s.solicitante.nombre }}</td>
+        <td>{{ s.get_tipo_display }}</td>
+        <td>{{ fila.vehiculos|join:", "|default:"—" }}</td>
+        <td>{% if fila.conductores %}{{ fila.conductores|join:", " }}{% else %}<span class="texto-secundario">Sin asignar</span>{% endif %}</td>
+        <td>{% if s.programada_para %}Programada <time datetime="{{ s.programada_para|date:'c' }}">{{ s.programada_para|date:"d/m/Y H:i" }}</time>{% else %}Inmediato{% endif %}</td>
+        <td><strong>{{ s.estado_etiqueta }}</strong></td>
+      </tr>
+      {% endwith %}
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+{% if pagina.has_other_pages %}
+<nav class="acciones" aria-label="Páginas">
+  {% if pagina.has_previous %}<a class="boton boton--secundario" href="?filtro={{ filtro }}{% if texto %}&amp;q={{ texto|urlencode }}{% endif %}&amp;pagina={{ pagina.previous_page_number }}">Anterior</a>{% endif %}
+  <span class="texto-secundario">Página {{ pagina.number }} de {{ pagina.paginator.num_pages }} · {{ pagina.paginator.count }} solicitudes</span>
+  {% if pagina.has_next %}<a class="boton boton--secundario" href="?filtro={{ filtro }}{% if texto %}&amp;q={{ texto|urlencode }}{% endif %}&amp;pagina={{ pagina.next_page_number }}">Siguiente</a>{% endif %}
+</nav>
+{% endif %}
+{% else %}
+<div class="vacio">
+  {% if texto %}<p>No se encontraron solicitudes con «{{ texto }}» en este filtro.</p><p><a href="?filtro=todas&amp;q={{ texto|urlencode }}">Buscar en todas</a></p>{% else %}<p>No hay solicitudes en este filtro.</p>{% endif %}
+</div>
+{% endif %}
+{% endblock %}

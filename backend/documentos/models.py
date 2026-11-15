@@ -1,6 +1,6 @@
 """Documentos de grúas y conductores (SOAT, tecnomecánica, licencia de conducción...).
 
-- Los tipos son configuración: la lista se edita en el panel (Flota y documentos). La migración de
+- Los tipos son configuración: la lista se edita en el panel (Flota y personal). La migración de
   datos siembra SOAT y tecnomecánica (grúa) y licencia de conducción (conductor), con aviso desde
   30 días antes. Un tipo no se borra: se desactiva.
 - Un documento es de una grúa o de un conductor, exactamente uno, y del lado que dice su tipo. Lo

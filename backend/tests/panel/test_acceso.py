@@ -53,14 +53,14 @@ def test_el_403_ofrece_salir_y_volver_al_inicio(client, crear_usuario):
     assert "Volver al inicio" in html
 
 
-def test_seccion_sin_pantalla_dice_aun_no_disponible(client, crear_usuario):
-    client.force_login(crear_usuario("logistica"))
-    respuesta = client.get("/tablero/")
+def test_seccion_sin_pantalla_dice_aun_no_disponible_en_su_url_directa(client, crear_usuario):
+    client.force_login(crear_usuario("facturacion"))
+    respuesta = client.get("/cobros/")
     assert respuesta.status_code == 200
     html = respuesta.content.decode()
-    assert "<h1 class=\"titulo-pagina\">Tablero</h1>" in html
+    assert "<h1 class=\"titulo-pagina\">Cobros</h1>" in html
     assert "Aún no disponible" in html
-    assert 'aria-current="page"' in html
+    assert 'href="/cobros/"' not in html  # no está en el menú mientras no tenga pantalla
 
 
 def test_inicio_saluda_por_nombre(client, crear_usuario):
@@ -76,11 +76,18 @@ def test_inicio_sin_nombre_saluda_con_el_usuario(client, crear_usuario):
     assert "Hola, caja" in client.get("/").content.decode()
 
 
-def test_inicio_marca_las_secciones_aun_no_disponibles(client, crear_usuario):
+def test_inicio_no_muestra_las_secciones_aun_no_disponibles(client, crear_usuario):
     client.force_login(crear_usuario("facturacion"))
     html = client.get("/").content.decode()
-    assert "Cobros" in html
-    assert "Aún no disponible" in html
+    assert 'href="/cobros/"' not in html
+    assert "Aún no disponible" not in html
+    assert "Las pantallas de su rol todavía no están disponibles" in html
+
+
+def test_un_usuario_sin_rol_no_entra_al_inicio(client, crear_usuario):
+    usuario = crear_usuario(superusuario=False)
+    client.force_login(usuario)
+    assert client.get("/").status_code == 403
 
 
 def test_estilos_abre_para_el_administrador(client, crear_usuario):

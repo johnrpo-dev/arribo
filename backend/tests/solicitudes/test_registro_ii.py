@@ -2,7 +2,10 @@
 externa de aseguradora, nota del momento de placa o VIN, advertencia de duplicado, regreso de
 eventos y cierre como no concretada.
 """
+from datetime import timedelta
+
 import pytest
+from django.utils import timezone
 
 from clientes.models import Cliente, TelefonoCliente, TipoCliente
 from configuracion.models import MomentoPlacaVin, configuracion_vigente
@@ -59,8 +62,12 @@ def con_vehiculos(*filas, **cambios):
 
 
 def borrador_guardado(client, **cambios):
-    client.post(RUTA, datos(accion="borrador", **cambios))
-    return Solicitud.objects.latest("pk")
+    """Un borrador guardado con el formulario: sin destino (salvo que se pida otra cosa), Guardar lo
+    deja en borrador."""
+    client.post(RUTA, datos(**{"destino": "", **cambios}))
+    solicitud = Solicitud.objects.latest("pk")
+    assert solicitud.estado_registro == EstadoRegistro.BORRADOR
+    return solicitud
 
 
 # --- Completar un borrador ---------------------------------------------------------------------
@@ -70,6 +77,94 @@ def test_el_detalle_de_un_borrador_enlaza_a_completarlo(client, logistica, con_t
     solicitud = borrador_guardado(client)
     html = client.get(ruta(solicitud)).content.decode()
     assert f'href="/solicitudes/{solicitud.pk}/completar/"' in html
+
+
+def test_un_borrador_con_faltantes_ofrece_completarlo_arriba_y_no_abrirlo(
+    client, logistica, con_telefono
+):
+    solicitud = borrador_guardado(client)
+    html = client.get(ruta(solicitud)).content.decode()
+    assert "Para abrirla y poder asignarla falta el destino" in html
+    assert html.index("Completar borrador") < html.index("Servicios")
+    assert "Abrir solicitud" not in html
+
+
+def borrador_sin_faltantes(cliente, crear_servicio):
+    """Un borrador que ya tiene todo (por ejemplo, guardado con el botón que existía antes)."""
+    solicitud = crear_solicitud(cliente, estado_registro=EstadoRegistro.BORRADOR)
+    crear_servicio(solicitud_de=solicitud)
+    return solicitud
+
+
+def test_un_borrador_sin_faltantes_muestra_arriba_un_solo_boton_para_abrirlo(
+    client, logistica, cliente, crear_servicio
+):
+    solicitud = borrador_sin_faltantes(cliente, crear_servicio)
+    html = client.get(ruta(solicitud)).content.decode()
+    assert html.count("Abrir solicitud") == 1
+    assert html.index("Abrir solicitud") < html.index("Servicios")
+    assert f'action="/solicitudes/{solicitud.pk}/abrir/"' in html
+    assert ">Completar borrador<" not in html
+
+
+def test_abrir_un_borrador_sin_faltantes_lo_deja_abierto_y_asignable(
+    client, logistica, cliente, crear_servicio
+):
+    solicitud = borrador_sin_faltantes(cliente, crear_servicio)
+    respuesta = client.post(ruta(solicitud, "abrir/"), follow=True)
+    solicitud.refresh_from_db()
+    assert solicitud.estado_registro == EstadoRegistro.ABIERTA
+    html = respuesta.content.decode()
+    assert f"Solicitud {solicitud.pk} abierta: sus servicios quedan pendientes de asignar." in html
+    assert "Asignar conductores" in html
+
+
+def test_abrir_un_borrador_con_faltantes_no_lo_abre_y_dice_que_falta(
+    client, logistica, cliente, crear_servicio
+):
+    solicitud = crear_solicitud(cliente, estado_registro=EstadoRegistro.BORRADOR, origen="")
+    crear_servicio(solicitud_de=solicitud)
+    respuesta = client.post(ruta(solicitud, "abrir/"), follow=True)
+    solicitud.refresh_from_db()
+    assert solicitud.estado_registro == EstadoRegistro.BORRADOR
+    assert "Para abrirla falta el origen" in respuesta.content.decode()
+
+
+def test_abrir_una_solicitud_que_ya_no_es_borrador_no_cambia_nada(
+    client, logistica, cliente, crear_servicio
+):
+    solicitud = crear_solicitud(
+        cliente, estado_registro=EstadoRegistro.NO_CONCRETADA, motivo_no_concretada="precio"
+    )
+    respuesta = client.post(ruta(solicitud, "abrir/"), follow=True)
+    solicitud.refresh_from_db()
+    assert solicitud.estado_registro == EstadoRegistro.NO_CONCRETADA
+    assert "ya no es un borrador" in respuesta.content.decode()
+
+
+def test_abrir_un_borrador_de_evento_con_regreso_crea_los_regresos(
+    client, logistica, cliente, crear_servicio
+):
+    solicitud = crear_solicitud(
+        cliente,
+        tipo="evento",
+        estado_registro=EstadoRegistro.BORRADOR,
+        tiene_regreso=True,
+        fecha_regreso=timezone.now() + timedelta(days=3),
+    )
+    ida = crear_servicio(solicitud_de=solicitud)
+    client.post(ruta(solicitud, "abrir/"))
+    assert ida.regreso.solicitud == solicitud
+
+
+def test_abrir_es_solo_por_post_y_no_para_facturacion(client, crear_usuario, cliente, crear_servicio):
+    solicitud = crear_solicitud(cliente, estado_registro=EstadoRegistro.BORRADOR)
+    client.force_login(crear_usuario("logistica"))
+    assert client.get(ruta(solicitud, "abrir/")).status_code == 405
+    client.force_login(crear_usuario("facturacion"))
+    assert client.post(ruta(solicitud, "abrir/")).status_code == 403
+    solicitud.refresh_from_db()
+    assert solicitud.estado_registro == EstadoRegistro.BORRADOR
 
 
 def test_el_detalle_de_una_abierta_no_ofrece_completarla(client, logistica, con_telefono):
@@ -535,7 +630,8 @@ def test_regreso_sin_fecha_se_rechaza_junto_al_campo(client, logistica, con_tele
 def test_evento_en_borrador_con_regreso_no_crea_regresos_hasta_abrirse(
     client, logistica, con_telefono
 ):
-    client.post(RUTA, evento(tiene_regreso="si", fecha_regreso="2026-11-22T18:00", accion="borrador"))
+    # Sin origen: Guardar lo deja en borrador.
+    client.post(RUTA, evento(tiene_regreso="si", fecha_regreso="2026-11-22T18:00", origen=""))
     solicitud = Solicitud.objects.get()
     assert solicitud.estado_registro == EstadoRegistro.BORRADOR
     assert solicitud.servicios.count() == 2

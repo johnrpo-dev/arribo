@@ -1,5 +1,5 @@
 """Admin de documentos: solo consulta. Los tipos y los documentos se manejan en el panel
-(Flota y documentos); nada se borra y un documento guardado no se edita."""
+(Flota y personal); nada se borra y un documento guardado no se edita."""
 from django.contrib import admin
 
 from .models import Documento, TipoDocumento

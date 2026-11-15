@@ -1,11 +1,11 @@
-"""Pantallas de Flota y documentos (solo administrador: lo aplican `panel/urls.py` para la sección y
-`documentos/urls.py` para el resto, con `requiere_rol`)."""
+"""Pantallas de documentos de la sección Flota y personal (solo administrador: lo aplica
+`documentos/urls.py` con `requiere_rol`). La lista con el resumen está en `flota/views.py`; aquí,
+el estado e historial de un tipo para una grúa o un conductor, los archivos y los tipos."""
 from django.contrib import messages
 from django.http import FileResponse, Http404
 from django.shortcuts import get_object_or_404, redirect, render
 
 from flota.models import Conductor, Grua
-from nucleo.documentos import EstadoDocumento
 
 from . import consultas
 from .archivos import con_archivo_a_disco
@@ -18,34 +18,6 @@ TIPO_DE_CONTENIDO = {
     TipoArchivo.PNG: "image/png",
     TipoArchivo.PDF: "application/pdf",
 }
-
-
-def _filas(aplica_a, sujetos, hoy):
-    estados = consultas.estados_por_sujeto(aplica_a, sujetos, hoy)
-    return [(sujeto, estados[sujeto.pk]) for sujeto in sujetos]
-
-
-def flota(request):
-    """Grúas y conductores con el estado de cada documento; lo vencido y por vencer, resaltado."""
-    hoy = consultas.dia_local()
-    gruas = _filas(AplicaA.GRUA, list(Grua.objects.order_by("-activa", "placa")), hoy)
-    conductores = _filas(
-        AplicaA.CONDUCTOR, list(Conductor.objects.order_by("-activo", "nombre", "pk")), hoy
-    )
-    todos = [e for _, estados in gruas + conductores for e in estados]
-    return render(
-        request,
-        "documentos/flota.html",
-        {
-            "hoy": hoy,
-            "gruas": gruas,
-            "conductores": conductores,
-            "tipos_grua": consultas.tipos_activos(AplicaA.GRUA),
-            "tipos_conductor": consultas.tipos_activos(AplicaA.CONDUCTOR),
-            "vencidos": sum(e.estado == EstadoDocumento.VENCIDO for e in todos),
-            "por_vencer": sum(e.estado == EstadoDocumento.POR_VENCER for e in todos),
-        },
-    )
 
 
 @con_archivo_a_disco

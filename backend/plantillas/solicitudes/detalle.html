@@ -3,8 +3,23 @@
 {% block contenido %}
 <h1 class="titulo-pagina">Solicitud {{ solicitud.pk }}</h1>
 
+{% if solicitud.estado_registro == "borrador" %}
 {% if faltantes %}
-<p class="aviso aviso--advertencia">Borrador. Para abrirla falta {{ faltantes }}.</p>
+<div class="aviso aviso--advertencia">
+  <p><strong>Borrador.</strong> Para abrirla y poder asignarla falta {{ faltantes }}.</p>
+</div>
+<div class="acciones">
+  <a class="boton boton--principal" href="{% url 'completar_solicitud' solicitud.pk %}">Completar borrador</a>
+</div>
+{% else %}
+<div class="aviso aviso--advertencia">
+  <p><strong>Borrador con todos los datos.</strong> Ábralo para poder asignarlo. Si algo está mal, <a href="{% url 'completar_solicitud' solicitud.pk %}">corrija los datos</a> antes.</p>
+</div>
+<form method="post" action="{% url 'abrir_solicitud' solicitud.pk %}" class="acciones">
+  {% csrf_token %}
+  <button type="submit" class="boton boton--principal">Abrir solicitud</button>
+</form>
+{% endif %}
 {% endif %}
 
 <div class="tabla-contenedor">
@@ -156,10 +171,8 @@
 {% endfor %}
 
 <div class="acciones">
-  {% if solicitud.estado_registro == "borrador" %}
-  <a class="boton boton--principal" href="{% url 'completar_solicitud' solicitud.pk %}">Completar borrador</a>
-  {% endif %}
   <a class="boton boton--secundario" href="{% url 'nueva_solicitud' %}">Registrar otra solicitud</a>
+  <a class="boton boton--secundario" href="{% url 'solicitudes' %}">Ver todas las solicitudes</a>
 </div>
 
 {% if puede_cerrar %}

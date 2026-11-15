@@ -1,4 +1,5 @@
-"""La navegación muestra solo las secciones del rol, definidas en `panel/secciones.py`."""
+"""La navegación muestra solo las secciones del rol que ya tienen pantalla, definidas en
+`panel/secciones.py`. Las que aún no la tienen no salen en el menú, pero su URL sigue protegida."""
 import re
 
 import pytest
@@ -11,6 +12,8 @@ from panel.secciones import SECCIONES
 pytestmark = pytest.mark.django_db
 
 TODAS = [s.nombre for s in SECCIONES]
+# Con pantalla hoy; Cobros y Panel del dueño llegan en sus tareas.
+DISPONIBLES = ["Tablero", "Nueva solicitud", "Solicitudes", "Flota y personal", "Configuración"]
 
 
 def nombres_en_la_navegacion(html):
@@ -18,47 +21,66 @@ def nombres_en_la_navegacion(html):
     return re.findall(r"<a [^>]*>([^<]+)</a>", nav)
 
 
-def comprobar_navegacion(client, usuario, esperadas):
+def comprobar_navegacion(client, usuario, esperadas, con_acceso):
+    """`esperadas`: las del menú. `con_acceso`: todas las secciones a las que entra por su rol,
+    también las que aún no tienen pantalla (por su URL directa)."""
     client.force_login(usuario)
     respuesta = client.get("/")
     assert respuesta.status_code == 200
     assert nombres_en_la_navegacion(respuesta.content.decode()) == esperadas
     for seccion in SECCIONES:
         codigo = client.get(f"/{seccion.ruta}").status_code
-        assert codigo == (200 if seccion.nombre in esperadas else 403), seccion.ruta
+        assert codigo == (200 if seccion.nombre in con_acceso else 403), seccion.ruta
+
+
+LOGISTICA = ["Tablero", "Nueva solicitud", "Solicitudes"]
 
 
 def test_navegacion_de_logistica(client, crear_usuario):
-    comprobar_navegacion(
-        client, crear_usuario("logistica"), ["Tablero", "Nueva solicitud", "Solicitudes"]
-    )
+    comprobar_navegacion(client, crear_usuario("logistica"), LOGISTICA, LOGISTICA)
 
 
 def test_navegacion_de_facturacion(client, crear_usuario):
-    comprobar_navegacion(client, crear_usuario("facturacion"), ["Cobros"])
+    comprobar_navegacion(client, crear_usuario("facturacion"), [], ["Cobros"])
 
 
 def test_navegacion_del_administrador(client, crear_usuario):
-    comprobar_navegacion(client, crear_usuario("administrador"), TODAS)
+    comprobar_navegacion(client, crear_usuario("administrador"), DISPONIBLES, TODAS)
 
 
 def test_navegacion_de_logistica_y_facturacion_juntas(client, crear_usuario):
     comprobar_navegacion(
-        client,
-        crear_usuario("logistica", "facturacion"),
-        ["Tablero", "Nueva solicitud", "Solicitudes", "Cobros"],
+        client, crear_usuario("logistica", "facturacion"), LOGISTICA, [*LOGISTICA, "Cobros"]
     )
 
 
 def test_el_superusuario_ve_todo(client, crear_usuario):
     usuario = crear_usuario(superusuario=True)
-    comprobar_navegacion(client, usuario, TODAS)
+    comprobar_navegacion(client, usuario, DISPONIBLES, TODAS)
     assert client.get("/estilos/").status_code == 200
     assert "Superusuario" in client.get("/").content.decode()
 
 
 def test_el_superusuario_ve_todo_aunque_este_en_el_grupo_conductor(client, crear_usuario):
-    comprobar_navegacion(client, crear_usuario("conductor", superusuario=True), TODAS)
+    comprobar_navegacion(client, crear_usuario("conductor", superusuario=True), DISPONIBLES, TODAS)
+
+
+def test_el_menu_y_el_inicio_no_muestran_secciones_sin_pantalla(client, crear_usuario):
+    client.force_login(crear_usuario("administrador"))
+    html = client.get("/").content.decode()
+    for seccion in SECCIONES:
+        if not seccion.disponible:
+            assert f'href="/{seccion.ruta}"' not in html, seccion.ruta
+    assert "Aún no disponible" not in html
+
+
+def test_las_rutas_viejas_de_personal_llevan_a_flota_y_personal(client, crear_usuario):
+    client.force_login(crear_usuario("administrador"))
+    respuesta = client.get("/personal/")
+    assert (respuesta.status_code, respuesta["Location"]) == (302, "/flota/")
+    respuesta = client.get("/personal/conductores/nuevo/")
+    assert (respuesta.status_code, respuesta["Location"]) == (302, "/flota/conductores/nuevo/")
+    assert client.get("/personal/", follow=True).status_code == 200
 
 
 def test_las_secciones_son_las_pedidas_en_orden():
@@ -67,8 +89,7 @@ def test_las_secciones_son_las_pedidas_en_orden():
         ("Nueva solicitud", {"logistica", "administrador"}),
         ("Solicitudes", {"logistica", "administrador"}),
         ("Cobros", {"facturacion", "administrador"}),
-        ("Flota y documentos", {"administrador"}),
-        ("Personal y grúas", {"administrador"}),
+        ("Flota y personal", {"administrador"}),
         ("Panel del dueño", {"administrador"}),
         ("Configuración", {"administrador"}),
     ]

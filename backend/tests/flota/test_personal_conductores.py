@@ -5,6 +5,8 @@ from datetime import timedelta
 import pytest
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
+from django.db import connection
+from django.test.utils import CaptureQueriesContext
 
 from api.models import TokenDispositivo
 from flota import operaciones as op
@@ -16,12 +18,12 @@ from ..api.conftest import PIN, URL_ASIGNACIONES, ingresar
 pytestmark = pytest.mark.django_db
 
 Usuario = get_user_model()
-URL_NUEVO = "/personal/conductores/nuevo/"
+URL_NUEVO = "/flota/conductores/nuevo/"
 NUEVO_PIN = "246810"
 
 
 def url(conductor, accion=""):
-    return f"/personal/conductores/{conductor.pk}/{accion}"
+    return f"/flota/conductores/{conductor.pk}/{accion}"
 
 
 def datos_nuevo(**otros):
@@ -408,7 +410,7 @@ def test_desactivar_un_conductor_enlazado_a_un_usuario_de_oficina_no_desactiva_e
 def test_la_lista_muestra_grua_pin_activo_y_acceso_a_la_app(client, administrador, ana_app, beto):
     Conductor.objects.create(nombre="Flaco", celular="3204445566", activo=False)
 
-    contenido = client.get("/personal/").content.decode()
+    contenido = client.get("/flota/").content.decode()
 
     assert "Nuevo conductor" in contenido
     for texto in ("Ana", "3000000001", "GRU001", "Beto", "GRU002", "Flaco"):
@@ -425,6 +427,15 @@ def test_la_lista_no_hace_una_consulta_por_conductor(
         dar_acceso(Conductor.objects.create(nombre=f"C{numero}", celular=f"30100000{numero:02d}"))
     Group.objects.get_or_create(name="conductor")
 
-    with django_assert_max_num_queries(12):
-        client.get("/personal/")
+    # Desde la 1a-08c la lista también trae el resumen de documentos de conductores y grúas
+    # (tipos activos y documentos vigentes de cada lado: cuatro consultas más, fijas).
+    with django_assert_max_num_queries(16):
+        client.get("/flota/")
+    with CaptureQueriesContext(connection) as con_8:
+        client.get("/flota/")
+    for numero in range(8, 16):
+        dar_acceso(Conductor.objects.create(nombre=f"C{numero}", celular=f"30100000{numero:02d}"))
+    with CaptureQueriesContext(connection) as con_16:
+        client.get("/flota/")
+    assert len(con_16) == len(con_8)
 

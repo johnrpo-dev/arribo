@@ -58,6 +58,16 @@ Toda tarea termina con `uv run pytest -q` y `uv run ruff check .` en verde, más
   para la app a un conductor existente. Nada se borra; nunca queda el panel sin administrador.
   Verificar: crear un conductor desde el panel e ingresar con él en la app; desactivarlo y ver que la app ya no lo deja entrar.
 
+- [x] **1a-08c Simplificar el panel** (3 h). Depende de: 08b. Agregada tras la primera prueba del dueño.
+  Lista de solicitudes (filtros Activas, Por asignar, Borradores, Programadas, Terminadas y Todas;
+  búsqueda por teléfono o nombre del cliente, placa, VIN, número y referencia; páginas). Inicio de
+  logística y administrador con lo que requiere acción (adelanto mínimo de la 1a-18). Una sola sección
+  "Flota y personal" (une Flota y documentos con Personal y grúas; `/personal/` redirige). Un solo
+  "Guardar" en Nueva solicitud y botón "Abrir solicitud" en un borrador completo. El menú y el inicio
+  ocultan las secciones sin pantalla. Corregir nombre y celular del conductor.
+  Verificar: registrar una solicitud, salir y encontrarla desde el inicio y con la búsqueda; asignarla
+  y verla en curso en el inicio; registrar un documento vencido y ver al conductor bloqueado.
+
 ## Conductor
 
 - [x] **1a-09 API: ingreso y asignaciones** (2 h). Depende de: 08.
@@ -122,6 +132,12 @@ Toda tarea termina con `uv run pytest -q` y `uv run ruff check .` en verde, más
   Nota: la app `alertas` ya existe desde la 1a-10 con lo mínimo (modelo Alerta, `abrir_alerta`,
   `resolver_alerta` y el admin); la sincronización ya abre las alertas de conflicto, de capacidad
   excedida y de evento rechazado. Faltan el comando con los umbrales, las otras tres alertas y el tablero.
+  Adelantado en la 1a-08c: el inicio de logística y del administrador (`/` y la sección Tablero,
+  `panel.views.tablero`) ya muestra servicios por asignar (inmediatos primero, luego programados por
+  hora), borradores con lo que les falta, las alertas abiertas que ya existen y lo que está en curso
+  por conductor; y la lista de solicitudes ya busca por teléfono, nombre, placa, VIN, número y
+  referencia. Falta lo de esta tarea: el comando con umbrales, las alertas nuevas, resolver alertas
+  desde el panel y buscar por conductor, grúa, factura y fecha.
 
 - [ ] **1a-19 Panel del dueño mínimo** (3 h). Depende de: 18.
   Servicios del día por estado, no concretadas por motivo, cobros pendientes por pagador, documentos por vencer.

@@ -187,10 +187,23 @@ def test_borrador_con_vehiculo_conserva_el_vehiculo(client, logistica, con_telef
     assert solicitud.servicios.get().vehiculo.placa == "ABC123"
 
 
-def test_guardar_como_borrador_deja_borrador_aunque_este_completa(client, logistica, con_telefono):
+def test_el_formulario_tiene_un_solo_boton_de_guardar(client, logistica):
+    html = client.get(RUTA).content.decode()
+    formulario = html[html.index('<form method="post" class="formulario"'):]
+    assert formulario.count('type="submit"') == 1
+    assert ">Guardar</button>" in formulario
+    assert "Guardar como borrador" not in html
+    assert 'value="borrador"' not in html
+
+
+def test_completa_queda_abierta_aunque_llegue_la_accion_borrador_de_antes(
+    client, logistica, con_telefono
+):
+    """El botón "Guardar como borrador" ya no existe (1a-08c): un formulario viejo que todavía lo
+    mande no deja en borrador una solicitud completa."""
     respuesta = client.post(RUTA, datos(accion="borrador"), follow=True)
-    assert Solicitud.objects.get().estado_registro == EstadoRegistro.BORRADOR
-    assert "guardada como borrador" in respuesta.content.decode()
+    assert Solicitud.objects.get().estado_registro == EstadoRegistro.ABIERTA
+    assert "Queda abierta" in respuesta.content.decode()
 
 
 def test_desvare_sin_destino_queda_abierto(client, logistica, con_telefono):
@@ -409,7 +422,7 @@ def test_detalle_de_un_borrador_dice_que_falta(client, logistica, cliente):
 
     solicitud = crear_solicitud(cliente, destino="", estado_registro=EstadoRegistro.BORRADOR)
     html = client.get(f"/solicitudes/{solicitud.pk}/").content.decode()
-    assert "Borrador. Para abrirla falta el destino y al menos un vehículo." in html
+    assert "<strong>Borrador.</strong> Para abrirla y poder asignarla falta el destino y al menos un vehículo." in html
 
 
 def test_detalle_de_una_solicitud_que_no_existe_da_404(client, logistica):

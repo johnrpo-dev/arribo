@@ -1,5 +1,6 @@
-"""Rutas de Flota y documentos que no son la sección de la navegación (la sección `flota` se
-registra en `panel/secciones.py`). Llevan los mismos roles que esa sección: solo administrador."""
+"""Rutas de documentos de Flota y personal (la sección `flota` se registra en
+`panel/secciones.py`; su lista está en `flota/views.py`). Llevan los mismos roles que esa sección:
+solo administrador."""
 from django.urls import path
 
 from panel.roles import requiere_rol

@@ -71,7 +71,7 @@ if not DATABASE_URL.startswith(("postgres://", "postgresql://")):
     raise RuntimeError("Falta DATABASE_URL de PostgreSQL en backend/.env (ver .env.example)")
 DATABASES = {"default": dj_database_url.parse(DATABASE_URL, conn_max_age=60)}
 
-# Contraseñas de los usuarios de oficina (pantalla "Personal y grúas", 1a-08b): los validadores
+# Contraseñas de los usuarios de oficina (pantalla "Flota y personal", 1a-08b): los validadores
 # estándar de Django, con sus mensajes en español. El conductor no tiene contraseña (celular y PIN).
 AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},

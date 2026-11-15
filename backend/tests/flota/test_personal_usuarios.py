@@ -14,12 +14,12 @@ from ..panel.conftest import CLAVE
 pytestmark = pytest.mark.django_db
 
 Usuario = get_user_model()
-URL_NUEVO = "/personal/usuarios/nuevo/"
+URL_NUEVO = "/flota/usuarios/nuevo/"
 CONTRASENA = "grua-amarilla-2026"
 
 
 def url(usuario, accion=""):
-    return f"/personal/usuarios/{usuario.pk}/{accion}"
+    return f"/flota/usuarios/{usuario.pk}/{accion}"
 
 
 def datos_nuevo(**otros):
@@ -47,19 +47,11 @@ def navegacion(cliente):
     ("rol", "secciones"),
     [
         ("logistica", ["Tablero", "Nueva solicitud", "Solicitudes"]),
-        ("facturacion", ["Cobros"]),
+        # Cobros y Panel del dueño no salen en el menú hasta tener pantalla (1a-08c).
+        ("facturacion", []),
         (
             "administrador",
-            [
-                "Tablero",
-                "Nueva solicitud",
-                "Solicitudes",
-                "Cobros",
-                "Flota y documentos",
-                "Personal y grúas",
-                "Panel del dueño",
-                "Configuración",
-            ],
+            ["Tablero", "Nueva solicitud", "Solicitudes", "Flota y personal", "Configuración"],
         ),
     ],
 )
@@ -130,7 +122,7 @@ def test_la_contrasena_nunca_vuelve_a_la_pantalla(client, administrador):
 
 
 def test_la_lista_no_muestra_a_los_conductores(client, administrador, ana_app):
-    contenido = client.get("/personal/").content.decode()
+    contenido = client.get("/flota/").content.decode()
 
     assert ana_app.usuario.username not in contenido
     assert "Olga" in contenido
@@ -164,7 +156,7 @@ def test_con_otro_administrador_si_puede_quitarse_el_rol(client, administrador, 
     assert respuesta.status_code == 302
     assert respuesta.url == "/"
     assert list(administrador.groups.values_list("name", flat=True)) == ["logistica"]
-    assert client.get("/personal/").status_code == 403
+    assert client.get("/flota/").status_code == 403
 
 
 def test_un_administrador_inactivo_no_cuenta_como_el_que_queda(
@@ -236,7 +228,7 @@ def test_cambiar_la_propia_contrasena_no_cierra_la_sesion(client, administrador)
         {"clave-contrasena": CONTRASENA, "clave-contrasena_confirmacion": CONTRASENA},
     )
 
-    assert client.get("/personal/").status_code == 200
+    assert client.get("/flota/").status_code == 200
 
 
 def test_un_administrador_no_restablece_la_contrasena_del_superusuario(

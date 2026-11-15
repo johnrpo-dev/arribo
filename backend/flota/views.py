@@ -1,12 +1,16 @@
-"""Pantallas de "Personal y grúas" (solo administrador: lo aplican `panel/urls.py` para la sección y
+"""Pantallas de "Flota y personal" (solo administrador: lo aplican `panel/urls.py` para la sección y
 `flota/urls.py` para el resto, con `requiere_rol`). Las vistas validan con los formularios, llaman a
-`flota/operaciones.py` y responden; la regla no vive aquí."""
+`flota/operaciones.py` y responden; la regla no vive aquí. Los documentos de cada grúa y conductor
+se ven en su página y se registran con las pantallas de `documentos`."""
 from django.contrib import messages
 from django.contrib.auth import get_user_model, update_session_auth_hash
 from django.http import HttpResponseNotAllowed
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
 
+from documentos import consultas as documentos
+from documentos.models import AplicaA
+from nucleo.documentos import EstadoDocumento
 from nucleo.personal import DesactivarseASiMismo, UltimoAdministrador
 from panel.roles import ADMINISTRADOR, CONDUCTOR, NOMBRES_DE_ROL, nombre_de_rol
 
@@ -14,6 +18,7 @@ from . import operaciones as op
 from .formularios import (
     FormularioCambiarGrua,
     FormularioContrasena,
+    FormularioDatosConductor,
     FormularioEditarGrua,
     FormularioGrua,
     FormularioNuevoConductor,
@@ -45,23 +50,38 @@ def _rol(usuario) -> str:
     return "Acceso total" if usuario.is_superuser else nombre_de_rol(usuario)
 
 
-def personal(request):
-    """Conductores, usuarios de oficina y grúas, con el botón para crear cada uno."""
+def flota(request):
+    """Conductores y grúas con el estado de sus documentos, y los usuarios de oficina, con el botón
+    para crear cada uno."""
+    hoy = documentos.dia_local()
     vigentes = op.asignaciones_vigentes()
-    conductores = [
-        (c, vigentes.get(c.pk), _acceso_a_la_app(c))
-        for c in Conductor.objects.select_related("usuario")
+    conductores = list(
+        Conductor.objects.select_related("usuario")
         .prefetch_related("usuario__groups")
         .order_by("-activo", "nombre", "pk")
-    ]
-    usuarios = [(u, _rol(u)) for u in op.usuarios_de_oficina()]
+    )
+    gruas = list(Grua.objects.order_by("-activa", "placa"))
+    de_conductores = documentos.estados_por_sujeto(AplicaA.CONDUCTOR, conductores, hoy)
+    de_gruas = documentos.estados_por_sujeto(AplicaA.GRUA, gruas, hoy)
+    todos = [e for estados in (*de_conductores.values(), *de_gruas.values()) for e in estados]
     return render(
         request,
-        "flota/personal.html",
+        "flota/flota.html",
         {
-            "conductores": conductores,
-            "usuarios": usuarios,
-            "gruas": Grua.objects.order_by("-activa", "placa"),
+            "hoy": hoy,
+            "conductores": [
+                (
+                    c,
+                    vigentes.get(c.pk),
+                    _acceso_a_la_app(c),
+                    documentos.resumen(de_conductores[c.pk]),
+                )
+                for c in conductores
+            ],
+            "gruas": [(g, documentos.resumen(de_gruas[g.pk])) for g in gruas],
+            "usuarios": [(u, _rol(u)) for u in op.usuarios_de_oficina()],
+            "vencidos": sum(e.estado == EstadoDocumento.VENCIDO for e in todos),
+            "por_vencer": sum(e.estado == EstadoDocumento.POR_VENCER for e in todos),
         },
     )
 
@@ -93,8 +113,9 @@ def _conductor(pk):
     return get_object_or_404(Conductor.objects.select_related("usuario"), pk=pk)
 
 
-def conductor(request, pk, formulario_pin=None, formulario_grua=None):
-    """Datos del conductor y sus acciones: habilitar, PIN, grúa, desactivar o reactivar."""
+def conductor(request, pk, formulario_pin=None, formulario_grua=None, formulario_datos=None):
+    """Datos del conductor, sus documentos y sus acciones: corregir nombre y celular, habilitar,
+    PIN, grúa, desactivar o reactivar."""
     c = _conductor(pk)
     vigente = op.asignaciones_vigentes().get(c.pk)
     usuario_ajeno = c.usuario is not None and op.necesita_habilitar(c)
@@ -108,11 +129,33 @@ def conductor(request, pk, formulario_pin=None, formulario_grua=None):
             "necesita_habilitar": op.necesita_habilitar(c),
             "usuario_ajeno": usuario_ajeno,
             "servicios_activos": op.servicios_activos(c),
+            "documentos": documentos.estados_de(c),
+            "vencidos": documentos.vencidos_para_asignar(c, vigente),
+            "formulario_datos": formulario_datos
+            or FormularioDatosConductor(
+                prefix="datos", conductor=c, initial={"nombre": c.nombre, "celular": c.celular}
+            ),
             "formulario_pin": formulario_pin or FormularioPin(prefix="pin"),
             "formulario_grua": formulario_grua
             or FormularioCambiarGrua(prefix="grua", initial={"grua": vigente}),
         },
     )
+
+
+@require_POST
+def editar_conductor(request, pk):
+    """Corrige el nombre y el celular. Si el celular ya es de otro conductor, lo dice y no cambia."""
+    c = _conductor(pk)
+    formulario = FormularioDatosConductor(request.POST, prefix="datos", conductor=c)
+    if formulario.is_valid():
+        try:
+            op.editar_datos_conductor(c, **formulario.cleaned_data)
+        except ERRORES as error:
+            formulario.add_error(None, str(error))
+        else:
+            messages.success(request, "Datos del conductor guardados.")
+            return redirect("conductor_personal", pk)
+    return conductor(request, pk, formulario_datos=formulario)
 
 
 @require_POST
@@ -211,7 +254,7 @@ def nuevo_usuario(request):
                 request,
                 f"Usuario {usuario.username} creado con el rol {NOMBRES_DE_ROL[datos['rol']]}.",
             )
-            return redirect("personal")
+            return redirect("flota")
     return render(request, "flota/usuario_nuevo.html", {"formulario": formulario})
 
 
@@ -300,8 +343,8 @@ def nueva_grua(request):
     formulario = FormularioGrua(request.POST or None)
     if request.method == "POST" and formulario.is_valid():
         grua = formulario.save()
-        messages.success(request, f"Grúa {grua.placa} creada.")
-        return redirect("personal")
+        messages.success(request, f"Grúa {grua.placa} creada. Registre aquí sus documentos.")
+        return redirect("editar_grua", grua.pk)
     return render(request, "flota/grua.html", {"formulario": formulario, "grua": None})
 
 
@@ -311,5 +354,15 @@ def editar_grua(request, pk):
     if request.method == "POST" and formulario.is_valid():
         formulario.save()
         messages.success(request, f"Grúa {formulario.instance.placa} guardada.")
-        return redirect("personal")
-    return render(request, "flota/grua.html", {"formulario": formulario, "grua": grua})
+        return redirect("flota")
+    estados = documentos.estados_de(grua)
+    return render(
+        request,
+        "flota/grua.html",
+        {
+            "formulario": formulario,
+            "grua": grua,
+            "documentos": estados,
+            "vencidos": [e.descripcion for e in estados if e.bloquea],
+        },
+    )

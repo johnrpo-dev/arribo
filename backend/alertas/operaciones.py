@@ -1,4 +1,6 @@
 """Abrir y resolver alertas. Quien necesita avisar a logística llama a `abrir_alerta`."""
+import uuid
+
 from django.contrib.contenttypes.models import ContentType
 from django.db import transaction
 from django.utils import timezone
@@ -48,3 +50,39 @@ def alertas_abiertas(registro=None, tipo=None):
     if tipo is not None:
         alertas = alertas.filter(tipo=TipoAlerta(tipo).value)
     return alertas
+
+
+# Las alertas abiertas que se muestran en el tablero de inicio (adelanto mínimo de la 1a-18).
+LIMITE_TABLERO = 50
+
+
+def alertas_para_tablero(limite: int = LIMITE_TABLERO) -> list[tuple[Alerta, int | None]]:
+    """Alertas abiertas, la más reciente primero, con la solicitud a la que llevan (o None).
+
+    Una alerta que apunta a un evento de estado lleva a la solicitud de su servicio; una que apunta
+    a un conductor no lleva a ninguna. Dos consultas en total.
+    """
+    from solicitudes.models import EventoEstado
+
+    alertas = list(
+        alertas_abiertas().select_related("tipo_registro").order_by("-creada_en", "-pk")[:limite]
+    )
+    tipo_evento = ContentType.objects.get_for_model(EventoEstado)
+    eventos = {
+        a.pk: _uuid(a.registro_id) for a in alertas if a.tipo_registro_id == tipo_evento.pk
+    }
+    solicitudes = {}
+    if any(eventos.values()):
+        solicitudes = dict(
+            EventoEstado.objects.filter(pk__in=[e for e in eventos.values() if e]).values_list(
+                "pk", "servicio__solicitud_id"
+            )
+        )
+    return [(a, solicitudes.get(eventos.get(a.pk))) for a in alertas]
+
+
+def _uuid(texto: str) -> uuid.UUID | None:
+    try:
+        return uuid.UUID(texto)
+    except ValueError:
+        return None

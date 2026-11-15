@@ -2,16 +2,17 @@
 {% block titulo %}Inicio{% endblock %}
 {% block contenido %}
 <h1 class="titulo-pagina">Hola, {{ user.get_short_name|default:user.get_username }}</h1>
-<h2 class="titulo-seccion">Sus secciones</h2>
 {% if secciones %}
+<h2 class="titulo-seccion">Sus secciones</h2>
 <ul class="lista-secciones">
   {% for seccion in secciones %}
-  <li>
-    <a href="{% url seccion.clave %}">{{ seccion.nombre }}</a>
-    {% if not seccion.disponible %}<span class="texto-secundario">Aún no disponible</span>{% endif %}
-  </li>
+  <li><a href="{% url seccion.clave %}">{{ seccion.nombre }}</a></li>
   {% endfor %}
 </ul>
+{% elif rol_usuario != "Sin rol" %}
+<div class="vacio">
+  <p>Las pantallas de su rol todavía no están disponibles. Llegan en una próxima entrega.</p>
+</div>
 {% else %}
 <div class="vacio">
   <p>Su usuario no tiene secciones asignadas.</p>

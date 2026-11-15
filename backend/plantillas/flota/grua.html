@@ -15,7 +15,9 @@
   {% if grua %}{% include "parciales/campo.html" with campo=formulario.activa %}{% endif %}
   <div class="acciones">
     <button type="submit" class="boton boton--principal">{% if grua %}Guardar grúa{% else %}Crear grúa{% endif %}</button>
-    <a class="boton boton--secundario" href="{% url 'personal' %}">Volver</a>
+    <a class="boton boton--secundario" href="{% url 'flota' %}">Volver</a>
   </div>
 </form>
+
+{% if grua %}{% include "flota/parcial_documentos.html" with sujeto=grua es_grua=True %}{% endif %}
 {% endblock %}

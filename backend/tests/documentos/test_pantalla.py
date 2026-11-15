@@ -1,4 +1,4 @@
-"""Pantalla Flota y documentos contra PostgreSQL: solo administrador, estado resaltado, registrar un
+"""Documentos en la sección Flota y personal contra PostgreSQL: solo administrador, estado resaltado, registrar un
 documento con archivo opcional (tipo y tamaño validados, a disco con nombre del servidor),
 historial y administración de tipos."""
 import pytest
@@ -83,35 +83,91 @@ def test_sin_sesion_flota_lleva_al_ingreso(client, soat, grua1):
 def test_la_seccion_flota_ya_no_dice_aun_no_disponible(client, administrador):
     html = client.get("/flota/").content.decode()
     assert "Aún no disponible" not in html
-    assert '<h1 class="titulo-pagina">Flota y documentos</h1>' in html
+    assert '<h1 class="titulo-pagina">Flota y personal</h1>' in html
 
 
 # --- Lista ---------------------------------------------------------------------------------------
 
 
-def test_la_lista_resalta_vencido_y_por_vencer_con_las_etiquetas_de_estado(
+def fila_de(html, enlace):
+    """El HTML de la fila de la tabla que lleva a `enlace`."""
+    inicio = html.index(enlace)
+    return html[inicio:html.index("</tr>", inicio)]
+
+
+def test_la_lista_resume_los_documentos_de_cada_uno_con_las_etiquetas_de_estado(
     client, administrador, soat, tecnomecanica, licencia, ana, beto, grua1, grua2, registrar
 ):
     registrar(soat, grua1, vence_en=-1)
+    registrar(tecnomecanica, grua1, vence_en=200)
     registrar(soat, grua2, vence_en=10)
+    registrar(tecnomecanica, grua2, vence_en=200)
     registrar(licencia, ana, vence_en=400)
 
     html = client.get("/flota/").content.decode()
 
-    assert '<span class="estado estado--novedad">Vencido</span>' in html
-    assert '<span class="estado estado--recogido">Por vencer</span>' in html
-    assert '<span class="estado estado--entregado">Vigente</span>' in html
-    assert '<span class="estado estado--pendiente_asignar">Falta</span>' in html
     assert "Hay 1 documento vencido" in html
     assert "Hay 1 documento por vencer" in html
+    grua_vencida = fila_de(html, f'href="/flota/gruas/{grua1.pk}/"')
+    assert '<span class="estado estado--novedad">Vencido</span>' in grua_vencida
+    assert "SOAT" in grua_vencida
+    grua_por_vencer = fila_de(html, f'href="/flota/gruas/{grua2.pk}/"')
+    assert '<span class="estado estado--recogido">Por vencer</span>' in grua_por_vencer
+    al_dia = fila_de(html, f'href="/flota/conductores/{ana.pk}/"')
+    assert '<span class="estado estado--entregado">Al día</span>' in al_dia
+    sin_licencia = fila_de(html, f'href="/flota/conductores/{beto.pk}/"')
+    assert '<span class="estado estado--pendiente_asignar">Falta</span>' in sin_licencia
+    assert "Licencia de conducción" in sin_licencia
+
+
+def test_la_pagina_de_la_grua_muestra_cada_documento_y_enlaza_a_registrarlo(
+    client, administrador, soat, tecnomecanica, grua1, registrar
+):
+    registrar(soat, grua1, vence_en=-1)
+
+    html = client.get(f"/flota/gruas/{grua1.pk}/").content.decode()
+
+    assert '<span class="estado estado--novedad">Vencido</span>' in html
+    assert '<span class="estado estado--pendiente_asignar">Falta</span>' in html
     assert url_grua(grua1, soat) in html
-    assert url_conductor(beto, licencia) in html
+    assert url_grua(grua1, tecnomecanica) in html
+    assert "Quien maneje esta grúa no recibe servicios nuevos" in html
 
 
-def test_un_tipo_inactivo_no_sale_como_columna(client, administrador, tecnomecanica, grua1):
+def test_la_pagina_del_conductor_muestra_sus_documentos_y_si_esta_bloqueado(
+    client, administrador, licencia, soat, ana, beto, grua1, registrar
+):
+    registrar(licencia, ana, vence_en=400)
+    registrar(soat, grua1, vence_en=-3)  # la grúa de Ana
+
+    ana_html = client.get(f"/flota/conductores/{ana.pk}/").content.decode()
+    beto_html = client.get(f"/flota/conductores/{beto.pk}/").content.decode()
+
+    assert '<span class="estado estado--entregado">Vigente</span>' in ana_html
+    assert url_conductor(ana, licencia) in ana_html
+    assert "No recibe servicios nuevos" in ana_html
+    assert "SOAT de la grúa GRU001" in ana_html
+    assert '<span class="estado estado--pendiente_asignar">Falta</span>' in beto_html
+    assert "No recibe servicios nuevos" not in beto_html
+
+
+def test_el_documento_vuelve_a_la_pagina_de_su_conductor_o_su_grua(
+    client, administrador, soat, licencia, ana, grua1
+):
+    assert f'href="/flota/conductores/{ana.pk}/"' in client.get(
+        url_conductor(ana, licencia)
+    ).content.decode()
+    assert f'href="/flota/gruas/{grua1.pk}/"' in client.get(url_grua(grua1, soat)).content.decode()
+
+
+def test_un_tipo_inactivo_no_se_exige_ni_en_la_lista_ni_en_la_grua(
+    client, administrador, tecnomecanica, grua1
+):
+    assert "Tecnomecánica" in client.get("/flota/").content.decode()  # falta, mientras esté activo
     tecnomecanica.activo = False
     tecnomecanica.save()
     assert "Tecnomecánica" not in client.get("/flota/").content.decode()
+    assert "Tecnomecánica" not in client.get(f"/flota/gruas/{grua1.pk}/").content.decode()
 
 
 # --- Registrar e historial -----------------------------------------------------------------------

@@ -1127,6 +1127,65 @@ La tarea 1a-16 se partió en dos: 1a-16a (modelo de línea de cobro con sus rest
      similar). En la ficha de `john` no hay botones de rol ni de desactivar.
   Para no dejar datos de prueba: desactivar al conductor y la grúa al terminar (nada se borra).
 
+### 1a-08c Simplificar el panel (15 de noviembre de 2026)
+
+Tras la primera prueba del dueño: el panel era difícil de operar (no había cómo volver a una solicitud)
+y redundante. Las reglas de negocio no cambiaron; esto es navegación y pantallas.
+
+- **Lista de solicitudes** (sección Solicitudes, logística y administrador): número, fecha, cliente,
+  tipo, vehículos (placa o VIN), conductores, cuándo y estado. Filtros Activas (por defecto: borrador,
+  abierta, en curso), Por asignar, Borradores, Programadas, Terminadas y Todas. Búsqueda por teléfono o
+  nombre del cliente (quien pide o quien paga), placa o VIN (como se digiten, también una parte),
+  número de solicitud y referencia externa; una búsqueda desde el inicio busca en todas. 25 por página.
+  El estado se deriva con `nucleo.estados.estado_solicitud` sobre los servicios precargados; el filtro
+  en la base usa la misma definición y una prueba lo compara con el núcleo en todas las combinaciones
+  de hasta dos servicios. Consultas fijas (cota en la prueba): `solicitudes/consultas.py`.
+- **Inicio útil** (`/` y la sección Tablero, `panel.views.tablero`): botón "Nueva solicitud", la
+  búsqueda y, en orden, servicios por asignar (inmediatos primero, luego programados por hora, con
+  botón "Asignar" que lleva a la solicitud), borradores con lo que les falta, alertas abiertas (las que
+  ya crea la sincronización, con enlace a su solicitud) y lo que está en curso por conductor. Adelanto
+  mínimo de la 1a-18: sin comando ni umbrales (anotado en la tarea). Facturación sigue con su inicio.
+- **Una sola sección "Flota y personal"** (solo administrador): conductores (celular, grúa, resumen de
+  documentos, app, activo), grúas (capacidad, estado, documentos, activa), usuarios de oficina y el
+  enlace a tipos de documento. Los documentos de cada uno se ven y registran en su página (las mismas
+  pantallas de `documentos`). Todo vive bajo `/flota/`; `/personal/...` redirige. Una grúa nueva lleva
+  a su página para registrar sus documentos.
+- **Nueva solicitud con un solo "Guardar"**: si falta algo, queda en borrador y dice qué falta. En el
+  detalle de un borrador, arriba: "Completar borrador" si le falta algo, o "Abrir solicitud" si ya
+  tiene todo (`registro.abrir_borrador`, con la fila bloqueada).
+- **Menú e inicio sin "Aún no disponible"**: Cobros y Panel del dueño no aparecen hasta tener
+  pantalla; su URL directa sigue protegida por rol. El 403 ofrece "Volver al inicio" a cualquier rol
+  del panel.
+- **Corregir nombre y celular del conductor** en su página (celular normalizado, único; si choca:
+  "Ya hay un conductor con el celular … : …"). El PIN no cambia; entra con el celular nuevo.
+- Decisiones y supuestos en `QUESTIONS.md` (sesiones al cambiar celular; qué es terminada y
+  programada; gravedad del resumen de documentos). CSS nuevo: ninguno. Sin migraciones.
+- Verificado: `uv run pytest -q` (1979 pruebas, 62 más que en 1a-08b), `uv run ruff check .` y
+  `makemigrations --check` sin cambios. Pruebas que cambiaron por la nueva conducta (sin quitar
+  cobertura): navegación y acceso del panel, `/personal/` → `/flota/`, la matriz de documentos pasó a
+  resumen en la lista y detalle en cada página, y `accion=borrador` (ahora un borrador se crea dejando
+  un obligatorio vacío). La cota de consultas de la lista de Flota subió de 12 a 16 (cuatro consultas
+  fijas del resumen de documentos) y ahora también comprueba que no crece con más conductores.
+- `solicitudes` sigue sin importar `alertas` (prueba de 1a-10): por eso el tablero vive en `panel`.
+- Recorrido en el navegador contra la base aparte `arribo_recorrido` (puerto 8772): entrar, inicio,
+  crear grúa (redirige a su página con SOAT y Tecnomecánica en "Falta") y conductor, probar un celular
+  repetido (mensaje claro), registrar una solicitud con un solo Guardar, ir a Configuración, volver
+  por el inicio (aparece en Por asignar) y buscarla por "rec 321", por teléfono y por nombre, asignarla,
+  verla en "En curso por conductor", registrar una licencia vencida y ver al conductor bloqueado en su
+  página, en la lista y en la asignación (su servicio en curso sigue). También: un borrador incompleto
+  sale en el inicio con "Falta el destino"; uno completo muestra "Abrir solicitud" y se abre.
+- Cómo probar (5 minutos, sin el admin):
+  1. `uv run python manage.py runserver` y entrar: el inicio muestra Por asignar, Borradores, Alertas
+     y En curso; el menú ya no tiene secciones "Aún no disponible".
+  2. "Nueva solicitud": solo hay un botón Guardar. Registre una sin destino: queda en borrador y en el
+     inicio aparece con "Falta el destino". Ábrala, "Completar borrador", ponga el destino y Guardar.
+  3. Vaya a otra pantalla y vuelva con "Arribo": la solicitud está en "Por asignar". Escriba su placa
+     en "Buscar solicitud" y ábrala desde la lista.
+  4. Asígnela: en el inicio aparece bajo el conductor, en "En curso por conductor".
+  5. "Flota y personal": pulse el conductor, corrija su nombre; registre su licencia con fecha pasada:
+     su página dice "No recibe servicios nuevos" y la lista lo muestra "Vencido". Renueve la licencia
+     (fecha futura) para dejarlo como estaba.
+
 ## Escalamientos
 
 Ninguno todavía.
