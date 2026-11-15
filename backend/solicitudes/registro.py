@@ -162,6 +162,29 @@ def faltantes_de(solicitud: Solicitud) -> list[Faltante]:
     )
 
 
+def faltantes_de_datos(datos: DatosRegistro) -> list[Faltante]:
+    """Lo que le faltaría a lo digitado para quedar abierta, antes de guardar. Misma regla que
+    `faltantes_de` (`nucleo.registro.faltantes_para_abrir`), leída del formulario: paga el
+    solicitante si no hay otro pagador, y los vehículos marcados para quitar no cuentan."""
+    idas = [v for v in datos.vehiculos if not v.quitar]
+    if datos.pagador is not None:
+        tipo_pagador = datos.pagador.tipo
+    elif datos.solicitante is not None:
+        tipo_pagador = datos.solicitante.tipo
+    else:
+        tipo_pagador = datos.cliente_nuevo.tipo if datos.cliente_nuevo else None
+    return faltantes_para_abrir(
+        tiene_solicitante=datos.solicitante is not None or datos.cliente_nuevo is not None,
+        tipo=datos.tipo,
+        origen=datos.origen,
+        destino=datos.destino,
+        vehiculos=len(idas),
+        tiene_regreso=datos.tiene_regreso,
+        paga_aseguradora=tipo_pagador == TipoCliente.ASEGURADORA,
+        vehiculos_sin_referencia=sum(1 for v in idas if not v.referencia_externa),
+    )
+
+
 # --- Duplicados --------------------------------------------------------------------------------
 
 

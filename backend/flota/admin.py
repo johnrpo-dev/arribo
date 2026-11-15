@@ -1,8 +1,7 @@
 """Admin de la flota. Nada se borra: se desactiva la grúa o el conductor, o se cierra la asignación.
 
-Para el día a día está la pantalla "Flota y personal" del panel (1a-08b, unida en 1a-08c), que crea al conductor con su
-acceso a la app sin pasar por usuarios ni grupos. Aquí el PIN también se puede fijar: el formulario del
-conductor tiene el campo "Nuevo PIN de la app", que guarda solo su hash y nunca lo muestra.
+El admin es solo de consulta (`panel/admin_consulta.py`): conductores, PIN y grúas se manejan en
+"Flota y personal" del panel.
 """
 from django import forms
 from django.contrib import admin
@@ -65,7 +64,6 @@ class ConductorAdmin(SinBorrarAdmin):
     list_display = ("nombre", "celular", "usuario", "activo", "pin_fijado")
     list_filter = ("activo",)
     search_fields = ("nombre", "celular")
-    autocomplete_fields = ("usuario",)
 
     @admin.display(boolean=True, description="PIN fijado")
     def pin_fijado(self, obj):

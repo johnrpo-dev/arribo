@@ -42,6 +42,13 @@ uv run python manage.py migrate          # aplicar migraciones
 uv run python manage.py runserver        # panel en http://127.0.0.1:8000
 ```
 
+Para probar con el celular por USB, desde la raíz del repositorio (deja el panel corriendo y
+recrea solo el túnel `adb reverse` cada vez que el celular se reconecta; Ctrl+C para terminar):
+
+```
+powershell -ExecutionPolicy Bypass -File .\arrancar.ps1
+```
+
 Desde `conductor/` (cuando exista el proyecto Flutter, tarea 1a-01):
 
 ```

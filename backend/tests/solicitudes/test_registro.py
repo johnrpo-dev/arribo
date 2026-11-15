@@ -32,7 +32,6 @@ def datos(**cambios):
         "marca": "Mazda",
         "linea": "3",
         "color": "Gris",
-        "accion": "guardar",
     }
     base.update(cambios)
     return formulario({k: v for k, v in base.items() if v is not None})
@@ -43,7 +42,13 @@ CAMPOS_VEHICULO = ("servicio", "placa", "vin", "marca", "linea", "color", "refer
 
 def formulario(campos, vehiculos=None):
     """Lo que manda el navegador: los campos del vehículo van en la fila 0 del conjunto de
-    vehículos (o en las filas de `vehiculos`), con su formulario de control."""
+    vehículos (o en las filas de `vehiculos`), con su formulario de control.
+
+    Por defecto con el botón "Guardar como borrador" (`accion=borrador`): una solicitud completa
+    queda abierta igual y una incompleta queda en borrador, que es lo que prueban casi todas. Las
+    pruebas de "Guardar" con algo faltante (no guarda y marca el campo) pasan `accion="guardar"`.
+    """
+    campos.setdefault("accion", "borrador")
     filas = vehiculos if vehiculos is not None else [
         {c: campos.pop(c) for c in CAMPOS_VEHICULO if c in campos}
     ]
@@ -196,7 +201,7 @@ def test_el_formulario_tiene_un_solo_boton_de_guardar(client, logistica):
     assert 'value="borrador"' not in html
 
 
-def test_completa_queda_abierta_aunque_llegue_la_accion_borrador_de_antes(
+def test_completa_queda_abierta_aunque_se_pulse_guardar_como_borrador(
     client, logistica, con_telefono
 ):
     """El botón "Guardar como borrador" ya no existe (1a-08c): un formulario viejo que todavía lo
@@ -209,6 +214,65 @@ def test_completa_queda_abierta_aunque_llegue_la_accion_borrador_de_antes(
 def test_desvare_sin_destino_queda_abierto(client, logistica, con_telefono):
     client.post(RUTA, datos(tipo="desvare", destino=""))
     assert Solicitud.objects.get().estado_registro == EstadoRegistro.ABIERTA
+
+
+def test_guardar_sin_destino_no_guarda_y_dice_que_falta_junto_al_campo(
+    client, logistica, con_telefono
+):
+    respuesta = client.post(RUTA, datos(destino="", accion="guardar"))
+
+    assert respuesta.status_code == 200
+    assert not Solicitud.objects.exists()  # nada se guardó en silencio como borrador
+    html = respuesta.content.decode()
+    assert "No se guardó todavía: falta el destino." in html
+    assert "Falta el destino para poder asignarla." in html  # junto al campo
+    assert 'name="accion" value="borrador"' in html  # y se ofrece el borrador a propósito
+    assert "Calle 10 # 43-20, El Poblado" in html  # lo digitado no se pierde
+
+
+def test_guardar_como_borrador_a_proposito_lo_guarda_con_lo_que_falta(
+    client, logistica, con_telefono
+):
+    respuesta = client.post(RUTA, datos(destino="", accion="borrador"), follow=True)
+
+    solicitud = Solicitud.objects.get()
+    assert solicitud.estado_registro == EstadoRegistro.BORRADOR
+    assert "Todavía no se puede asignar: es un borrador y le falta el destino." in (
+        respuesta.content.decode()
+    )
+
+
+def test_guardar_completa_queda_abierta_y_se_puede_asignar(client, logistica, con_telefono):
+    respuesta = client.post(RUTA, datos(accion="guardar"), follow=True)
+
+    solicitud = Solicitud.objects.get()
+    assert solicitud.estado_registro == EstadoRegistro.ABIERTA
+    servicio = solicitud.servicios.get()
+    assert f'name="s{servicio.pk}-conductor"' in respuesta.content.decode()
+
+
+def test_faltantes_de_datos_aplica_la_misma_regla_que_lo_guardado(con_telefono):
+    cliente = Cliente.objects.get()
+    vehiculo = DatosVehiculo(placa="ABC123", vin="")
+    completos = DatosRegistro(
+        tipo="traslado", solicitante=cliente, origen="A", destino="B", vehiculos=(vehiculo,)
+    )
+    assert registro.faltantes_de_datos(completos) == []
+    sin_nada = DatosRegistro(tipo="traslado")
+    assert registro.faltantes_de_datos(sin_nada) == [
+        Faltante.SOLICITANTE, Faltante.ORIGEN, Faltante.DESTINO, Faltante.VEHICULO
+    ]
+    aseguradora = Cliente.objects.create(nombre="Seguros", tipo=TipoCliente.ASEGURADORA)
+    paga_aseguradora = DatosRegistro(
+        tipo="traslado", solicitante=cliente, pagador=aseguradora, origen="A", destino="B",
+        vehiculos=(vehiculo,),
+    )
+    assert registro.faltantes_de_datos(paga_aseguradora) == [Faltante.REFERENCIA_EXTERNA]
+    quitado = DatosVehiculo(placa="ABC123", vin="", servicio_id=1, quitar=True)
+    sin_vehiculos = DatosRegistro(
+        tipo="traslado", solicitante=cliente, origen="A", destino="B", vehiculos=(quitado,)
+    )
+    assert registro.faltantes_de_datos(sin_vehiculos) == [Faltante.VEHICULO]
 
 
 def test_traslado_sin_destino_queda_en_borrador(client, logistica, con_telefono):

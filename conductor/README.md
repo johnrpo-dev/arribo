@@ -52,8 +52,16 @@ el SDK de Android:
 & "$env:LOCALAPPDATA\Android\sdk\platform-tools\adb.exe" reverse tcp:8000 tcp:8000
 ```
 
-Esto hace que `127.0.0.1:8000` en el celular sea el `runserver` del PC. Hay que repetirlo cada vez
-que se desconecta el cable. Para quitarlo: `... adb.exe reverse --remove-all`.
+Esto hace que `127.0.0.1:8000` en el celular sea el `runserver` del PC. El túnel se pierde cada vez
+que el celular se desconecta, se bloquea o adb se reinicia, y entonces la app dice "No hay conexión
+con el servidor". Para no repetirlo a mano, use desde la raíz del repositorio:
+
+```
+powershell -ExecutionPolicy Bypass -File .\arrancar.ps1
+```
+
+Arranca el panel (o usa el que ya esté corriendo) y revisa el túnel cada 3 segundos, recreándolo
+solo. Para quitarlo a mano: `... adb.exe reverse --remove-all`.
 
 HTTP en claro solo se permite en el APK de depuración y solo hacia `127.0.0.1` y `localhost`
 (`android/app/src/debug/res/xml/network_security_config.xml`). El APK de release solo habla HTTPS.

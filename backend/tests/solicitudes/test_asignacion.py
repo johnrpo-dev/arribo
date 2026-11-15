@@ -365,7 +365,8 @@ def test_un_borrador_no_se_asigna_desde_la_vista(client, logistica, cliente, cre
     borrador = crear_solicitud(cliente, estado_registro=EstadoRegistro.BORRADOR)
     servicio = crear_servicio(solicitud_de=borrador)
     html = client.get(f"/solicitudes/{borrador.pk}/").content.decode()
-    assert "Asignar conductores" not in html
+    assert f'name="s{servicio.pk}-conductor"' not in html  # sin formulario para asignar
+    assert "Todavía no se puede asignar: es un borrador" in html  # y dice por qué
     respuesta = client.post(
         url_asignar(servicio), {f"s{servicio.pk}-conductor": ana.pk}, follow=True
     )

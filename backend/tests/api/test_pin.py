@@ -90,39 +90,10 @@ def _url(conductor):
     return f"/admin/flota/conductor/{conductor.pk}/change/"
 
 
-def test_el_admin_fija_el_pin_y_guarda_solo_su_hash(admin_client, ana):
-    respuesta = admin_client.post(_url(ana), _formulario(ana, nuevo_pin=PIN))
-
-    assert respuesta.status_code == 302
-    ana.refresh_from_db()
-    assert ana.verificar_pin(PIN)
-    assert PIN not in ana.pin_hash
-
-
-def test_el_admin_rechaza_un_pin_que_no_es_de_seis_digitos(admin_client, ana):
-    respuesta = admin_client.post(_url(ana), _formulario(ana, nuevo_pin="1234"))
-
-    assert respuesta.status_code == 200
-    assert "El PIN tiene exactamente 6 dígitos" in respuesta.content.decode()
-    ana.refresh_from_db()
-    assert not ana.tiene_pin
-
-
-def test_dejar_vacio_el_nuevo_pin_en_el_admin_no_cambia_el_pin(admin_client, ana_app):
-    antes = ana_app.pin_hash
-
-    respuesta = admin_client.post(_url(ana_app), _formulario(ana_app, nombre="Ana María"))
-
-    assert respuesta.status_code == 302
-    ana_app.refresh_from_db()
-    assert ana_app.nombre == "Ana María"
-    assert ana_app.pin_hash == antes
-
-
 def test_el_admin_no_muestra_el_pin_ni_su_hash(admin_client, ana_app):
     pagina = admin_client.get(_url(ana_app)).content.decode()
 
-    assert 'name="nuevo_pin"' in pagina
+    assert 'name="nuevo_pin"' not in pagina  # solo consulta: el PIN se cambia en Flota y personal
     assert ana_app.pin_hash not in pagina
     assert 'name="pin_hash"' not in pagina
 

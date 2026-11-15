@@ -23,6 +23,11 @@ urlpatterns = [
     path("salir/", LogoutView.as_view(), name="salir"),
     path("estilos/", views.estilos, name="estilos"),
     path(
+        "alertas/<int:pk>/resolver/",
+        views.resolver_alerta_desde_tablero,
+        name="resolver_alerta",
+    ),
+    path(
         "configuracion/restablecer/",
         requiere_rol(ADMINISTRADOR)(vistas_configuracion.restablecer),
         name="restablecer",

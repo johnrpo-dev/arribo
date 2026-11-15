@@ -77,7 +77,7 @@ def rutas(ana, crear_usuario):
 ACCIONES_POST = [
     "conductores/{c}/habilitar/",
     "conductores/{c}/pin/",
-    "conductores/{c}/grua/",
+    "conductores/{c}/datos/",
     "conductores/{c}/desactivar/",
     "conductores/{c}/reactivar/",
     "usuarios/{u}/rol/",
