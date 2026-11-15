@@ -1268,7 +1268,33 @@ tiene botón de actualizar información".
   servicios, la fecha del regreso). La app del conductor ya lo marcaba "(regreso)".
 - Prueba nueva: `test_detalle_y_tablero_distinguen_el_regreso_de_la_ida`.
 - Cómo probar: abrir la solicitud 2; el N.º 3 dice "Regreso del N.º 2" con su fecha; en el inicio, la
-  tarjeta de Flaco muestra "ASD345 (regreso)".
+  tarjeta de Flaco muestra "ASD345" con la etiqueta de regreso.
+
+### 1a-08g · Panel con aspecto profesional y regreso en color
+
+- Pedido del dueño: "los servicios de regreso deben ir marcados de otro color" y "que el panel se vea
+  más profesional, más premium".
+- **Regreso en color**: verde azulado propio (`--regreso`), distinto de todos los estados. Etiqueta
+  `etiqueta--regreso` con flecha ↩ en la tabla de servicios, el formulario de asignar, la ronda, la
+  tarjeta "Por asignar" (con fondo teñido, `tarjeta--regreso`) y la ronda de cada conductor en el
+  tablero; las filas de regreso llevan una franja de ese color. La ida va en una etiqueta neutra.
+- **Corrección encontrada al hacerlo**: en el tablero, un regreso por asignar mostraba la hora y el
+  trayecto de la ida y se ponía "urgente" cuando se acercaba la ida (aunque el regreso fuera días
+  después). Ahora usa `nucleo.trayecto` (`hora_programada`, `puntos_del_servicio`) para la hora, el
+  trayecto y la urgencia, y `consultas.por_asignar` ordena por la hora propia de cada servicio.
+- **Aspecto**: misma hoja `arribo.css` con los mismos nombres de clase (ninguna pantalla cambió de
+  estructura salvo el buscador y los filtros). Barra lateral oscura con logotipo, superficies blancas
+  con sombra suave, títulos más marcados, encabezados de tabla en versalitas, etiquetas de estado tipo
+  píldora con punto, cifras del tablero con franja de color arriba, buscador en una fila con lupa,
+  filtros de la lista como pestañas. CSS nuevo justificado: `.cabecera-pagina`, `.pestanas`,
+  `.buscador`, `.marca-logo`, `.etiqueta--regreso/--ida`, `.fila--regreso`, `.tarjeta--regreso`.
+  Versión de la hoja a `?v=3` para que el navegador la recargue.
+- Revisado con capturas a 1440 px (tablero, detalle, lista, nueva, flota, ingreso) y a 375 px sin
+  desplazamiento horizontal.
+- Pruebas nuevas: `test_el_regreso_por_asignar_usa_su_propia_hora_y_va_del_destino_al_origen`;
+  `test_detalle_y_tablero_distinguen_el_regreso_de_la_ida` actualizada a la etiqueta de color.
+- Cómo probar (3 minutos): recargar con Ctrl+F5. Ver el tablero y la solicitud 2: el N.º 3 aparece
+  con la etiqueta verde azulada "↩ Regreso del N.º 2". En Solicitudes, los filtros son pestañas.
 
 ## Escalamientos
 

@@ -1,17 +1,16 @@
 {% extends "base.html" %}
 {% block titulo %}Solicitudes{% endblock %}
 {% block contenido %}
-<h1 class="titulo-pagina">Solicitudes</h1>
-
-<div class="acciones">
-  <a class="boton boton--principal" href="{% url 'nueva_solicitud' %}">Nueva solicitud</a>
+<div class="cabecera-pagina">
+  <h1 class="titulo-pagina">Solicitudes</h1>
+  <a class="boton boton--principal" href="{% url 'nueva_solicitud' %}">+ Nueva solicitud</a>
 </div>
 
 {% include "solicitudes/parcial_buscar.html" %}
 
-<nav class="acciones" aria-label="Filtros">
+<nav class="pestanas" aria-label="Filtros">
   {% for clave, nombre in filtros.items %}
-  <a class="boton {% if clave == filtro %}boton--principal{% else %}boton--secundario{% endif %}" href="?filtro={{ clave }}{% if texto %}&amp;q={{ texto|urlencode }}{% endif %}"{% if clave == filtro %} aria-current="page"{% endif %}>{{ nombre }}</a>
+  <a class="pestana" href="?filtro={{ clave }}{% if texto %}&amp;q={{ texto|urlencode }}{% endif %}"{% if clave == filtro %} aria-current="page"{% endif %}>{{ nombre }}</a>
   {% endfor %}
 </nav>
 

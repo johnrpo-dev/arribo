@@ -13,6 +13,7 @@ from django.utils import timezone
 from alertas.operaciones import alertas_para_tablero
 from configuracion.models import configuracion_vigente
 from nucleo.estados import Estado
+from nucleo.trayecto import hora_programada, puntos_del_servicio
 from solicitudes import consultas
 from solicitudes.disponibilidad import Disponibilidad, disponibilidad_de_conductores
 from solicitudes.formularios import FormularioAsignacion
@@ -25,6 +26,9 @@ class PorAsignar:
     formulario: FormularioAsignacion
     espera: str  # "12 min", "2 h 5 min"; vacío si es programado
     urgente: bool  # pasó el umbral de la configuración
+    hora: datetime | None = None  # para cuándo es; None es inmediato (en un regreso, la fecha de regreso)
+    recoger: str = ""  # dónde se recoge (en un regreso, el destino de la solicitud)
+    entregar: str = ""  # dónde se entrega
 
 
 @dataclass
@@ -80,8 +84,11 @@ def _por_asignar(ahora, configuracion, disponibilidades) -> list[PorAsignar]:
     filas = []
     for servicio in consultas.por_asignar():
         solicitud = servicio.solicitud
-        if solicitud.programada_para:
-            espera, urgente = "", solicitud.programada_para - ahora <= limite_programado
+        es_regreso = servicio.regreso_de_id is not None
+        hora = hora_programada(es_regreso, solicitud.programada_para, solicitud.fecha_regreso)
+        recoger, entregar = puntos_del_servicio(es_regreso, solicitud.origen, solicitud.destino)
+        if hora:
+            espera, urgente = "", hora - ahora <= limite_programado
         else:
             transcurrido = ahora - solicitud.creada_en
             espera = _texto_espera(max(0, int(transcurrido.total_seconds() // 60)))
@@ -89,7 +96,7 @@ def _por_asignar(ahora, configuracion, disponibilidades) -> list[PorAsignar]:
         formulario = FormularioAsignacion(
             prefix=f"s{servicio.pk}", disponibilidades=disponibilidades
         )
-        filas.append(PorAsignar(servicio, formulario, espera, urgente))
+        filas.append(PorAsignar(servicio, formulario, espera, urgente, hora, recoger, entregar))
     return filas
 
 

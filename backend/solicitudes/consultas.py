@@ -14,7 +14,7 @@ import re
 from dataclasses import dataclass
 from itertools import groupby
 
-from django.db.models import Exists, F, OuterRef, Prefetch, Q
+from django.db.models import Case, Exists, F, OuterRef, Prefetch, Q, When
 
 from clientes.models import TelefonoCliente
 from nucleo.estados import TERMINALES, Estado
@@ -175,15 +175,22 @@ class RondaEnCurso:
 
 def por_asignar():
     """Servicios pendientes de asignar de solicitudes abiertas: los inmediatos primero (por hora de
-    registro) y luego los programados por hora."""
+    registro) y luego los programados por hora. La hora de un regreso es la fecha de regreso de la
+    solicitud, no la de la ida (la misma regla de `nucleo.trayecto.hora_programada`)."""
     return list(
         Servicio.objects.filter(
             estado=Estado.PENDIENTE_ASIGNAR.value,
             solicitud__estado_registro=EstadoRegistro.ABIERTA,
         )
         .select_related("vehiculo", "solicitud__solicitante")
+        .annotate(
+            hora_del_servicio=Case(
+                When(regreso_de__isnull=False, then=F("solicitud__fecha_regreso")),
+                default=F("solicitud__programada_para"),
+            )
+        )
         .order_by(
-            F("solicitud__programada_para").asc(nulls_first=True),
+            F("hora_del_servicio").asc(nulls_first=True),
             "solicitud__creada_en",
             "pk",
         )

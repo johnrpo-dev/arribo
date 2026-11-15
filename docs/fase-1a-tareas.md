@@ -81,6 +81,16 @@ Toda tarea termina con `uv run pytest -q` y `uv run ruff check .` en verde, más
   para superusuarios, sin usuarios ni grupos. Nombre, celular y grúa del conductor con un solo Guardar.
   Verificar: asignar desde el tablero y resolver una alerta; darle grúa a un conductor creado sin ella.
 
+- [x] **1a-08f Ida y regreso visibles** (0,5 h). Depende de: 08e. Reporte del dueño ("servicio duplicado").
+  El regreso de un evento se marca como tal en asignar, ronda y tablero, con su fecha.
+  Verificar: en un evento con regreso, el N.º del regreso dice "Regreso del N.º …" con su fecha.
+
+- [x] **1a-08g Panel con aspecto profesional y regreso en color** (1,5 h). Depende de: 08f. Pedida por el dueño.
+  Hoja de estilos renovada (barra lateral oscura, sombras suaves, tipografía y tablas más claras,
+  buscador en una fila, filtros como pestañas) y color propio para el regreso. En el tablero, el
+  regreso por asignar usa su propia hora (fecha de regreso) y su trayecto al revés para la urgencia y el orden.
+  Verificar: el regreso se ve en verde azulado en el tablero y en el detalle; no sale urgente por la hora de la ida.
+
 ## Conductor
 
 - [x] **1a-09 API: ingreso y asignaciones** (2 h). Depende de: 08.
