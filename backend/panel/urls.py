@@ -2,8 +2,9 @@ from django.contrib.auth.views import LogoutView
 from django.urls import path
 from django.utils.module_loading import import_string
 
+from configuracion import views as vistas_configuracion
 from panel import views
-from panel.roles import requiere_rol
+from panel.roles import ADMINISTRADOR, requiere_rol
 from panel.secciones import SECCIONES
 
 
@@ -21,5 +22,10 @@ urlpatterns = [
     # LogoutView de Django 5 solo acepta POST: un enlace o una precarga no cierran la sesión.
     path("salir/", LogoutView.as_view(), name="salir"),
     path("estilos/", views.estilos, name="estilos"),
+    path(
+        "configuracion/restablecer/",
+        requiere_rol(ADMINISTRADOR)(vistas_configuracion.restablecer),
+        name="restablecer",
+    ),
     *[_ruta_de_seccion(s) for s in SECCIONES],
 ]
