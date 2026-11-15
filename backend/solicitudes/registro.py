@@ -138,19 +138,27 @@ def servicios_de_ida(solicitud: Solicitud):
 
 
 def faltantes_de(solicitud: Solicitud) -> list[Faltante]:
-    """Lo que le falta a una solicitud guardada para quedar abierta."""
-    idas = servicios_de_ida(solicitud)
+    """Lo que le falta a una solicitud guardada para quedar abierta.
+
+    Lee los servicios con `servicios.all()` y el pagador por su relación, así que aprovecha lo
+    precargado (`prefetch_related("servicios")`, `select_related("pagador")`): el tablero lo pide
+    para varios borradores sin una consulta por cada uno.
+    """
+    idas = [
+        s
+        for s in solicitud.servicios.all()
+        if s.regreso_de_id is None and s.estado != Estado.CANCELADO.value
+    ]
     return faltantes_para_abrir(
         tiene_solicitante=solicitud.solicitante_id is not None,
         tipo=solicitud.tipo,
         origen=solicitud.origen,
         destino=solicitud.destino,
-        vehiculos=idas.count(),
+        vehiculos=len(idas),
         tiene_regreso=solicitud.tiene_regreso,
-        paga_aseguradora=Cliente.objects.filter(
-            pk=solicitud.pagador_id, tipo=TipoCliente.ASEGURADORA
-        ).exists(),
-        vehiculos_sin_referencia=idas.filter(referencia_externa="").count(),
+        paga_aseguradora=solicitud.pagador_id is not None
+        and solicitud.pagador.tipo == TipoCliente.ASEGURADORA,
+        vehiculos_sin_referencia=sum(1 for s in idas if not s.referencia_externa),
     )
 
 
@@ -273,6 +281,20 @@ def _guardar_vehiculos(solicitud: Solicitud, vehiculos: Iterable[DatosVehiculo],
             servicio.save(update_fields=["vehiculo", "referencia_externa"])
         elif datos.tiene_datos and not datos.quitar:
             _crear_servicio(solicitud, _vehiculo(datos), datos.referencia_externa.strip())
+
+
+def abrir_borrador(solicitud: Solicitud) -> tuple[Solicitud, list[Faltante]]:
+    """Abre un borrador que ya tiene todo, sin volver a pasar por el formulario.
+
+    Devuelve la solicitud y lo que le falta (si falta algo, sigue en borrador). Solo borradores
+    (SolicitudNoEditable si no); la fila queda bloqueada para que dos personas no la abran a la vez.
+    """
+    with transaction.atomic():
+        bloqueada = Solicitud.objects.select_for_update().get(pk=solicitud.pk)
+        if bloqueada.estado_registro != EstadoRegistro.BORRADOR:
+            raise SolicitudNoEditable("Solo un borrador se abre; esta solicitud ya no lo es.")
+        faltantes = _abrir_si_completa(bloqueada, True)
+    return bloqueada, faltantes
 
 
 def _abrir_si_completa(solicitud: Solicitud, abrir: bool) -> list[Faltante]:

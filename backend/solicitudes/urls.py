@@ -28,6 +28,7 @@ urlpatterns = [
         _con_rol(views.completar),
         name="completar_solicitud",
     ),
+    path("solicitudes/<int:pk>/abrir/", _con_rol(views.abrir), name="abrir_solicitud"),
     path(
         "solicitudes/<int:pk>/no-concretada/",
         _con_rol(views.no_concretada),

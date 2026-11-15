@@ -2,6 +2,7 @@
 la sección `nueva_solicitud` en `panel/urls.py` y las rutas de `solicitudes/urls.py`.
 """
 from django.contrib import messages
+from django.core.paginator import Paginator
 from django.db import IntegrityError
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
@@ -17,7 +18,7 @@ from nucleo.identificacion import (
 from nucleo.registro import CierreNoPermitido, describir_faltantes
 from nucleo.ronda import MovimientoInvalido
 
-from . import operaciones
+from . import consultas, operaciones
 from .disponibilidad import disponibilidad_de_conductores
 from .formularios import (
     FormularioAsignacion,
@@ -32,6 +33,7 @@ from .models import VALORES_EN_RONDA, EstadoRegistro, Servicio, Solicitud
 from .operaciones import SolicitudNoAsignable
 from .registro import (
     SolicitudNoEditable,
+    abrir_borrador,
     cerrar_no_concretada,
     completar_borrador,
     duplicados_activos,
@@ -44,6 +46,31 @@ from .registro import (
 
 BUSQUEDAS = (("solicitante", "telefono"), ("pagador", "pagador_telefono"))
 CAMPO_CONFIRMACION = "duplicados_confirmados"
+
+
+def lista(request):
+    """Lista de solicitudes con filtros (Activas por defecto), búsqueda y páginas. Una búsqueda sin
+    filtro elegido (la del tablero) busca en todas."""
+    texto = request.GET.get("q", "").strip()
+    por_defecto = "todas" if texto else consultas.FILTRO_POR_DEFECTO
+    filtro = request.GET.get("filtro") or por_defecto
+    if filtro not in consultas.FILTROS:
+        filtro = por_defecto
+    pagina = Paginator(consultas.lista(filtro, texto), consultas.POR_PAGINA).get_page(
+        request.GET.get("pagina")
+    )
+    return render(
+        request,
+        "solicitudes/lista.html",
+        {
+            "filtros": consultas.FILTROS,
+            "filtro": filtro,
+            "nombre_filtro": consultas.FILTROS[filtro],
+            "texto": texto,
+            "pagina": pagina,
+            "filas": consultas.filas(pagina),
+        },
+    )
 
 
 def nueva(request):
@@ -100,15 +127,13 @@ def _formulario(request, solicitud):
 
 
 def _guardar(request, formulario, solicitud, datos):
-    """Registra o completa; devuelve la solicitud guardada o None si no se guardó."""
-    abrir = request.POST.get("accion") != "borrador"
+    """Registra o completa; devuelve la solicitud guardada o None si no se guardó. Queda abierta si
+    no le falta nada; si falta algo, en borrador."""
     try:
         if solicitud is None:
-            guardada, faltantes = registrar_solicitud(datos, usuario=request.user, abrir=abrir)
+            guardada, faltantes = registrar_solicitud(datos, usuario=request.user)
         else:
-            guardada, faltantes = completar_borrador(
-                solicitud, datos, usuario=request.user, abrir=abrir
-            )
+            guardada, faltantes = completar_borrador(solicitud, datos, usuario=request.user)
     except SolicitudNoEditable as error:
         formulario.add_error(None, f"No se guardó: {error}")
         return None
@@ -274,6 +299,24 @@ def mover_en_ronda(request, pk, servicio_pk):
         messages.error(request, f"No se movió el servicio N.º {servicio.pk}: {texto}")
     else:
         messages.success(request, f"Ronda de {servicio.conductor} actualizada.")
+    return redirect("detalle_solicitud", pk=pk)
+
+
+@require_POST
+def abrir(request, pk):
+    """Abre un borrador que ya tiene todo (el botón de arriba en su detalle)."""
+    solicitud = get_object_or_404(Solicitud, pk=pk)
+    try:
+        abierta, faltantes = abrir_borrador(solicitud)
+    except SolicitudNoEditable:
+        messages.info(request, f"La solicitud {pk} ya no es un borrador.")
+    else:
+        if abierta.estado_registro == EstadoRegistro.ABIERTA:
+            messages.success(
+                request, f"Solicitud {pk} abierta: sus servicios quedan pendientes de asignar."
+            )
+        else:
+            _avisar_guardado(request, abierta, faltantes)
     return redirect("detalle_solicitud", pk=pk)
 
 
