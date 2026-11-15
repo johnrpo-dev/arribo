@@ -16,6 +16,7 @@ from django.utils import timezone
 from rest_framework.test import APIClient
 
 from api.models import TokenDispositivo
+from tests.panel.conftest import crear_usuario  # noqa: F401
 
 PIN = "482913"
 OTRO_PIN = "135790"

@@ -1,4 +1,5 @@
-"""Sesiones de la app del conductor: un token por celular y los intentos fallidos de ingreso.
+"""Sesiones de la app del conductor: un token por celular, los intentos fallidos de ingreso y la
+tabla de salida de los avisos push.
 
 Del token solo se guarda su hash (SHA-256): quien lea la base no puede usarlo. Un token se revoca
 (no se borra) desde el admin o al cerrar sesión en la app. Los intentos fallidos se guardan aquí, en
@@ -10,11 +11,15 @@ import secrets
 
 from django.db import models
 from django.db.models import Q
+from django.utils import timezone
 
 from nucleo.ingreso import Intentos
+from nucleo.push import TipoAviso
 
 # 32 bytes aleatorios (256 bits): imposible de adivinar, por eso basta un hash rápido para buscarlo.
 BYTES_DEL_TOKEN = 32
+# Un token de FCM mide unos 160 caracteres; el tope deja margen sin pasarse del índice único.
+LARGO_MAXIMO_TOKEN_PUSH = 1000
 
 
 def hash_del_token(clave: str) -> str:
@@ -42,12 +47,42 @@ class TokenDispositivo(models.Model):
     revocado_en = models.DateTimeField(
         "revocado", null=True, blank=True, help_text="Vacío = vigente."
     )
+    # Push (1a-14): el token que Firebase le dio a la app en este celular. Lo registra la app con
+    # PUT /api/v1/push/; se borra al revocar la sesión o cuando FCM dice que ya no existe.
+    push_token = models.CharField(
+        "token de push",
+        max_length=LARGO_MAXIMO_TOKEN_PUSH,
+        blank=True,
+        editable=False,
+        help_text="Vacío = este celular no recibe avisos push.",
+    )
+    push_registrado_en = models.DateTimeField("push registrado", null=True, blank=True)
+    push_desactivado_en = models.DateTimeField(
+        "push desactivado",
+        null=True,
+        blank=True,
+        help_text="Cuándo Firebase dijo que el token de push ya no existe (por ejemplo, la app se "
+        "desinstaló). Se vacía cuando la app registra uno nuevo.",
+    )
 
     class Meta:
         verbose_name = "token de celular"
         verbose_name_plural = "tokens de celular"
         ordering = ("-creado_en",)
         constraints = (
+            # Un token de push llega a un solo celular: si estuviera en dos sesiones, un aviso de
+            # un conductor le sonaría a otro (el mismo celular usado antes por otro conductor).
+            models.UniqueConstraint(
+                fields=("push_token",),
+                condition=~Q(push_token=""),
+                name="token_push_unico",
+                violation_error_message="Ese token de push ya está registrado en otra sesión.",
+            ),
+            models.CheckConstraint(
+                condition=Q(revocado_en__isnull=True) | Q(push_token=""),
+                name="token_revocado_sin_push",
+                violation_error_message="Una sesión revocada no recibe avisos push.",
+            ),
             models.UniqueConstraint(
                 fields=("conductor", "dispositivo_id"),
                 condition=Q(revocado_en__isnull=True),
@@ -124,3 +159,83 @@ class IntentosIngreso(models.Model):
         self.primer_fallo = intentos.primer_fallo
         self.bloqueado_hasta = intentos.bloqueado_hasta
         self.save(update_fields=["fallos", "primer_fallo", "bloqueado_hasta"])
+
+
+OPCIONES_TIPO_AVISO = [
+    (TipoAviso.ASIGNADO.value, "Servicio asignado"),
+    (TipoAviso.RETIRADO.value, "Servicio retirado (reasignado a otro conductor)"),
+]
+
+
+class EstadoNotificacion(models.TextChoices):
+    PENDIENTE = "pendiente", "Pendiente"
+    ENVIADA = "enviada", "Enviada"
+    FALLIDA = "fallida", "Fallida"
+
+
+class NotificacionPush(models.Model):
+    """Tabla de salida de los avisos push (1a-14): un aviso para un celular.
+
+    Se crea en la misma transacción que la asignación (si la asignación se deshace, el aviso
+    también) y se envía después de confirmada, con reintentos acotados (`nucleo/push.py`). Las
+    que quedan pendientes las reenvía `manage.py enviar_notificaciones_pendientes`. No se borra.
+    """
+
+    dispositivo = models.ForeignKey(
+        TokenDispositivo,
+        verbose_name="celular",
+        on_delete=models.PROTECT,
+        related_name="notificaciones",
+    )
+    servicio = models.ForeignKey(
+        "solicitudes.Servicio",
+        verbose_name="servicio",
+        on_delete=models.PROTECT,
+        related_name="notificaciones_push",
+    )
+    tipo = models.CharField("tipo", max_length=10, choices=OPCIONES_TIPO_AVISO)
+    titulo = models.CharField("título", max_length=100)
+    cuerpo = models.CharField("texto", max_length=300)
+    estado = models.CharField(
+        "estado",
+        max_length=10,
+        choices=EstadoNotificacion.choices,
+        default=EstadoNotificacion.PENDIENTE,
+    )
+    intentos = models.PositiveSmallIntegerField("intentos", default=0)
+    proximo_intento = models.DateTimeField(
+        "próximo intento", default=timezone.now, help_text="Solo cuenta mientras está pendiente."
+    )
+    creada_en = models.DateTimeField("creada", auto_now_add=True)
+    enviada_en = models.DateTimeField("enviada", null=True, blank=True)
+    error = models.TextField(
+        "último error", blank=True, help_text="Por qué falló el último intento, si falló."
+    )
+
+    class Meta:
+        verbose_name = "notificación push"
+        verbose_name_plural = "notificaciones push"
+        ordering = ("-creada_en", "-pk")
+        indexes = (models.Index(fields=("estado", "proximo_intento"), name="push_pendientes"),)
+        constraints = (
+            models.CheckConstraint(
+                condition=Q(estado__in=EstadoNotificacion.values),
+                name="push_estado_valido",
+                violation_error_message="Estado de notificación desconocido.",
+            ),
+            models.CheckConstraint(
+                condition=Q(tipo__in=[t.value for t in TipoAviso]),
+                name="push_tipo_valido",
+                violation_error_message="Tipo de aviso desconocido.",
+            ),
+            models.CheckConstraint(
+                condition=Q(estado=EstadoNotificacion.ENVIADA, enviada_en__isnull=False)
+                | (~Q(estado=EstadoNotificacion.ENVIADA) & Q(enviada_en__isnull=True)),
+                name="push_enviada_con_hora",
+                violation_error_message="Una notificación enviada guarda cuándo se envió (y solo "
+                "ella).",
+            ),
+        )
+
+    def __str__(self):
+        return f"{self.titulo} · servicio {self.servicio_id} · {self.dispositivo}"

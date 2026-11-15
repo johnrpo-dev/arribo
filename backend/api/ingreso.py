@@ -95,10 +95,13 @@ def ingresar(celular: str, pin: str, dispositivo_id: str, dispositivo_nombre: st
 
 
 def revocar_tokens(tokens) -> int:
-    """Revoca los tokens vigentes de la consulta (los ya revocados no cambian); devuelve cuántos."""
-    return tokens.filter(revocado_en__isnull=True).update(revocado_en=timezone.now())
+    """Revoca los tokens vigentes de la consulta (los ya revocados no cambian); devuelve cuántos.
+    Con la sesión se borra su token de push: ese celular deja de recibir avisos."""
+    return tokens.filter(revocado_en__isnull=True).update(
+        revocado_en=timezone.now(), push_token=""
+    )
 
 
 def cerrar_sesion(token: TokenDispositivo) -> None:
-    """La app cierra su sesión: su token deja de servir."""
+    """La app cierra su sesión: su token deja de servir y su token de push se borra."""
     revocar_tokens(TokenDispositivo.objects.filter(pk=token.pk))

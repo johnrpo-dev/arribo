@@ -19,9 +19,16 @@ el conductor digitó al recoger y que no quedaron en el vehículo; vacío si no 
 otro contenido, servicio que no existe, datos ilegibles). Argumentos: `conductor`, `motivo`
 (`nucleo.sincronizacion.Motivo`), `contenido` (lo que llegó) y `original` (el EventoEstado que ya
 tenía ese id, o None). La escucha `alertas`.
+
+`servicio_asignado`: al asignar o reasignar un servicio desde el panel, dentro de su transacción y
+con la fila del servicio bloqueada. Argumentos: `servicio` (ya guardado con su conductor nuevo) y
+`conductor_anterior` (el que lo tenía, al reasignar; None al asignar). La escucha `api`, que
+encola en la misma transacción los avisos push a los conductores (1a-14). A diferencia de las
+otras, su receptor no deja que una falla suya deshaga la asignación: la atrapa y la registra.
 """
 from django.dispatch import Signal
 
 servicio_entregado = Signal()
 evento_del_conductor_guardado = Signal()
 evento_del_conductor_rechazado = Signal()
+servicio_asignado = Signal()

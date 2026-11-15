@@ -433,6 +433,13 @@ class Servicio(models.Model):
         related_name="regreso",
         help_text="Si este servicio es un regreso, el servicio de ida.",
     )
+    visto_por_conductor_en = models.DateTimeField(
+        "visto por el conductor",
+        null=True,
+        blank=True,
+        help_text="La primera vez que la app del conductor asignado descargó el servicio. Se "
+        "vacía al asignarlo a otro conductor o al devolverlo a la cola.",
+    )
 
     class Meta:
         verbose_name = "servicio"
@@ -480,6 +487,13 @@ class Servicio(models.Model):
                 violation_error_message="Ese conductor ya tiene otro servicio en ese puesto de "
                 "la ronda.",
             ),
+            # "Visto" es del conductor que tiene el servicio: sin conductor no hay quién lo vea.
+            models.CheckConstraint(
+                condition=Q(visto_por_conductor_en__isnull=True) | Q(conductor__isnull=False),
+                name="servicio_visto_solo_con_conductor",
+                violation_error_message="Solo un servicio con conductor puede estar visto por "
+                "el conductor.",
+            ),
         )
 
     _cambio_desde_operaciones = False
@@ -524,7 +538,14 @@ class Servicio(models.Model):
         self._cambio_desde_operaciones = True
         try:
             self.save(
-                update_fields=["estado", "estado_previo", "conductor", "grua", "orden_ronda"]
+                update_fields=[
+                    "estado",
+                    "estado_previo",
+                    "conductor",
+                    "grua",
+                    "orden_ronda",
+                    "visto_por_conductor_en",
+                ]
             )
         finally:
             self._cambio_desde_operaciones = False

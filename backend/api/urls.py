@@ -8,6 +8,7 @@ app_name = "api"
 urlpatterns = [
     path("ingresar/", views.Ingresar.as_view(), name="ingresar"),
     path("salir/", views.Salir.as_view(), name="salir"),
+    path("push/", views.Push.as_view(), name="push"),
     path("asignaciones/", views.Asignaciones.as_view(), name="asignaciones"),
     path("asignaciones/<int:servicio_id>/", views.Asignacion.as_view(), name="asignacion"),
     path("eventos/", views.Eventos.as_view(), name="eventos"),

@@ -22,6 +22,19 @@ BOGOTA = ZoneInfo("America/Bogota")
 VIN = "1HGCM82633A004352"
 
 
+@pytest.fixture(autouse=True)
+def sin_credenciales_de_firebase(settings):
+    """Ninguna prueba lee la cuenta de servicio real de Firebase ni toca la red: el `.env` de la
+    máquina puede traer `ARRIBO_FIREBASE_CREDENCIALES`, pero en las pruebas el push queda sin
+    configurar. Las pruebas del envío ponen un enviador falso (`tests/api/test_push.py`)."""
+    from api import push
+
+    settings.ARRIBO_FIREBASE_CREDENCIALES = ""
+    push._enviadores.clear()
+    yield
+    push._enviadores.clear()
+
+
 def hora(minuto: int) -> datetime:
     """Una hora fija del 12 de noviembre de 2026 en Medellín (para la hora del celular)."""
     return datetime(2026, 11, 12, 8, 0, tzinfo=BOGOTA) + timedelta(minutes=minuto)
