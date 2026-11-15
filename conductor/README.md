@@ -6,6 +6,7 @@ que se ve sin señal, y llamar o abrir la dirección en Google Maps o Waze con u
 1a-12: botones de estado en el detalle (En camino, Recogido, Entregado y Novedad) y cola de eventos
 que funciona sin señal. Desde la 1a-13: Recogido y Entregado exigen fotos y el nombre de quien
 entrega o recibe, las fotos suben en su propia cola, y un Recogido se bloquea si la grúa va llena.
+Desde la 1a-14: avisos push al asignar o reasignar (Firebase Cloud Messaging).
 
 - Paquete: `co.arribo.arribo_conductor`
 - `minSdk = 26` (Android 8.0 o superior), fijado en `android/app/build.gradle.kts`.
@@ -16,6 +17,10 @@ entrega o recibe, las fotos suben en su propia cola, y un Recogido se bloquea si
 - Flutter estable (probado con Flutter 3.50.0 / Dart 3.14.0) y el SDK de Android con sus licencias
   aceptadas (`flutter doctor --android-licenses`).
 - Para correr en un celular: Android 8.0 o superior con la depuración USB activada.
+- Para compilar: `android/app/google-services.json`, el archivo de configuración de la app Android
+  que se descarga de la consola de Firebase (Configuración del proyecto → Tus apps → Android, paquete
+  `co.arribo.arribo_conductor`). Está en `.gitignore`: no va al repositorio y hay que copiarlo a
+  mano en cada computador donde se compile. Sin él, Gradle no arma el APK.
 
 ## Comandos
 
@@ -249,6 +254,25 @@ del servicio, "N fotos por subir". Con fotos propias pendientes no se cierra ses
   vuelva a ingresar en ese celular (o desde el admin).
 - Sin red, tiempo agotado o un 500: la lista sigue mostrando lo guardado, con un aviso discreto.
 
+### Avisos push (1a-14, `lib/push.dart`)
+
+- `main.dart` arranca Firebase (`Firebase.initializeApp()`, sin FlutterFire CLI: las opciones las
+  arma el plugin de Gradle `com.google.gms.google-services` a partir de `google-services.json`). Si
+  no arranca, la app sigue igual, sin avisos.
+- `RegistroPush` registra el token de push en el servidor (`PUT /api/v1/push/`) al ingresar, al abrir
+  la app con sesión guardada y cuando Firebase lo cambia. Sin señal (o si Firebase todavía no da el
+  token) lo reintenta la próxima vez que el servidor responda la lista. La primera vez de cada
+  arranque con sesión pide el permiso de notificaciones (Android 13 o superior).
+- Al cerrarse la sesión (a pedido o por un 401) borra el token en Firebase; en el servidor lo borra
+  `POST /salir/` (o la revocación desde el admin, o el siguiente ingreso en ese celular).
+- Un aviso con la app abierta refresca la lista. Tocar la notificación cierra lo que esté abierto
+  encima de la lista y la refresca.
+- El aviso lleva solo el número del servicio y un texto fijo (contrato, "Avisos push"). La lista del
+  servidor sigue siendo la verdad: el aviso solo hace que la app la pida antes.
+- Usa el token de FCM (`getToken`, `onTokenRefresh`, `deleteToken`). firebase_messaging 17 los marca
+  obsoletos a favor del registro por identificador de instalación; cambiarlo exige cambiar también el
+  envío del servidor (anotado como riesgo en `PROGRESS.md`, 1a-14).
+
 ## Dependencias
 
 Se agregan con `flutter pub add` en la tarea que las use, para que queden en su versión vigente.
@@ -262,6 +286,7 @@ Se agregan con `flutter pub add` en la tarea que las use, para que queden en su 
 | `url_launcher` | Abrir el marcador del teléfono, Google Maps y Waze |
 | `uuid` | El identificador del celular (y los ids de eventos y fotos desde la 1a-12) |
 | `image_picker` | La cámara del sistema para las fotos de evidencia (1a-13): toma la foto en otro proceso, la achica y la comprime en nativo y recupera la foto si Android mató la app |
+| `firebase_core`, `firebase_messaging` | Avisos push (1a-14): arrancar Firebase, el token de push del celular y los avisos. Es la vía oficial de Firebase Cloud Messaging en Flutter |
 | `sqflite_common_ffi` (solo pruebas) | La misma base SQLite en el computador, sin celular |
 
 `sqflite_common_ffi` trae `sqlite3`, cuyo hook de compilación empacaba `libsqlite3.so` en el APK

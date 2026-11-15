@@ -1,5 +1,6 @@
 // Arranque de la app del conductor: abre la base local, arma las piezas y lee la sesión guardada.
 
+import 'package:firebase_core/firebase_core.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:sqflite/sqflite.dart';
 
@@ -15,6 +16,7 @@ import 'fotos/almacen_fotos.dart';
 import 'fotos/subidor_fotos.dart';
 import 'ingreso/almacen_token.dart';
 import 'ingreso/sesion.dart';
+import 'push.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -40,6 +42,24 @@ Future<void> main() async {
     sincronizador: sincronizador,
     fotos: fotos,
   );
-  runApp(ArriboApp(sesion: sesion, lista: lista));
+  // Avisos push (1a-14). Si Firebase no arranca, la app funciona igual, sin avisos: la lista se
+  // refresca al abrirla, al volver a ella y al deslizar.
+  final mensajeria = await _iniciarFirebase();
+  if (mensajeria != null) {
+    RegistroPush(mensajeria: mensajeria, api: api, sesion: sesion, lista: lista).iniciar();
+  }
+  runApp(ArriboApp(sesion: sesion, lista: lista, avisosTocados: mensajeria?.avisosTocados));
   await sesion.iniciar();
+}
+
+Future<MensajeriaPush?> _iniciarFirebase() async {
+  try {
+    // Sin opciones: en Android las lee de la configuración que arma el plugin google-services a
+    // partir de android/app/google-services.json.
+    await Firebase.initializeApp();
+    return MensajeriaFirebase();
+  } catch (error) {
+    debugPrint('Firebase no arrancó; la app sigue sin avisos push ($error).');
+    return null;
+  }
 }
