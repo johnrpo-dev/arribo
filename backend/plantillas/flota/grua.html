@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block titulo %}{% if grua %}Grúa {{ grua.placa }}{% else %}Nueva grúa{% endif %}{% endblock %}
+{% block contenido %}
+<h1 class="titulo-pagina">{% if grua %}Grúa {{ grua.placa }}{% else %}Nueva grúa{% endif %}</h1>
+
+<form method="post" class="formulario" novalidate>
+  {% csrf_token %}
+  {% include "flota/_errores.html" %}
+  <div class="fila-campos">
+    {% include "parciales/campo.html" with campo=formulario.placa %}
+    {% include "parciales/campo.html" with campo=formulario.capacidad %}
+  </div>
+  {% include "parciales/campo.html" with campo=formulario.descripcion %}
+  {% include "parciales/campo.html" with campo=formulario.estado_operativo %}
+  {% if grua %}{% include "parciales/campo.html" with campo=formulario.activa %}{% endif %}
+  <div class="acciones">
+    <button type="submit" class="boton boton--principal">{% if grua %}Guardar grúa{% else %}Crear grúa{% endif %}</button>
+    <a class="boton boton--secundario" href="{% url 'personal' %}">Volver</a>
+  </div>
+</form>
+{% endblock %}

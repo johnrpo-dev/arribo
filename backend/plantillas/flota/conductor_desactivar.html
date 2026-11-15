@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block titulo %}Desactivar a {{ conductor.nombre }}{% endblock %}
+{% block contenido %}
+<h1 class="titulo-pagina">Desactivar a {{ conductor.nombre }}</h1>
+
+{% if servicios_activos %}
+<p class="aviso aviso--advertencia">{{ conductor.nombre }} tiene {% if servicios_activos == 1 %}1 servicio activo{% else %}{{ servicios_activos }} servicios activos{% endif %}. Al desactivarlo se le cierra la app de inmediato y no podrá marcarlos desde el celular: logística tendrá que reasignarlos o resolverlos desde el panel.</p>
+{% else %}
+<p class="aviso">{{ conductor.nombre }} no tiene servicios activos.</p>
+{% endif %}
+<p class="ayuda">Deja de recibir servicios nuevos y se le cierra la sesión en la app. Su historial no cambia y se puede reactivar.</p>
+
+<form method="post" class="formulario">
+  {% csrf_token %}
+  <div class="acciones">
+    <button type="submit" class="boton boton--peligro">Sí, desactivar</button>
+    <a class="boton boton--secundario" href="{% url 'conductor_personal' conductor.pk %}">No, volver</a>
+  </div>
+</form>
+{% endblock %}

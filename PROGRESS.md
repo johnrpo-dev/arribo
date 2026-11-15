@@ -1062,6 +1062,71 @@ La tarea 1a-16 se partió en dos: 1a-16a (modelo de línea de cobro con sus rest
      Quitar la variable del `.env` no sirve para esto: sin credenciales el aviso queda fallido, no
      pendiente.
 
+### 1a-08b Personal y grúas (15 de noviembre de 2026)
+- Hecho: sección nueva "Personal y grúas" (`/personal/`, solo administrador) registrada en
+  `panel/secciones.py`, con tres listas y sus formularios:
+  - Conductores: nombre, celular, grúa, PIN sí/no, activo y si puede entrar a la app. "Nuevo
+    conductor" pide nombre, celular, PIN (dos veces) y grúa opcional y, en una transacción, crea el
+    usuario interno de la app (`conductor-<celular>`, grupo conductor, contraseña inutilizable: no
+    entra al panel), la ficha y la asignación a la grúa desde ahora. Por conductor: habilitar para la
+    app, cambiar PIN, cambiar de grúa (cierra la vigente y abre la nueva en el mismo instante; si la
+    grúa la tiene otro, dice quién), desactivar (con confirmación que dice cuántos servicios activos
+    tiene; revoca sus sesiones de la app y con ellas el token de push) y reactivar.
+  - Usuarios de oficina: nombre, usuario, contraseña (validadores de Django, mensajes en español) y
+    rol (Logística, Facturación o Administrador). Cambiar rol, restablecer contraseña, desactivar y
+    reactivar.
+  - Grúas: placa, descripción, capacidad (1 o 2) y estado operativo; al editar, también activa.
+- Decidido:
+  - Sección aparte de "Flota y documentos": aquella responde "¿qué documentos están al día?" y esta
+    "¿quién trabaja aquí y con qué grúa?". Así la de documentos no cambia (solo su texto de lista
+    vacía, que mandaba al admin y ahora manda aquí). El código va en la app `flota` (la 1a-02 era
+    "Flota y usuarios"): `flota/operaciones.py`, `formularios.py`, `views.py`, `urls.py`.
+  - Reglas reutilizadas, no reescritas: formato del PIN (`nucleo/ingreso.py`, vía `fijar_pin`),
+    celular (`nucleo/identificacion.py`), traslapes (restricciones de la base y `full_clean`),
+    revocar sesiones (`api.ingreso.revocar_tokens`). Reglas nuevas en `nucleo/personal.py`: nombre
+    del usuario interno del conductor y "nunca cero administradores activos" (cuentan los usuarios
+    activos con rol administrador y las cuentas con acceso total), y nadie se desactiva a sí mismo.
+    Al quitar un administrador se bloquean las filas de los administradores, para que dos cambios a la
+    vez no dejen el panel sin ninguno.
+  - Habilitar para la app sirve también para el caso que vivió el dueño: un conductor enlazado a un
+    usuario de oficina. Se le crea su propio usuario de conductor y el de oficina no se toca.
+    Desactivar o reactivar un conductor solo cambia su usuario si es de conductor.
+  - La cuenta con acceso total (la del dueño, `john`) aparece como "Acceso total": desde la pantalla
+    no se le cambia el rol ni el estado, y solo ella misma cambia su contraseña (si no, cualquiera con
+    rol administrador podría quedarse con ella). Pregunta en `QUESTIONS.md`.
+  - `AUTH_PASSWORD_VALIDATORS` no estaba configurado (Django no validaba nada): se agregaron los
+    cuatro estándar en `config/settings.py`. No afecta a los usuarios ya creados.
+  - Sin HTMX ni CSS nuevo: formularios normales con `parciales/campo.html` y los componentes de
+    `arribo.css`. No hay botón de borrar en ninguna pantalla.
+  - Sin historial nuevo: la flota no tenía un patrón de historial; las asignaciones conductor–grúa sí
+    quedan como historial (se cierran, no se borran). Pregunta en `QUESTIONS.md`.
+- Superusuario sin grupos: `tiene_rol` lo deja pasar siempre, así que `john` ve esta sección y todas
+  las de administrador (probado en `test_el_superusuario_sin_roles_entra`).
+- En la base local: hoy "juan" ya aparece con usuario de conductor y "Puede entrar", y "Flaco" como
+  inactivo. No se modificó ningún dato real; el administrador temporal usado para mirar la pantalla en
+  el puerto 8770 se borró al terminar.
+- Prueba que cambió: `test_las_secciones_son_las_pedidas_en_orden` (`tests/panel/test_navegacion.py`)
+  incluye la sección nueva en su lista.
+- Verificado: `uv run pytest -q` (1917 pruebas, 83 nuevas), `uv run ruff check .` y
+  `manage.py makemigrations --check` sin cambios (la tarea no tiene migraciones). Pruebas nuevas
+  contra PostgreSQL en `tests/flota/test_personal_*.py` y `tests/nucleo/test_personal.py`.
+- Sin hacer: editar nombre o celular de un conductor (sigue en `/admin/`); historial de personal.
+- Preguntas abiertas nuevas: cuatro en `QUESTIONS.md` (grúas que se ofrecen, historial de personal,
+  la cuenta con acceso total, editar nombre y celular).
+- Cómo probar (5 minutos):
+  1. `uv run python manage.py runserver` y entrar como `john`: en la barra aparece "Personal y grúas".
+  2. "Nueva grúa": placa "prueba-1", capacidad 1. Se guarda como PRUEBA1.
+  3. "Nuevo conductor": nombre "Prueba", un celular que no sea de nadie, PIN 123456 dos veces y la
+     grúa PRUEBA1. Probar antes un PIN de 4 dígitos y el celular de juan: salen los errores en rojo.
+  4. En la app (o con `curl -X POST http://127.0.0.1:8000/api/v1/ingresar/ -H "Content-Type:
+     application/json" -d "{\"celular\":\"<celular>\",\"pin\":\"123456\",\"dispositivo_id\":\"prueba\"}"`),
+     el conductor entra.
+  5. En su ficha, "Desactivar conductor": la confirmación dice cuántos servicios activos tiene.
+     Confirmar y volver a ingresar: la app responde que no tiene acceso. "Reactivar" se lo devuelve.
+  6. "Nuevo usuario" con contraseña "12345678": sale "La contraseña está completamente numérica" (o
+     similar). En la ficha de `john` no hay botones de rol ni de desactivar.
+  Para no dejar datos de prueba: desactivar al conductor y la grúa al terminar (nada se borra).
+
 ## Escalamientos
 
 Ninguno todavía.

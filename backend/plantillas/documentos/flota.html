@@ -35,7 +35,7 @@
     </table>
   </div>
   {% else %}
-  <div class="vacio"><p>No hay grúas registradas. Se crean en el admin (Flota → Grúas).</p></div>
+  <div class="vacio"><p>No hay grúas registradas. Se crean en <a href="{% url 'personal' %}">Personal y grúas</a>.</p></div>
   {% endif %}
 </section>
 
@@ -63,7 +63,7 @@
     </table>
   </div>
   {% else %}
-  <div class="vacio"><p>No hay conductores registrados. Se crean en el admin (Flota → Conductores).</p></div>
+  <div class="vacio"><p>No hay conductores registrados. Se crean en <a href="{% url 'personal' %}">Personal y grúas</a>.</p></div>
   {% endif %}
 </section>
 

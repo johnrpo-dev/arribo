@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block titulo %}Nuevo usuario{% endblock %}
+{% block contenido %}
+<h1 class="titulo-pagina">Nuevo usuario de oficina</h1>
+
+<form method="post" class="formulario" novalidate>
+  {% csrf_token %}
+  {% include "flota/_errores.html" %}
+  {% include "parciales/campo.html" with campo=formulario.nombre %}
+  {% include "parciales/campo.html" with campo=formulario.usuario %}
+  <div class="fila-campos">
+    {% include "parciales/campo.html" with campo=formulario.contrasena %}
+    {% include "parciales/campo.html" with campo=formulario.contrasena_confirmacion %}
+  </div>
+  {% include "parciales/campo.html" with campo=formulario.rol ayuda="Logística: solicitudes y asignación. Facturación: cobros. Administrador: todo el panel." %}
+  <div class="acciones">
+    <button type="submit" class="boton boton--principal">Crear usuario</button>
+    <a class="boton boton--secundario" href="{% url 'personal' %}">Volver</a>
+  </div>
+</form>
+{% endblock %}

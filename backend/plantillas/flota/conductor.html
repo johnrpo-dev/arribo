@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+{% block titulo %}{{ conductor.nombre }}{% endblock %}
+{% block contenido %}
+<h1 class="titulo-pagina">{{ conductor.nombre }}</h1>
+
+<div class="tabla-contenedor">
+  <table class="tabla">
+    <tbody>
+      <tr><th scope="row">Celular</th><td class="cifra">{{ conductor.celular }}</td></tr>
+      <tr><th scope="row">Grúa</th><td>{% if grua %}{{ grua.placa }} ({{ grua.get_capacidad_display }}){% else %}<span class="texto-secundario">Sin grúa</span>{% endif %}</td></tr>
+      <tr><th scope="row">PIN de la app</th><td>{% if conductor.tiene_pin %}Fijado{% else %}<span class="texto-secundario">Sin fijar</span>{% endif %}</td></tr>
+      <tr><th scope="row">Activo</th><td>{% if conductor.activo %}Sí{% else %}No{% endif %}</td></tr>
+      <tr><th scope="row">App</th><td>{{ acceso }}</td></tr>
+      <tr><th scope="row">Servicios activos</th><td class="cifra">{{ servicios_activos }}</td></tr>
+    </tbody>
+  </table>
+</div>
+
+{% if necesita_habilitar %}
+<section class="bloque" aria-labelledby="t-habilitar">
+  <h2 class="titulo-seccion" id="t-habilitar">Habilitar para la app</h2>
+  <p class="aviso aviso--advertencia">{% if usuario_ajeno %}Este conductor quedó enlazado a una cuenta que no es de conductor, por eso la app le dice que no tiene acceso.{% else %}Este conductor todavía no puede entrar a la app.{% endif %}</p>
+  <form method="post" action="{% url 'habilitar_conductor' conductor.pk %}" class="formulario">
+    {% csrf_token %}
+    <p class="ayuda">Le prepara el acceso para que entre con su celular {{ conductor.celular }} y su PIN.{% if usuario_ajeno %} La otra cuenta no cambia.{% endif %}</p>
+    <div class="acciones">
+      <button type="submit" class="boton boton--principal">Habilitar para la app</button>
+    </div>
+  </form>
+</section>
+{% endif %}
+
+<section class="bloque" aria-labelledby="t-pin">
+  <h2 class="titulo-seccion" id="t-pin">{% if conductor.tiene_pin %}Cambiar PIN{% else %}Poner PIN{% endif %}</h2>
+  <form method="post" action="{% url 'cambiar_pin' conductor.pk %}" class="formulario" novalidate>
+    {% csrf_token %}
+    {% include "flota/_errores.html" with formulario=formulario_pin %}
+    <div class="fila-campos">
+      {% include "parciales/campo.html" with campo=formulario_pin.pin %}
+      {% include "parciales/campo.html" with campo=formulario_pin.pin_confirmacion %}
+    </div>
+    <div class="acciones">
+      <button type="submit" class="boton boton--secundario">Guardar PIN</button>
+    </div>
+  </form>
+</section>
+
+<section class="bloque" aria-labelledby="t-grua">
+  <h2 class="titulo-seccion" id="t-grua">Cambiar de grúa</h2>
+  <form method="post" action="{% url 'cambiar_grua' conductor.pk %}" class="formulario" novalidate>
+    {% csrf_token %}
+    {% include "flota/_errores.html" with formulario=formulario_grua %}
+    {% include "parciales/campo.html" with campo=formulario_grua.grua ayuda="El cambio rige desde ahora. Los servicios ya hechos conservan la grúa con que se hicieron." %}
+    <div class="acciones">
+      <button type="submit" class="boton boton--secundario">Cambiar grúa</button>
+    </div>
+  </form>
+</section>
+
+<section class="bloque" aria-labelledby="t-estado">
+  <h2 class="titulo-seccion" id="t-estado">{% if conductor.activo %}Desactivar{% else %}Reactivar{% endif %}</h2>
+  {% if conductor.activo %}
+  <p class="ayuda">Un conductor inactivo no recibe servicios nuevos ni entra a la app. No se borra: se puede reactivar.</p>
+  <div class="acciones">
+    <a class="boton boton--peligro" href="{% url 'desactivar_conductor' conductor.pk %}">Desactivar conductor</a>
+  </div>
+  {% else %}
+  <form method="post" action="{% url 'reactivar_conductor' conductor.pk %}" class="formulario">
+    {% csrf_token %}
+    <p class="ayuda">Vuelve a recibir servicios. Para usar la app, ingresa otra vez con su celular y su PIN.</p>
+    <div class="acciones">
+      <button type="submit" class="boton boton--secundario">Reactivar conductor</button>
+    </div>
+  </form>
+  {% endif %}
+</section>
+
+<div class="acciones">
+  <a class="boton boton--secundario" href="{% url 'personal' %}">Volver a Personal y grúas</a>
+</div>
+{% endblock %}

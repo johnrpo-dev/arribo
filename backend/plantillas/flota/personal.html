@@ -1,0 +1,111 @@
+{% extends "base.html" %}
+{% block titulo %}Personal y grúas{% endblock %}
+{% block contenido %}
+<h1 class="titulo-pagina">Personal y grúas</h1>
+<p class="ayuda">Aquí se crean los conductores, los usuarios de oficina y las grúas. Nada se borra: quien ya no trabaja aquí se desactiva. Los documentos de cada uno están en <a href="{% url 'flota' %}">Flota y documentos</a>.</p>
+
+<section class="bloque" aria-labelledby="t-conductores">
+  <h2 class="titulo-seccion" id="t-conductores">Conductores</h2>
+  {% if conductores %}
+  <div class="tabla-contenedor">
+    <table class="tabla">
+      <thead>
+        <tr>
+          <th scope="col">Nombre</th>
+          <th scope="col">Celular</th>
+          <th scope="col">Grúa</th>
+          <th scope="col">PIN</th>
+          <th scope="col">Activo</th>
+          <th scope="col">App</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for conductor, grua, acceso in conductores %}
+        <tr>
+          <th scope="row"><a href="{% url 'conductor_personal' conductor.pk %}">{{ conductor.nombre }}</a></th>
+          <td class="cifra">{{ conductor.celular }}</td>
+          <td>{% if grua %}{{ grua.placa }}{% else %}<span class="texto-secundario">Sin grúa</span>{% endif %}</td>
+          <td>{% if conductor.tiene_pin %}Sí{% else %}<span class="texto-secundario">No</span>{% endif %}</td>
+          <td>{% if conductor.activo %}Sí{% else %}<span class="texto-secundario">No</span>{% endif %}</td>
+          <td>{% if acceso == "Puede entrar" %}{{ acceso }}{% else %}<span class="texto-secundario">{{ acceso }}</span>{% endif %}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="vacio"><p>No hay conductores registrados.</p></div>
+  {% endif %}
+  <div class="acciones">
+    <a class="boton boton--principal" href="{% url 'nuevo_conductor' %}">Nuevo conductor</a>
+  </div>
+</section>
+
+<section class="bloque" aria-labelledby="t-usuarios">
+  <h2 class="titulo-seccion" id="t-usuarios">Usuarios de oficina</h2>
+  {% if usuarios %}
+  <div class="tabla-contenedor">
+    <table class="tabla">
+      <thead>
+        <tr>
+          <th scope="col">Nombre</th>
+          <th scope="col">Usuario</th>
+          <th scope="col">Rol</th>
+          <th scope="col">Activo</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for u, rol in usuarios %}
+        <tr>
+          <th scope="row"><a href="{% url 'usuario_personal' u.pk %}">{{ u.get_full_name|default:u.get_username }}</a></th>
+          <td>{{ u.get_username }}</td>
+          <td>{{ rol }}</td>
+          <td>{% if u.is_active %}Sí{% else %}<span class="texto-secundario">No</span>{% endif %}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="vacio"><p>No hay usuarios de oficina.</p></div>
+  {% endif %}
+  <div class="acciones">
+    <a class="boton boton--principal" href="{% url 'nuevo_usuario' %}">Nuevo usuario</a>
+  </div>
+</section>
+
+<section class="bloque" aria-labelledby="t-gruas">
+  <h2 class="titulo-seccion" id="t-gruas">Grúas</h2>
+  {% if gruas %}
+  <div class="tabla-contenedor">
+    <table class="tabla">
+      <thead>
+        <tr>
+          <th scope="col">Placa</th>
+          <th scope="col">Descripción</th>
+          <th scope="col">Capacidad</th>
+          <th scope="col">Estado</th>
+          <th scope="col">Activa</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for grua in gruas %}
+        <tr>
+          <th scope="row"><a href="{% url 'editar_grua' grua.pk %}">{{ grua.placa }}</a></th>
+          <td>{{ grua.descripcion|default:"—" }}</td>
+          <td>{{ grua.get_capacidad_display }}</td>
+          <td>{{ grua.get_estado_operativo_display }}</td>
+          <td>{% if grua.activa %}Sí{% else %}<span class="texto-secundario">No</span>{% endif %}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="vacio"><p>No hay grúas registradas.</p></div>
+  {% endif %}
+  <div class="acciones">
+    <a class="boton boton--principal" href="{% url 'nueva_grua' %}">Nueva grúa</a>
+  </div>
+</section>
+{% endblock %}

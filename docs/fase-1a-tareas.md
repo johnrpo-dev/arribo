@@ -51,6 +51,13 @@ Toda tarea termina con `uv run pytest -q` y `uv run ruff check .` en verde, más
   ronda, reasignar. Lista de conductores con disponibilidad y capacidad. Un Borrador no se puede asignar.
   Verificar: pruebas de disponibilidad y de que el servicio conserva la grúa aunque el conductor cambie después; repartir una solicitud de 3 vehículos entre 2 conductores.
 
+- [x] **1a-08b Personal y grúas** (2 h). Depende de: 08.
+  Pantalla del panel (solo administrador) para crear y administrar conductores (con su acceso a la app:
+  celular, PIN y grúa, sin tocar usuarios ni grupos), usuarios de oficina con un rol, y grúas. Cambiar
+  PIN, cambiar de grúa sin traslapes, desactivar y reactivar (revoca las sesiones de la app), habilitar
+  para la app a un conductor existente. Nada se borra; nunca queda el panel sin administrador.
+  Verificar: crear un conductor desde el panel e ingresar con él en la app; desactivarlo y ver que la app ya no lo deja entrar.
+
 ## Conductor
 
 - [x] **1a-09 API: ingreso y asignaciones** (2 h). Depende de: 08.

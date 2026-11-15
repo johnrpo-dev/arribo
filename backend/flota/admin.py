@@ -1,6 +1,7 @@
 """Admin de la flota. Nada se borra: se desactiva la grúa o el conductor, o se cierra la asignación.
 
-El PIN de la app del conductor se fija aquí (no hay pantalla del panel para eso): el formulario del
+Para el día a día está la pantalla "Personal y grúas" del panel (1a-08b), que crea al conductor con su
+acceso a la app sin pasar por usuarios ni grupos. Aquí el PIN también se puede fijar: el formulario del
 conductor tiene el campo "Nuevo PIN de la app", que guarda solo su hash y nunca lo muestra.
 """
 from django import forms

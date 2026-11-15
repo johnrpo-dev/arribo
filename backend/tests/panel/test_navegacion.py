@@ -68,6 +68,7 @@ def test_las_secciones_son_las_pedidas_en_orden():
         ("Solicitudes", {"logistica", "administrador"}),
         ("Cobros", {"facturacion", "administrador"}),
         ("Flota y documentos", {"administrador"}),
+        ("Personal y grúas", {"administrador"}),
         ("Panel del dueño", {"administrador"}),
         ("Configuración", {"administrador"}),
     ]
