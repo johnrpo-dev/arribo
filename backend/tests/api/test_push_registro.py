@@ -151,19 +151,6 @@ def test_cerrar_sesion_borra_el_token_de_push(sesion):
     assert sesion.token.push_token == ""
 
 
-def test_el_admin_al_revocar_borra_el_token_de_push(admin_client, sesion):
-    registrar(sesion)
-
-    admin_client.post(
-        "/admin/api/tokendispositivo/",
-        {"action": "revocar", "_selected_action": [sesion.token.pk]},
-    )
-
-    sesion.token.refresh_from_db()
-    assert not sesion.token.vigente
-    assert sesion.token.push_token == ""
-
-
 def test_volver_a_ingresar_en_el_celular_borra_el_push_de_la_sesion_anterior(api, sesion, ana_app):
     registrar(sesion)
 

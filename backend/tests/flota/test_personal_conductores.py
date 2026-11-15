@@ -258,12 +258,21 @@ def test_cambiar_pin_invalido_muestra_el_error_y_no_cambia(client, administrador
 # --- Grúa ------------------------------------------------------------------------------------------
 
 
+def cambiar_grua(client, conductor, grua):
+    """Guarda la página del conductor (un solo formulario) con sus datos actuales y la grúa dada."""
+    conductor.refresh_from_db()
+    return client.post(
+        url(conductor, "datos/"),
+        {"datos-nombre": conductor.nombre, "datos-celular": conductor.celular, "datos-grua": grua},
+    )
+
+
 def test_cambiar_de_grua_cierra_la_vigente_y_abre_otra_sin_traslape(
     client, administrador, ana, grua3
 ):
     anterior = AsignacionConductorGrua.objects.get(conductor=ana)
 
-    respuesta = client.post(url(ana, "grua/"), {"grua-grua": grua3.pk})
+    respuesta = cambiar_grua(client, ana, grua3.pk)
 
     assert respuesta.status_code == 302
     anterior.refresh_from_db()
@@ -275,9 +284,9 @@ def test_cambiar_de_grua_cierra_la_vigente_y_abre_otra_sin_traslape(
 
 
 def test_la_grua_anterior_queda_libre_para_otro_conductor(client, administrador, ana, beto, grua3):
-    client.post(url(ana, "grua/"), {"grua-grua": grua3.pk})
+    cambiar_grua(client, ana, grua3.pk)
 
-    respuesta = client.post(url(beto, "grua/"), {"grua-grua": Grua.objects.get(placa="GRU001").pk})
+    respuesta = cambiar_grua(client, beto, Grua.objects.get(placa="GRU001").pk)
 
     assert respuesta.status_code == 302
     assert grua_vigente(beto).placa == "GRU001"
@@ -286,7 +295,7 @@ def test_la_grua_anterior_queda_libre_para_otro_conductor(client, administrador,
 def test_cambiar_a_una_grua_ocupada_explica_quien_la_tiene_y_no_cambia_nada(
     client, administrador, ana, beto
 ):
-    respuesta = client.post(url(ana, "grua/"), {"grua-grua": grua_vigente(beto).pk})
+    respuesta = cambiar_grua(client, ana, grua_vigente(beto).pk)
 
     assert respuesta.status_code == 200
     assert "La grúa GRU002 ya la tiene Beto." in respuesta.content.decode()
@@ -295,24 +304,60 @@ def test_cambiar_a_una_grua_ocupada_explica_quien_la_tiene_y_no_cambia_nada(
 
 
 def test_dejar_sin_grua_cierra_la_asignacion(client, administrador, ana):
-    client.post(url(ana, "grua/"), {"grua-grua": ""})
+    cambiar_grua(client, ana, "")
 
     assert grua_vigente(ana) is None
     assert AsignacionConductorGrua.objects.get(conductor=ana).fin is not None
 
 
-def test_elegir_la_misma_grua_no_cambia_nada(client, administrador, ana):
-    respuesta = client.post(url(ana, "grua/"), {"grua-grua": grua_vigente(ana).pk})
+def test_guardar_con_la_misma_grua_no_toca_la_asignacion(client, administrador, ana):
+    respuesta = cambiar_grua(client, ana, grua_vigente(ana).pk)
 
-    assert "Ana ya tiene la grúa GRU001." in respuesta.content.decode()
+    assert respuesta.status_code == 302
     assert AsignacionConductorGrua.objects.get(conductor=ana).fin is None
+
+
+def test_un_solo_guardar_cambia_nombre_y_grua(client, administrador, ana, grua3):
+    respuesta = client.post(
+        url(ana, "datos/"),
+        {"datos-nombre": "Ana María", "datos-celular": ana.celular, "datos-grua": grua3.pk},
+    )
+
+    assert respuesta.status_code == 302
+    ana.refresh_from_db()
+    assert ana.nombre == "Ana María"
+    assert grua_vigente(ana) == grua3
+
+
+def test_si_la_grua_falla_tampoco_cambia_el_nombre(client, administrador, ana, beto):
+    respuesta = client.post(
+        url(ana, "datos/"),
+        {"datos-nombre": "Otro", "datos-celular": ana.celular, "datos-grua": grua_vigente(beto).pk},
+    )
+
+    assert respuesta.status_code == 200
+    ana.refresh_from_db()
+    assert ana.nombre == "Ana"
+
+
+def test_conductor_creado_sin_grua_la_recibe_desde_su_pagina(client, administrador, grua3):
+    client.post("/flota/conductores/nuevo/", datos_nuevo())
+    carlos = Conductor.objects.get(nombre="Carlos")
+    assert grua_vigente(carlos) is None
+
+    pagina = client.get(url(carlos)).content.decode()
+    assert "Guardar cambios" in pagina
+    assert 'name="datos-grua"' in pagina
+
+    cambiar_grua(client, carlos, grua3.pk)
+    assert grua_vigente(carlos) == grua3
 
 
 def test_una_grua_inactiva_no_se_ofrece(client, administrador, ana, grua3):
     grua3.activa = False
     grua3.save()
 
-    respuesta = client.post(url(ana, "grua/"), {"grua-grua": grua3.pk})
+    respuesta = cambiar_grua(client, ana, grua3.pk)
 
     assert respuesta.status_code == 200
     assert grua_vigente(ana).placa == "GRU001"
@@ -323,7 +368,7 @@ def test_el_servicio_hecho_conserva_la_grua_al_cambiarla(
 ):
     servicio = crear_servicio(Estado.ENTREGADO)
 
-    client.post(url(ana, "grua/"), {"grua-grua": grua3.pk})
+    cambiar_grua(client, ana, grua3.pk)
 
     servicio.refresh_from_db()
     assert servicio.grua.placa == "GRU001"

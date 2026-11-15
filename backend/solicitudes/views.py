@@ -15,7 +15,7 @@ from nucleo.identificacion import (
     TelefonoInvalido,
     normalizar_telefono,
 )
-from nucleo.registro import CierreNoPermitido, describir_faltantes
+from nucleo.registro import CierreNoPermitido, Faltante, describir_faltantes
 from nucleo.ronda import MovimientoInvalido
 
 from . import consultas, operaciones
@@ -38,6 +38,7 @@ from .registro import (
     completar_borrador,
     duplicados_activos,
     faltantes_de,
+    faltantes_de_datos,
     historial_reciente,
     puede_cerrarse_no_concretada,
     registrar_solicitud,
@@ -109,9 +110,15 @@ def _formulario(request, solicitud):
             datos.vehiculos, excluir_solicitud=solicitud.pk if solicitud else None
         )
         if not duplicados or request.POST.get(CAMPO_CONFIRMACION) == _firma(duplicados):
-            guardada = _guardar(request, formulario, solicitud, datos)
-            if guardada is not None:
-                return redirect("detalle_solicitud", pk=guardada.pk)
+            faltantes = faltantes_de_datos(datos)
+            if faltantes and request.POST.get("accion") != ACCION_BORRADOR:
+                # No se guarda en silencio como borrador: se dice qué falta junto a su campo y
+                # se ofrece guardarla como borrador a propósito.
+                _marcar_faltantes(formulario, faltantes)
+            else:
+                guardada = _guardar(request, formulario, solicitud, datos)
+                if guardada is not None:
+                    return redirect("detalle_solicitud", pk=guardada.pk)
 
     contexto = {
         "formulario": formulario,
@@ -120,10 +127,31 @@ def _formulario(request, solicitud):
         "duplicados": duplicados,
         "firma_duplicados": _firma(duplicados),
         "momento_placa_vin": _momento_placa_vin(),
+        "faltan": getattr(formulario, "faltan", ""),
     }
     for para, campo in BUSQUEDAS:
         contexto[para] = _busqueda(formulario[campo].value(), para)
     return render(request, "solicitudes/nueva.html", contexto)
+
+
+ACCION_BORRADOR = "borrador"
+CAMPO_DE_FALTANTE = {
+    Faltante.SOLICITANTE: "telefono",
+    Faltante.TIPO: "tipo",
+    Faltante.ORIGEN: "origen",
+    Faltante.DESTINO: "destino",
+    Faltante.RESPUESTA_REGRESO: "tiene_regreso",
+}
+
+
+def _marcar_faltantes(formulario, faltantes):
+    """Error junto a cada campo que falta; lo que no es un campo (vehículos, referencias) va en el
+    aviso de arriba del botón."""
+    for faltante in faltantes:
+        campo = CAMPO_DE_FALTANTE.get(faltante)
+        if campo:
+            formulario.add_error(campo, f"Falta {faltante.etiqueta} para poder asignarla.")
+    formulario.faltan = describir_faltantes(faltantes)
 
 
 def _guardar(request, formulario, solicitud, datos):
@@ -234,6 +262,13 @@ def _contexto_asignacion(servicios):
     }
 
 
+def _volver_tras_asignar(request, pk):
+    """Desde el tablero se vuelve al tablero; desde la solicitud, a la solicitud."""
+    if request.POST.get("volver") == "tablero":
+        return redirect("inicio")
+    return redirect("detalle_solicitud", pk=pk)
+
+
 @require_POST
 def asignar_servicio(request, pk, servicio_pk):
     """Asigna un servicio pendiente o reasigna uno ya asignado; las reglas son de las operaciones.
@@ -252,7 +287,7 @@ def asignar_servicio(request, pk, servicio_pk):
     if not formulario.is_valid():
         errores = [e for lista in formulario.errors.values() for e in lista]
         messages.error(request, f"No se asignó {nombre}: {' '.join(errores)}")
-        return redirect("detalle_solicitud", pk=pk)
+        return _volver_tras_asignar(request, pk)
     operacion = operaciones.reasignar if reasignando else operaciones.asignar
     try:
         operacion(
@@ -284,7 +319,7 @@ def asignar_servicio(request, pk, servicio_pk):
         messages.success(
             request, f"Servicio N.º {servicio.pk} {accion} a {servicio.conductor}."
         )
-    return redirect("detalle_solicitud", pk=pk)
+    return _volver_tras_asignar(request, pk)
 
 
 @require_POST

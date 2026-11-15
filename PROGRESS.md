@@ -1210,6 +1210,55 @@ de prueba".
   prueba…", leer los conteos, escribir BORRAR y "Borrar todo": el inicio queda vacío. Luego crear de
   nuevo grúa y conductor en Flota y personal; en el celular, volver a ingresar.
 
+### 1a-08e Tablero visual, admin de consulta y grúa del conductor (15 de noviembre de 2026)
+
+Pedido del dueño: "el panel principal de quien realiza las asignaciones debe ser más dinámico, paneles
+llamativos", "deja el admin solo de consulta", y al darle grúa a un conductor creado sin ella "no
+tiene botón de actualizar información".
+
+- **Tablero** (`/` de logística y administrador; datos en `panel/tablero.py`): cinco cifras de colores
+  arriba (por asignar, con cuántos esperan de más; en curso; entregados hoy; conductores libres;
+  alertas). Por asignar en tarjetas con la espera ("Inmediato · espera 27 min") y en rojo si pasó el
+  umbral de la configuración (`alerta_sin_asignar_minutos`; un programado, si faltan menos de
+  `alerta_programado_sin_asignar_horas`). Cada tarjeta trae la lista de conductores (los bloqueados
+  deshabilitados, con su motivo) y "Asignar": usa la misma vista y las mismas reglas que la solicitud y
+  vuelve al tablero. Alertas en tarjetas con "Marcar resuelta" (`/alertas/<id>/resolver/`, logística y
+  administrador; adelanto de la 1a-18). A la derecha, una tarjeta por conductor activo: libre, en
+  servicio, grúa llena o bloqueado (con el motivo), su grúa con barra de ocupación y su ronda con el
+  estado de cada vehículo. Se actualiza solo cada minuto con HTMX, salvo mientras se elige un conductor.
+  CSS nuevo en `arribo.css` (sección "Tablero de logística"): tarjetas, cifras, etiquetas y barra; no
+  había componentes de tablero. La hoja se pide con `?v=2` para que el navegador baje la nueva.
+- **Admin de Django solo de consulta** (`panel/admin_consulta.py`, aplicado en `PanelConfig.ready`):
+  solo entra un superusuario; nada se agrega, edita ni borra; sin acciones; sin Usuarios ni Grupos.
+  Se quitaron las pruebas que escribían por el admin (crear clientes, vehículos y solicitudes, fijar
+  PIN, revocar sesiones, resolver alertas por acción): esas reglas siguen probadas en sus modelos y en
+  el panel (`test_clientes_y_telefonos`, `test_tarifas`, `test_asignaciones`, `test_vehiculos`,
+  `test_registro_ii`, `test_pin`, `test_personal_conductores`). Las que solo abren listas ahora
+  comprueban que no se puede agregar. Prueba nueva de que `manage.py check` pasa: el autocompletar de
+  usuario en el admin del conductor impedía arrancar el servidor y las pruebas no lo veían.
+- **Página del conductor**: nombre, celular y grúa en un solo formulario con "Guardar cambios" (arriba,
+  antes de los documentos); si no hay grúas, enlace "Crear una grúa". Si la grúa falla, no cambia nada.
+  Se quitó la ruta aparte `/flota/conductores/<id>/grua/`; sus pruebas pasaron al formulario único.
+- Recorrido en el navegador (base aparte): crear conductor sin grúa, crear grúa, darle la grúa desde su
+  página; tablero con 3 por asignar (uno urgente en rojo), asignar desde la tarjeta, resolver la alerta,
+  recarga automática sin duplicar, celular (375 px) sin desplazamiento horizontal; el admin rechaza a
+  un administrador que no es superusuario.
+- **"Guardar" ya no deja borradores en silencio** (el dueño registró una solicitud sin destino, quedó
+  en borrador y no encontraba cómo asignarla): si falta algo, no guarda, marca el campo ("Falta el
+  destino para poder asignarla.") y ofrece "Guardar como borrador" a propósito
+  (`registro.faltantes_de_datos`, la misma regla del núcleo leída del formulario). En el detalle de un
+  borrador, la sección "Asignar conductores" dice por qué todavía no se puede y lleva a completarlo.
+  Las pruebas que guardaban borradores con "Guardar" ahora usan el botón de borrador (el ayudante
+  `formulario()` lo pone por defecto); cuatro pruebas nuevas cubren "Guardar" con faltantes.
+- **Celular por USB de raíz**: `arrancar.ps1` en la raíz arranca el panel (o usa el que ya corre) y
+  revisa cada 3 segundos el túnel `adb reverse`, recreándolo si el celular se desconectó, se bloqueó o
+  adb se reinició (causa de "No hay conexión con el servidor"). Probado: se quitó el túnel a mano y el
+  script lo recreó en menos de 7 segundos; el celular volvió a llegar al panel. En CLAUDE.md y en
+  `conductor/README.md`.
+- Cómo probar (5 minutos): entrar; el inicio muestra las cifras y las tarjetas. Asignar un servicio
+  desde su tarjeta. Nueva solicitud sin destino y "Guardar": no se guarda y marca el destino. En Flota y personal, abrir un conductor sin grúa, elegirla y "Guardar cambios". Abrir
+  /admin/ con el superusuario: todo se ve, nada se puede cambiar.
+
 ## Escalamientos
 
 Ninguno todavía.

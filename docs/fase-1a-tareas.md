@@ -74,6 +74,13 @@ Toda tarea termina con `uv run pytest -q` y `uv run ruff check .` en verde, más
   producción (`ARRIBO_PERMITIR_RESTABLECER`).
   Verificar: restablecer y ver el inicio y Flota vacíos, con el administrador intacto.
 
+- [x] **1a-08e Tablero visual y admin de consulta** (1 h). Depende de: 08d. Pedida por el dueño.
+  Tablero de logística con cifras del día, tarjetas por asignar con su espera (urgente según la
+  configuración) y asignación ahí mismo, alertas que se resuelven ahí y una tarjeta por conductor con
+  su grúa, ocupación y ronda; se actualiza solo cada minuto. Admin de Django solo de consulta y solo
+  para superusuarios, sin usuarios ni grupos. Nombre, celular y grúa del conductor con un solo Guardar.
+  Verificar: asignar desde el tablero y resolver una alerta; darle grúa a un conductor creado sin ella.
+
 ## Conductor
 
 - [x] **1a-09 API: ingreso y asignaciones** (2 h). Depende de: 08.

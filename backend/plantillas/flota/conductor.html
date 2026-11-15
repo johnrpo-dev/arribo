@@ -16,10 +16,8 @@
   </table>
 </div>
 
-{% include "flota/parcial_documentos.html" with sujeto=conductor es_grua=False %}
-
 <section class="bloque" aria-labelledby="t-datos">
-  <h2 class="titulo-seccion" id="t-datos">Corregir nombre o celular</h2>
+  <h2 class="titulo-seccion" id="t-datos">Datos del conductor</h2>
   <form method="post" action="{% url 'editar_conductor' conductor.pk %}" class="formulario" novalidate>
     {% csrf_token %}
     {% include "flota/_errores.html" with formulario=formulario_datos %}
@@ -27,11 +25,15 @@
       {% include "parciales/campo.html" with campo=formulario_datos.nombre %}
       {% include "parciales/campo.html" with campo=formulario_datos.celular ayuda="Con el que entra a la app. Si lo cambia, desde su próximo ingreso entra con el nuevo; el PIN no cambia." %}
     </div>
+    {% include "parciales/campo.html" with campo=formulario_datos.grua %}
+    {% if not formulario_datos.fields.grua.queryset.exists %}<p class="ayuda">No hay grúas activas. <a href="{% url 'nueva_grua' %}">Crear una grúa</a>.</p>{% endif %}
     <div class="acciones">
-      <button type="submit" class="boton boton--secundario">Guardar datos</button>
+      <button type="submit" class="boton boton--principal">Guardar cambios</button>
     </div>
   </form>
 </section>
+
+{% include "flota/parcial_documentos.html" with sujeto=conductor es_grua=False %}
 
 {% if necesita_habilitar %}
 <section class="bloque" aria-labelledby="t-habilitar">
@@ -58,18 +60,6 @@
     </div>
     <div class="acciones">
       <button type="submit" class="boton boton--secundario">Guardar PIN</button>
-    </div>
-  </form>
-</section>
-
-<section class="bloque" aria-labelledby="t-grua">
-  <h2 class="titulo-seccion" id="t-grua">Cambiar de grúa</h2>
-  <form method="post" action="{% url 'cambiar_grua' conductor.pk %}" class="formulario" novalidate>
-    {% csrf_token %}
-    {% include "flota/_errores.html" with formulario=formulario_grua %}
-    {% include "parciales/campo.html" with campo=formulario_grua.grua ayuda="El cambio rige desde ahora. Los servicios ya hechos conservan la grúa con que se hicieron." %}
-    <div class="acciones">
-      <button type="submit" class="boton boton--secundario">Cambiar grúa</button>
     </div>
   </form>
 </section>

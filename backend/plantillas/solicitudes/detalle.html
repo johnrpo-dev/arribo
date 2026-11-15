@@ -81,6 +81,20 @@
   {% endif %}
 </section>
 
+{% if solicitud.estado_registro == "borrador" %}
+<section class="bloque" aria-labelledby="t-asignar">
+  <h2 class="titulo-seccion" id="t-asignar">Asignar conductores</h2>
+  <div class="aviso aviso--advertencia">
+    {% if faltantes %}
+    <p>Todavía no se puede asignar: es un borrador y le falta {{ faltantes }}.</p>
+    <div class="acciones"><a class="boton boton--principal" href="{% url 'completar_solicitud' solicitud.pk %}">Completar ahora</a></div>
+    {% else %}
+    <p>Todavía no se puede asignar: es un borrador. Ya tiene todos los datos: ábrala con el botón de arriba.</p>
+    {% endif %}
+  </div>
+</section>
+{% endif %}
+
 {% if asignaciones %}
 <section class="bloque" aria-labelledby="t-asignar">
   <h2 class="titulo-seccion" id="t-asignar">Asignar conductores</h2>

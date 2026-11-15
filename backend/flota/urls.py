@@ -37,7 +37,6 @@ urlpatterns = [
         name="habilitar_conductor",
     ),
     path("flota/conductores/<int:pk>/pin/", _con_rol(views.cambiar_pin), name="cambiar_pin"),
-    path("flota/conductores/<int:pk>/grua/", _con_rol(views.cambiar_grua), name="cambiar_grua"),
     path(
         "flota/conductores/<int:pk>/desactivar/",
         _con_rol(views.desactivar_conductor),

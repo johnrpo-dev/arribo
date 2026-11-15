@@ -175,23 +175,6 @@ def test_la_base_exige_el_identificador_del_celular(ana_app):
 # --- Admin ---------------------------------------------------------------------------------------
 
 
-def test_el_admin_revoca_los_tokens_seleccionados(admin_client, ana_app):
-    elegido, clave_elegida = TokenDispositivo.emitir(ana_app, "celular-1")
-    _, clave_otra = TokenDispositivo.emitir(ana_app, "celular-2")
-
-    respuesta = admin_client.post(
-        "/admin/api/tokendispositivo/",
-        {"action": "revocar", "_selected_action": [elegido.pk]},
-        follow=True,
-    )
-
-    assert "Tokens revocados: 1." in respuesta.content.decode()
-    elegido.refresh_from_db()
-    assert not elegido.vigente
-    assert cliente_con(clave_elegida).get(URL_ASIGNACIONES).status_code == 401
-    assert cliente_con(clave_otra).get(URL_ASIGNACIONES).status_code == 200
-
-
 def test_el_admin_lista_los_tokens_y_no_los_crea_ni_los_borra(admin_client, ana_app):
     token, _ = TokenDispositivo.emitir(ana_app, "celular-1", "Moto G de Ana")
 

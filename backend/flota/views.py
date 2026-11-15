@@ -4,6 +4,7 @@
 se ven en su página y se registran con las pantallas de `documentos`."""
 from django.contrib import messages
 from django.contrib.auth import get_user_model, update_session_auth_hash
+from django.db import transaction
 from django.http import HttpResponseNotAllowed
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
@@ -16,7 +17,6 @@ from panel.roles import ADMINISTRADOR, CONDUCTOR, NOMBRES_DE_ROL, nombre_de_rol
 
 from . import operaciones as op
 from .formularios import (
-    FormularioCambiarGrua,
     FormularioContrasena,
     FormularioDatosConductor,
     FormularioEditarGrua,
@@ -113,7 +113,7 @@ def _conductor(pk):
     return get_object_or_404(Conductor.objects.select_related("usuario"), pk=pk)
 
 
-def conductor(request, pk, formulario_pin=None, formulario_grua=None, formulario_datos=None):
+def conductor(request, pk, formulario_pin=None, formulario_datos=None):
     """Datos del conductor, sus documentos y sus acciones: corregir nombre y celular, habilitar,
     PIN, grúa, desactivar o reactivar."""
     c = _conductor(pk)
@@ -133,23 +133,30 @@ def conductor(request, pk, formulario_pin=None, formulario_grua=None, formulario
             "vencidos": documentos.vencidos_para_asignar(c, vigente),
             "formulario_datos": formulario_datos
             or FormularioDatosConductor(
-                prefix="datos", conductor=c, initial={"nombre": c.nombre, "celular": c.celular}
+                prefix="datos",
+                conductor=c,
+                initial={"nombre": c.nombre, "celular": c.celular, "grua": vigente},
             ),
             "formulario_pin": formulario_pin or FormularioPin(prefix="pin"),
-            "formulario_grua": formulario_grua
-            or FormularioCambiarGrua(prefix="grua", initial={"grua": vigente}),
         },
     )
 
 
 @require_POST
 def editar_conductor(request, pk):
-    """Corrige el nombre y el celular. Si el celular ya es de otro conductor, lo dice y no cambia."""
+    """Corrige nombre, celular y grúa con un solo Guardar. Si el celular ya es de otro conductor o
+    la grúa no se puede asignar, lo dice y no cambia nada."""
     c = _conductor(pk)
     formulario = FormularioDatosConductor(request.POST, prefix="datos", conductor=c)
     if formulario.is_valid():
+        datos = dict(formulario.cleaned_data)
+        grua = datos.pop("grua")
         try:
-            op.editar_datos_conductor(c, **formulario.cleaned_data)
+            with transaction.atomic():
+                op.editar_datos_conductor(c, **datos)
+                vigente = op.asignaciones_vigentes().get(c.pk)
+                if (vigente.pk if vigente else None) != (grua.pk if grua else None):
+                    op.cambiar_grua(c, grua)
         except ERRORES as error:
             formulario.add_error(None, str(error))
         else:
@@ -183,25 +190,6 @@ def cambiar_pin(request, pk):
     op.cambiar_pin(c, formulario.cleaned_data["pin"])
     messages.success(request, f"PIN de {c} cambiado.")
     return redirect("conductor_personal", pk)
-
-
-@require_POST
-def cambiar_grua(request, pk):
-    c = _conductor(pk)
-    formulario = FormularioCambiarGrua(request.POST, prefix="grua")
-    if formulario.is_valid():
-        grua = formulario.cleaned_data["grua"]
-        try:
-            op.cambiar_grua(c, grua)
-        except ERRORES as error:
-            formulario.add_error(None, str(error))
-        else:
-            if grua:
-                messages.success(request, f"{c} tiene ahora la grúa {grua.placa}.")
-            else:
-                messages.success(request, f"{c} quedó sin grúa.")
-            return redirect("conductor_personal", pk)
-    return conductor(request, pk, formulario_grua=formulario)
 
 
 def desactivar_conductor(request, pk):

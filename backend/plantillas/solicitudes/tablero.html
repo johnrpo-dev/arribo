@@ -1,78 +1,108 @@
 {% extends "base.html" %}
 {% block titulo %}Tablero{% endblock %}
 {% block contenido %}
-<h1 class="titulo-pagina">Hola, {{ user.get_short_name|default:user.get_username }}</h1>
+<div id="tablero" class="tablero"
+     hx-get="{% url 'inicio' %}" hx-select="#tablero" hx-swap="outerHTML"
+     hx-trigger="every 60s [document.visibilityState === 'visible' && !document.querySelector('#tablero select:focus') && !document.querySelector('#tablero select.elegido')]">
 
-<div class="acciones">
-  <a class="boton boton--principal" href="{% url 'nueva_solicitud' %}">Nueva solicitud</a>
-  <a class="boton boton--secundario" href="{% url 'solicitudes' %}">Ver todas las solicitudes</a>
+<div class="tablero-cabecera">
+  <div>
+    <h1 class="titulo-pagina">Hola, {{ user.get_short_name|default:user.get_username }}</h1>
+    <p class="texto-secundario">Actualizado a las {{ ahora|time:"H:i" }} · se actualiza solo cada minuto</p>
+  </div>
+  <div class="acciones">
+    <a class="boton boton--principal" href="{% url 'nueva_solicitud' %}">+ Nueva solicitud</a>
+    <a class="boton boton--secundario" href="{% url 'solicitudes' %}">Ver todas las solicitudes</a>
+  </div>
 </div>
 
+<ul class="cifras" aria-label="Resumen">
+  <li class="cifra-tarjeta{% if cifras.urgentes %} cifra-tarjeta--alerta{% elif cifras.por_asignar %} cifra-tarjeta--aviso{% else %} cifra-tarjeta--bien{% endif %}">
+    <a href="#t-por-asignar">
+      <span class="cifra-valor">{{ cifras.por_asignar }}</span>
+      <span class="cifra-nombre">Por asignar</span>
+      {% if cifras.urgentes %}<span class="cifra-detalle">{{ cifras.urgentes }} esperando de más</span>{% endif %}
+    </a>
+  </li>
+  <li class="cifra-tarjeta cifra-tarjeta--en-curso">
+    <a href="#t-conductores">
+      <span class="cifra-valor">{{ cifras.en_curso }}</span>
+      <span class="cifra-nombre">En curso</span>
+    </a>
+  </li>
+  <li class="cifra-tarjeta cifra-tarjeta--bien">
+    <a href="{% url 'solicitudes' %}?filtro=terminadas">
+      <span class="cifra-valor">{{ cifras.entregados_hoy }}</span>
+      <span class="cifra-nombre">Entregados hoy</span>
+    </a>
+  </li>
+  <li class="cifra-tarjeta{% if cifras.libres %} cifra-tarjeta--bien{% else %} cifra-tarjeta--aviso{% endif %}">
+    <a href="#t-conductores">
+      <span class="cifra-valor">{{ cifras.libres }}<small>/{{ cifras.conductores }}</small></span>
+      <span class="cifra-nombre">Conductores libres</span>
+    </a>
+  </li>
+  <li class="cifra-tarjeta{% if cifras.alertas %} cifra-tarjeta--alerta{% else %} cifra-tarjeta--bien{% endif %}">
+    <a href="#t-alertas">
+      <span class="cifra-valor">{{ cifras.alertas }}</span>
+      <span class="cifra-nombre">Alertas</span>
+    </a>
+  </li>
+</ul>
+
 {% include "solicitudes/parcial_buscar.html" with filtro="" texto="" %}
+
+<div class="tablero-columnas">
+<div class="tablero-principal">
 
 <section class="bloque" aria-labelledby="t-por-asignar">
   <h2 class="titulo-seccion" id="t-por-asignar">Por asignar{% if por_asignar %} ({{ por_asignar|length }}){% endif %}</h2>
   {% if por_asignar %}
-  <p class="ayuda">Primero los inmediatos, del más antiguo al más reciente; luego los programados, por hora.</p>
-  <div class="tabla-contenedor">
-    <table class="tabla">
-      <thead>
-        <tr>
-          <th scope="col">Cuándo</th>
-          <th scope="col">Solicitud</th>
-          <th scope="col">Cliente</th>
-          <th scope="col">Vehículo</th>
-          <th scope="col">Trayecto</th>
-          <th scope="col"><span class="texto-secundario">Acción</span></th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for servicio in por_asignar %}
-        {% with s=servicio.solicitud %}
-        <tr>
-          <td>{% if s.programada_para %}<time datetime="{{ s.programada_para|date:'c' }}">{{ s.programada_para|date:"d/m/Y H:i" }}</time>{% else %}<strong>Inmediato</strong>{% endif %}</td>
-          <td class="cifra">{{ s.pk }}</td>
-          <td>{{ s.solicitante.nombre }}</td>
-          <td>{{ servicio.vehiculo }}</td>
-          <td>{% if servicio.regreso_de_id %}Regreso{% else %}Ida{% endif %} · {{ s.get_tipo_display }}</td>
-          <td><a class="boton boton--principal" href="{% url 'detalle_solicitud' s.pk %}#t-asignar" aria-label="Asignar el servicio N.º {{ servicio.pk }} de la solicitud {{ s.pk }}">Asignar</a></td>
-        </tr>
+  <p class="ayuda">Primero los inmediatos, del que más lleva esperando; luego los programados, por hora.</p>
+  <ul class="tarjetas">
+    {% for fila in por_asignar %}
+    {% with servicio=fila.servicio s=fila.servicio.solicitud %}
+    <li class="tarjeta{% if fila.urgente %} tarjeta--urgente{% elif s.programada_para %} tarjeta--programado{% else %} tarjeta--espera{% endif %}">
+      <div class="tarjeta-encabezado">
+        {% if s.programada_para %}
+        <span class="etiqueta{% if fila.urgente %} etiqueta--urgente{% else %} etiqueta--programado{% endif %}">Programado <time datetime="{{ s.programada_para|date:'c' }}">{{ s.programada_para|date:"d/m H:i" }}</time></span>
+        {% else %}
+        <span class="etiqueta{% if fila.urgente %} etiqueta--urgente{% else %} etiqueta--espera{% endif %}">Inmediato · espera {{ fila.espera }}</span>
+        {% endif %}
+        <a class="texto-secundario" href="{% url 'detalle_solicitud' s.pk %}#t-asignar" aria-label="Abrir la solicitud {{ s.pk }}">Solicitud {{ s.pk }}</a>
+      </div>
+      <p class="tarjeta-titulo">{{ servicio.vehiculo }} · {{ s.solicitante.nombre }}</p>
+      <p class="tarjeta-trayecto">{{ s.origen }} → {{ s.destino }}</p>
+      <p class="texto-secundario">{% if servicio.regreso_de_id %}Regreso{% else %}Ida{% endif %} · {{ s.get_tipo_display }}</p>
+      <form method="post" action="{% url 'asignar_servicio' s.pk servicio.pk %}" class="asignar-rapido">
+        {% csrf_token %}
+        <input type="hidden" name="volver" value="tablero">
+        {% with campo=fila.formulario.conductor %}
+        <label class="oculto" for="{{ campo.id_for_label }}">Conductor para el servicio {{ servicio.pk }}</label>
+        {{ campo }}
         {% endwith %}
-        {% endfor %}
-      </tbody>
-    </table>
-  </div>
+        <button type="submit" class="boton boton--principal">Asignar</button>
+      </form>
+    </li>
+    {% endwith %}
+    {% endfor %}
+  </ul>
   {% else %}
-  <div class="vacio"><p>No hay servicios por asignar.</p></div>
+  <div class="vacio"><p>Todo asignado. No hay servicios esperando.</p></div>
   {% endif %}
 </section>
 
 <section class="bloque" aria-labelledby="t-borradores">
   <h2 class="titulo-seccion" id="t-borradores">Borradores{% if borradores %} ({{ borradores|length }}){% endif %}</h2>
   {% if borradores %}
-  <p class="ayuda">Solicitudes guardadas a las que les falta algo para poder asignarlas.</p>
-  <div class="tabla-contenedor">
-    <table class="tabla">
-      <thead>
-        <tr>
-          <th scope="col">Solicitud</th>
-          <th scope="col">Registrada</th>
-          <th scope="col">Cliente</th>
-          <th scope="col">Qué falta</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for b in borradores %}
-        <tr>
-          <th scope="row" class="cifra"><a href="{% url 'detalle_solicitud' b.solicitud.pk %}" aria-label="Abrir el borrador {{ b.solicitud.pk }}">{{ b.solicitud.pk }}</a></th>
-          <td><time datetime="{{ b.solicitud.creada_en|date:'c' }}">{{ b.solicitud.creada_en|date:"d/m/Y H:i" }}</time></td>
-          <td>{{ b.solicitud.solicitante.nombre }}</td>
-          <td>{% if b.falta %}Falta {{ b.falta }}{% else %}<strong>Nada: lista para abrir</strong>{% endif %}</td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </div>
+  <ul class="tarjetas tarjetas--compactas">
+    {% for b in borradores %}
+    <li class="tarjeta">
+      <a class="tarjeta-titulo" href="{% url 'detalle_solicitud' b.solicitud.pk %}" aria-label="Abrir el borrador {{ b.solicitud.pk }}">Solicitud {{ b.solicitud.pk }} · {{ b.solicitud.solicitante.nombre }}</a>
+      <p class="texto-secundario">{% if b.falta %}Falta {{ b.falta }}{% else %}<strong>Nada: lista para abrir</strong>{% endif %}</p>
+    </li>
+    {% endfor %}
+  </ul>
   {% else %}
   <div class="vacio"><p>No hay borradores.</p></div>
   {% endif %}
@@ -81,66 +111,69 @@
 <section class="bloque" aria-labelledby="t-alertas">
   <h2 class="titulo-seccion" id="t-alertas">Alertas sin resolver{% if alertas %} ({{ alertas|length }}){% endif %}</h2>
   {% if alertas %}
-  <p class="ayuda">Avisos de la app de los conductores que alguien debe revisar.</p>
-  <div class="tabla-contenedor">
-    <table class="tabla">
-      <thead>
-        <tr>
-          <th scope="col">Desde</th>
-          <th scope="col">Tipo</th>
-          <th scope="col">Qué pasó</th>
-          <th scope="col">Solicitud</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for alerta, solicitud_id in alertas %}
-        <tr>
-          <td><time datetime="{{ alerta.creada_en|date:'c' }}">{{ alerta.creada_en|date:"d/m/Y H:i" }}</time></td>
-          <td>{{ alerta.get_tipo_display }}</td>
-          <td>{{ alerta.mensaje }}</td>
-          <td>{% if solicitud_id %}<a href="{% url 'detalle_solicitud' solicitud_id %}">{{ solicitud_id }}</a>{% else %}—{% endif %}</td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </div>
+  <ul class="tarjetas">
+    {% for alerta, solicitud_id in alertas %}
+    <li class="tarjeta tarjeta--urgente">
+      <div class="tarjeta-encabezado">
+        <span class="etiqueta etiqueta--urgente">{{ alerta.get_tipo_display }}</span>
+        <time class="texto-secundario" datetime="{{ alerta.creada_en|date:'c' }}">{{ alerta.creada_en|date:"d/m H:i" }}</time>
+      </div>
+      <p>{{ alerta.mensaje }}</p>
+      <div class="acciones">
+        {% if solicitud_id %}<a class="boton boton--secundario" href="{% url 'detalle_solicitud' solicitud_id %}">Ver solicitud {{ solicitud_id }}</a>{% endif %}
+        <form method="post" action="{% url 'resolver_alerta' alerta.pk %}">
+          {% csrf_token %}
+          <button type="submit" class="boton boton--secundario">Marcar resuelta</button>
+        </form>
+      </div>
+    </li>
+    {% endfor %}
+  </ul>
   {% else %}
   <div class="vacio"><p>No hay alertas sin resolver.</p></div>
   {% endif %}
 </section>
 
-<section class="bloque" aria-labelledby="t-en-curso">
-  <h2 class="titulo-seccion" id="t-en-curso">En curso por conductor</h2>
-  {% if en_curso %}
-  {% for ronda in en_curso %}
-  <h3 class="titulo-seccion">{{ ronda.conductor|default:"Sin conductor" }}{% if ronda.servicios.0.grua %} · grúa {{ ronda.servicios.0.grua.placa }}{% endif %}</h3>
-  <div class="tabla-contenedor">
-    <table class="tabla">
-      <thead>
-        <tr>
-          <th scope="col">Orden</th>
-          <th scope="col">Solicitud</th>
-          <th scope="col">Cliente</th>
-          <th scope="col">Vehículo</th>
-          <th scope="col">Estado</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for servicio in ronda.servicios %}
-        <tr>
-          <td class="cifra">{{ forloop.counter }}</td>
-          <td class="cifra"><a href="{% url 'detalle_solicitud' servicio.solicitud_id %}" aria-label="Abrir la solicitud {{ servicio.solicitud_id }}">{{ servicio.solicitud_id }}</a></td>
-          <td>{{ servicio.solicitud.solicitante.nombre }}</td>
-          <td>{{ servicio.vehiculo }}</td>
-          <td><span class="estado estado--{{ servicio.estado }}">{{ servicio.get_estado_display }}</span></td>
-        </tr>
+</div>
+
+<section class="bloque tablero-lateral" aria-labelledby="t-conductores">
+  <h2 class="titulo-seccion" id="t-conductores">Conductores</h2>
+  {% if conductores %}
+  <ul class="tarjetas">
+    {% for t in conductores %}
+    <li class="tarjeta tarjeta-conductor tarjeta-conductor--{{ t.situacion }}">
+      <div class="tarjeta-encabezado">
+        <span class="tarjeta-titulo">{{ t.conductor.nombre }}</span>
+        <span class="etiqueta etiqueta--{{ t.situacion }}">{% if t.situacion == "libre" %}Libre{% elif t.situacion == "lleno" %}Grúa llena{% elif t.situacion == "bloqueado" %}Bloqueado{% else %}En servicio{% endif %}</span>
+      </div>
+      {% if t.grua %}
+      <p class="texto-secundario">Grúa {{ t.grua.placa }} · {{ t.montados }} de {{ t.capacidad }} montado{{ t.capacidad|pluralize }}</p>
+      <div class="barra" role="meter" aria-valuemin="0" aria-valuemax="{{ t.capacidad }}" aria-valuenow="{{ t.montados }}" aria-label="Ocupación de la grúa {{ t.grua.placa }}"><span style="width: {{ t.ocupacion }}%"></span></div>
+      {% else %}
+      <p class="texto-secundario">Sin grúa</p>
+      {% endif %}
+      {% if t.disponibilidad.bloqueado %}<p class="aviso-corto">{{ t.disponibilidad.motivos|join:" " }}</p>{% endif %}
+      {% if t.servicios %}
+      <ol class="ronda">
+        {% for servicio in t.servicios %}
+        <li><a href="{% url 'detalle_solicitud' servicio.solicitud_id %}" aria-label="Abrir la solicitud {{ servicio.solicitud_id }}">{{ servicio.vehiculo }}</a> <span class="estado estado--{{ servicio.estado }}">{{ servicio.get_estado_display }}</span></li>
         {% endfor %}
-      </tbody>
-    </table>
-  </div>
-  {% endfor %}
+      </ol>
+      {% endif %}
+    </li>
+    {% endfor %}
+  </ul>
   {% else %}
-  <div class="vacio"><p>Ningún conductor tiene servicios en curso.</p></div>
+  <div class="vacio"><p>No hay conductores activos. Créelos en Flota y personal.</p></div>
   {% endif %}
 </section>
+
+</div>
+</div>
+<script>
+  // Mientras se elige un conductor en una tarjeta, el tablero no se recarga solo.
+  document.addEventListener("change", function (e) {
+    if (e.target.matches(".asignar-rapido select")) e.target.classList.add("elegido");
+  });
+</script>
 {% endblock %}

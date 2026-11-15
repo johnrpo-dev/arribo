@@ -102,7 +102,19 @@ class _DatosConductor(forms.Form):
 
 
 class FormularioDatosConductor(_DatosConductor):
-    pass
+    """Nombre, celular y grúa en un solo formulario de la página del conductor."""
+
+    grua = _CampoGrua(
+        label="Grúa",
+        queryset=Grua.objects.none(),
+        required=False,
+        empty_label="Sin grúa",
+        help_text="Si la cambia, rige desde ahora. Los servicios ya hechos conservan la suya.",
+    )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["grua"].queryset = _opciones_de_grua()
 
 
 class FormularioNuevoConductor(_ConPin, _DatosConductor):
@@ -123,19 +135,6 @@ class FormularioNuevoConductor(_ConPin, _DatosConductor):
 
 class FormularioPin(_ConPin):
     pass
-
-
-class FormularioCambiarGrua(forms.Form):
-    grua = _CampoGrua(
-        label="Grúa nueva",
-        queryset=Grua.objects.none(),
-        required=False,
-        empty_label="Sin grúa",
-    )
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.fields["grua"].queryset = _opciones_de_grua()
 
 
 class _ConContrasena(forms.Form):

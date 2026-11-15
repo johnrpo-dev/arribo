@@ -32,14 +32,3 @@ def test_la_alerta_se_ve_pero_no_se_edita(admin_client, alerta):
     assert admin_client.post(url, {"mensaje": "otro"}).status_code == 403
     assert Alerta.objects.get(pk=alerta.pk).mensaje == "La app de Ana envió algo ilegible."
 
-
-def test_la_accion_del_admin_marca_las_alertas_como_resueltas(admin_client, admin_user, alerta):
-    respuesta = admin_client.post(
-        LISTA, {"action": "resolver", "_selected_action": [alerta.pk]}, follow=True
-    )
-
-    assert respuesta.status_code == 200
-    assert "Alertas resueltas: 1." in respuesta.content.decode()
-    alerta.refresh_from_db()
-    assert not alerta.abierta
-    assert alerta.resuelta_por == admin_user

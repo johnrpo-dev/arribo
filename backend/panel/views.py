@@ -1,11 +1,14 @@
+from django.contrib import messages
 from django.contrib.auth.views import LoginView
-from django.shortcuts import render
+from django.shortcuts import get_object_or_404, redirect, render
+from django.views.decorators.http import require_POST
 
-from alertas.operaciones import alertas_para_tablero
+from alertas.models import Alerta
+from alertas.operaciones import resolver_alerta
 from panel.formularios import FormularioIngreso
 from panel.roles import ADMINISTRADOR, LOGISTICA, ROLES_DEL_PANEL, requiere_rol, tiene_rol
 from panel.secciones import SECCIONES, secciones_para
-from solicitudes import consultas
+from panel.tablero import datos_del_tablero
 
 
 class Ingreso(LoginView):
@@ -24,19 +27,20 @@ def inicio(request):
 
 
 def tablero(request):
-    """Lo que requiere acción ahora: por asignar, borradores, alertas abiertas y lo que está en
-    curso por conductor. Es también el inicio de logística y del administrador. Vive en el panel
-    porque junta solicitudes y alertas (`solicitudes` no importa `alertas`)."""
-    return render(
-        request,
-        "solicitudes/tablero.html",
-        {
-            "por_asignar": consultas.por_asignar(),
-            "borradores": consultas.borradores(),
-            "alertas": alertas_para_tablero(),
-            "en_curso": consultas.en_curso(),
-        },
-    )
+    """Lo que requiere acción ahora, de forma visual: cifras del día, servicios por asignar (con su
+    espera y para asignarlos ahí mismo), alertas para resolver, borradores y una tarjeta por
+    conductor. Es también el inicio de logística y del administrador. Se recarga solo cada minuto
+    (HTMX). Vive en el panel porque junta solicitudes, flota y alertas."""
+    return render(request, "solicitudes/tablero.html", datos_del_tablero())
+
+
+@require_POST
+@requiere_rol(LOGISTICA, ADMINISTRADOR)
+def resolver_alerta_desde_tablero(request, pk):
+    alerta = get_object_or_404(Alerta, pk=pk)
+    resolver_alerta(alerta, por=request.user)
+    messages.success(request, "Alerta marcada como resuelta.")
+    return redirect("inicio")
 
 
 def no_disponible(request, clave):

@@ -82,10 +82,16 @@
     </div>
   </section>
 
+  {% if faltan %}
+  <div class="aviso aviso--advertencia" role="alert" id="faltan">
+    <p><strong>No se guardó todavía: falta {{ faltan }}.</strong> Sin eso no se le puede asignar conductor. Complételo arriba y pulse Guardar, o guárdela como borrador para terminarla después.</p>
+  </div>
+  {% endif %}
   <div class="acciones">
     <button type="submit" name="accion" value="guardar" class="boton boton--principal">Guardar</button>
+    {% if faltan %}<button type="submit" name="accion" value="borrador" class="boton boton--secundario">Guardar como borrador</button>{% endif %}
     {% if solicitud %}<a class="boton boton--secundario" href="{% url 'detalle_solicitud' solicitud.pk %}">Volver sin guardar</a>{% endif %}
   </div>
-  <p class="ayuda">Guardar deja la solicitud abierta si tiene solicitante, tipo, origen, destino (salvo en desvare), al menos un vehículo, la referencia externa de cada vehículo si paga una aseguradora y, en un evento, la respuesta de si tiene regreso; si falta algo, queda en borrador y se dice qué falta.</p>
+  <p class="ayuda">Para poder asignarla necesita solicitante, tipo, origen, destino (salvo en desvare), al menos un vehículo, la referencia externa de cada vehículo si paga una aseguradora y, en un evento, la respuesta de si tiene regreso.</p>
 </form>
 {% endblock %}
