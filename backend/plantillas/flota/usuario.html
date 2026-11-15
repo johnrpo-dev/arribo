@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+{% block titulo %}{{ usuario.get_full_name|default:usuario.get_username }}{% endblock %}
+{% block contenido %}
+<h1 class="titulo-pagina">{{ usuario.get_full_name|default:usuario.get_username }}</h1>
+
+<div class="tabla-contenedor">
+  <table class="tabla">
+    <tbody>
+      <tr><th scope="row">Usuario</th><td>{{ usuario.get_username }}</td></tr>
+      <tr><th scope="row">Rol</th><td>{{ rol }}</td></tr>
+      <tr><th scope="row">Activo</th><td>{% if usuario.is_active %}Sí{% else %}No{% endif %}</td></tr>
+    </tbody>
+  </table>
+</div>
+
+{% if usuario.is_superuser %}
+<p class="aviso">Este usuario tiene acceso total al panel. Su rol y su estado no se cambian desde aquí{% if not es_uno_mismo %}, ni su contraseña{% endif %}.</p>
+{% else %}
+<section class="bloque" aria-labelledby="t-rol">
+  <h2 class="titulo-seccion" id="t-rol">Cambiar rol</h2>
+  <form method="post" action="{% url 'cambiar_rol' usuario.pk %}" class="formulario" novalidate>
+    {% csrf_token %}
+    {% include "flota/_errores.html" with formulario=formulario_rol %}
+    {% include "parciales/campo.html" with campo=formulario_rol.rol ayuda="Logística: solicitudes y asignación. Facturación: cobros. Administrador: todo el panel." %}
+    <div class="acciones">
+      <button type="submit" class="boton boton--secundario">Guardar rol</button>
+    </div>
+  </form>
+</section>
+{% endif %}
+
+{% if not usuario.is_superuser or es_uno_mismo %}
+<section class="bloque" aria-labelledby="t-clave">
+  <h2 class="titulo-seccion" id="t-clave">Restablecer contraseña</h2>
+  <form method="post" action="{% url 'restablecer_contrasena' usuario.pk %}" class="formulario" novalidate>
+    {% csrf_token %}
+    {% include "flota/_errores.html" with formulario=formulario_contrasena %}
+    <div class="fila-campos">
+      {% include "parciales/campo.html" with campo=formulario_contrasena.contrasena %}
+      {% include "parciales/campo.html" with campo=formulario_contrasena.contrasena_confirmacion %}
+    </div>
+    <div class="acciones">
+      <button type="submit" class="boton boton--secundario">Guardar contraseña</button>
+    </div>
+  </form>
+</section>
+{% endif %}
+
+{% if not usuario.is_superuser %}
+<section class="bloque" aria-labelledby="t-estado">
+  <h2 class="titulo-seccion" id="t-estado">{% if usuario.is_active %}Desactivar{% else %}Reactivar{% endif %}</h2>
+  {% if usuario.is_active %}
+  {% if es_uno_mismo %}
+  <p class="ayuda">No puede desactivar su propio usuario.</p>
+  {% else %}
+  <form method="post" action="{% url 'desactivar_usuario' usuario.pk %}" class="formulario">
+    {% csrf_token %}
+    <p class="ayuda">Un usuario inactivo no entra al panel. No se borra: se puede reactivar.</p>
+    <div class="acciones">
+      <button type="submit" class="boton boton--peligro">Desactivar usuario</button>
+    </div>
+  </form>
+  {% endif %}
+  {% else %}
+  <form method="post" action="{% url 'reactivar_usuario' usuario.pk %}" class="formulario">
+    {% csrf_token %}
+    <div class="acciones">
+      <button type="submit" class="boton boton--secundario">Reactivar usuario</button>
+    </div>
+  </form>
+  {% endif %}
+</section>
+{% endif %}
+
+<div class="acciones">
+  <a class="boton boton--secundario" href="{% url 'personal' %}">Volver a Personal y grúas</a>
+</div>
+{% endblock %}

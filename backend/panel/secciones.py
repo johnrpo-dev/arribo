@@ -41,6 +41,13 @@ SECCIONES = (
         (ADMINISTRADOR,),
         vista="documentos.views.flota",
     ),
+    Seccion(
+        "personal",
+        "Personal y grúas",
+        "personal/",
+        (ADMINISTRADOR,),
+        vista="flota.views.personal",
+    ),
     Seccion("panel_dueno", "Panel del dueño", "dueno/", (ADMINISTRADOR,)),
     Seccion(
         "configuracion",

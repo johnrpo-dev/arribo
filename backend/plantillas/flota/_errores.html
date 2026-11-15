@@ -1,0 +1,4 @@
+{% if formulario.errors %}
+<p class="aviso aviso--error" role="alert">No se guardó: revise los campos marcados.</p>
+{% for error in formulario.non_field_errors %}<p class="aviso aviso--error">{{ error }}</p>{% endfor %}
+{% endif %}

@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block titulo %}Nuevo conductor{% endblock %}
+{% block contenido %}
+<h1 class="titulo-pagina">Nuevo conductor</h1>
+<p class="ayuda">Al guardar, el conductor ya puede entrar a la app con su celular y el PIN.</p>
+
+<form method="post" class="formulario" novalidate>
+  {% csrf_token %}
+  {% include "flota/_errores.html" %}
+  {% include "parciales/campo.html" with campo=formulario.nombre %}
+  {% include "parciales/campo.html" with campo=formulario.celular %}
+  <div class="fila-campos">
+    {% include "parciales/campo.html" with campo=formulario.pin %}
+    {% include "parciales/campo.html" with campo=formulario.pin_confirmacion %}
+  </div>
+  {% include "parciales/campo.html" with campo=formulario.grua %}
+  <div class="acciones">
+    <button type="submit" class="boton boton--principal">Crear conductor</button>
+    <a class="boton boton--secundario" href="{% url 'personal' %}">Volver</a>
+  </div>
+</form>
+{% endblock %}
