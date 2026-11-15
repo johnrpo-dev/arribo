@@ -21,9 +21,13 @@ Formato: fecha, tarea, pregunta, qué se asumió mientras tanto (si se asumió a
   desde la pantalla nadie le cambia el rol ni la desactiva, y solo su dueño le cambia la contraseña.
   Así un usuario con el rol administrador no puede tomar esa cuenta restableciéndole la contraseña.
   Esa cuenta se sigue administrando en `/admin/`.
-- **2026-11-15, 1a-08b. ¿Se puede corregir el nombre o el celular de un conductor desde el panel?**
-  La tarea no lo pidió y no se hizo: hoy se corrige en `/admin/`. Cambiar el celular cambia con qué
-  entra a la app (su usuario interno no cambia). Si se quiere, se agrega "Editar datos" con su prueba.
+- **2026-11-15, 1a-08c. ¿Al cambiar el celular de un conductor se cierran sus sesiones de la app?**
+  Asumido: no. El celular solo sirve para entrar; con el cambio, desde su próximo ingreso entra con el
+  nuevo y el mismo PIN. Su nombre de usuario interno (`conductor-<celular viejo>`) no cambia.
+- **2026-11-15, 1a-08c. ¿Qué cuenta como "terminada" y "programada" en la lista de solicitudes?**
+  Asumido: Terminadas = completadas, canceladas y no concretadas; Programadas = activas (borrador,
+  abierta o en curso) con hora programada, de la más próxima a la más lejana. En el resumen de
+  documentos de Flota y personal, el orden de gravedad es vencido, falta, por vencer, al día.
 
 - **2026-11-12, 1a-02. ¿Se puede asignar un conductor a una grúa inactiva o fuera de servicio, o un
   conductor inactivo a una grúa?** Asumido: el modelo no lo bloquea; solo se impiden los traslapes.
@@ -285,6 +289,10 @@ Formato: fecha, tarea, pregunta, qué se asumió mientras tanto (si se asumió a
   contrato y su cola sin señal.
 
 ## Resueltas
+
+- **2026-11-15, 1a-08b → resuelta en 1a-08c. ¿Se puede corregir el nombre o el celular de un
+  conductor desde el panel?** Sí: en su página, "Corregir nombre o celular". El celular se normaliza y
+  no puede ser de otro conductor (mensaje claro si choca). Pedido del dueño tras la primera prueba.
 
 - **2026-11-14, 1a-13 → resuelta en 1a-13b. ¿El conductor digita la placa o el VIN cuando el
   vehículo llegó sin ellos?** Decisión: sí, con "placa/VIN al recoger" (la configuración de
