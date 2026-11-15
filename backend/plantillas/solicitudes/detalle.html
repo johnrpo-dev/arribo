@@ -63,10 +63,10 @@
       </thead>
       <tbody>
         {% for servicio in servicios %}
-        <tr>
+        <tr{% if servicio.regreso_de_id %} class="fila--regreso"{% endif %}>
           <td class="cifra">{{ servicio.pk }}</td>
           <td>{{ servicio.vehiculo }}{% if servicio.vehiculo.color %} {{ servicio.vehiculo.color }}{% endif %}</td>
-          <td>{% if servicio.regreso_de_id %}<strong>Regreso del N.º {{ servicio.regreso_de_id }} (destino a origen)</strong>{% if solicitud.fecha_regreso %}, <time datetime="{{ solicitud.fecha_regreso|date:'c' }}">{{ solicitud.fecha_regreso|date:"d/m/Y H:i" }}</time>{% endif %}{% else %}Ida{% endif %}</td>
+          <td>{% if servicio.regreso_de_id %}<span class="etiqueta etiqueta--regreso">Regreso del N.º {{ servicio.regreso_de_id }} (destino a origen)</span>{% if solicitud.fecha_regreso %} <time datetime="{{ solicitud.fecha_regreso|date:'c' }}">{{ solicitud.fecha_regreso|date:"d/m/Y H:i" }}</time>{% endif %}{% else %}<span class="etiqueta etiqueta--ida">Ida</span>{% endif %}</td>
           <td>{{ servicio.referencia_externa|default:"—" }}</td>
           <td>{% if servicio.conductor %}{{ servicio.conductor }}{% if servicio.grua %} ({{ servicio.grua.placa }}){% endif %}{% else %}<span class="texto-secundario">Sin asignar</span>{% endif %}</td>
           <td>{% if not servicio.conductor_id %}—{% elif servicio.visto_por_conductor_en %}<time datetime="{{ servicio.visto_por_conductor_en|date:'c' }}">{{ servicio.visto_por_conductor_en|date:"d/m/Y H:i" }}</time>{% else %}<span class="texto-secundario">Sin ver</span>{% endif %}</td>
@@ -104,7 +104,7 @@
   <form method="post" action="{{ accion }}" hx-post="{{ accion }}" hx-target="#contenido" hx-select="#contenido" hx-swap="outerHTML" class="formulario" novalidate>
     {% csrf_token %}
     <fieldset class="grupo-opciones">
-      <legend>N.º {{ a.servicio.pk }} · {{ a.servicio.vehiculo }} · {% if a.servicio.regreso_de_id %}regreso del N.º {{ a.servicio.regreso_de_id }}{% else %}ida{% endif %} ·{{ a.servicio.get_estado_display }}{% if a.reasignar %} con {{ a.servicio.conductor }}{% endif %}</legend>
+      <legend>N.º {{ a.servicio.pk }} · {{ a.servicio.vehiculo }} · {% if a.servicio.regreso_de_id %}<span class="etiqueta etiqueta--regreso">regreso del N.º {{ a.servicio.regreso_de_id }}</span>{% else %}ida{% endif %} · {{ a.servicio.get_estado_display }}{% if a.reasignar %} con {{ a.servicio.conductor }}{% endif %}</legend>
       {% include "parciales/campo.html" with campo=a.formulario.conductor %}
       {% if a.reasignar %}{% include "parciales/campo.html" with campo=a.formulario.motivo %}{% endif %}
     </fieldset>
@@ -167,7 +167,7 @@
         {% url 'mover_en_ronda' solicitud.pk s.pk as accion %}
         <tr>
           <td class="cifra">{{ forloop.counter }}</td>
-          <td>N.º {{ s.pk }} · {{ s.vehiculo }} · {% if s.regreso_de_id %}regreso{% else %}ida{% endif %}{% if s.solicitud_id != solicitud.pk %} · <a href="{% url 'detalle_solicitud' s.solicitud_id %}">solicitud {{ s.solicitud_id }}</a>{% endif %}</td>
+          <td>N.º {{ s.pk }} · {{ s.vehiculo }} · {% if s.regreso_de_id %}<span class="etiqueta etiqueta--regreso">regreso</span>{% else %}ida{% endif %}{% if s.solicitud_id != solicitud.pk %} · <a href="{% url 'detalle_solicitud' s.solicitud_id %}">solicitud {{ s.solicitud_id }}</a>{% endif %}</td>
           <td><span class="estado estado--{{ s.estado }}">{{ s.get_estado_display }}</span></td>
           <td>
             <form method="post" action="{{ accion }}" hx-post="{{ accion }}" hx-target="#contenido" hx-select="#contenido" hx-swap="outerHTML" class="fila-etiquetas">

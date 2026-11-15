@@ -2,7 +2,7 @@
 {% block titulo %}Ingresar{% endblock %}
 {% block cuerpo %}
 <main id="contenido" class="ingreso" tabindex="-1">
-  <h1 class="ingreso-marca">Arribo</h1>
+  <h1 class="ingreso-marca"><span class="marca-logo" aria-hidden="true">A</span> Arribo</h1>
   <form method="post" action="{% url 'ingresar' %}" class="ingreso-formulario" novalidate>
     {% csrf_token %}
     <h2 class="titulo-seccion">Ingresar al panel</h2>

@@ -513,10 +513,12 @@ def test_detalle_y_tablero_distinguen_el_regreso_de_la_ida(client, logistica, cl
     operaciones.asignar(regreso, ana, actor=logistica)
 
     detalle = client.get(f"/solicitudes/{evento.pk}/").content.decode()
-    assert f"<strong>Regreso del N.º {ida.pk} (destino a origen)</strong>" in detalle
+    regreso_marcado = '<span class="etiqueta etiqueta--regreso">'
+    assert f"{regreso_marcado}Regreso del N.º {ida.pk} (destino a origen)</span>" in detalle
+    assert '<tr class="fila--regreso">' in detalle
     assert timezone.localtime(regreso_en).strftime("%d/%m/%Y %H:%M") in detalle
     assert f"N.º {ida.pk} · ASD345 · ida" in detalle
-    assert f"N.º {regreso.pk} · ASD345 · regreso" in detalle
+    assert f"N.º {regreso.pk} · ASD345 · {regreso_marcado}regreso</span>" in detalle
 
     tablero = client.get("/").content.decode()
-    assert tablero.count("(regreso)") == 1
+    assert tablero.count(f"{regreso_marcado}regreso</span>") == 1  # en la ronda de Ana

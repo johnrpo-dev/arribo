@@ -15,7 +15,7 @@ from flota.models import Conductor
 from nucleo.estados import Estado
 from panel.tablero import datos_del_tablero, entregados_hoy
 from solicitudes import consultas, operaciones
-from solicitudes.models import EstadoRegistro, Solicitud
+from solicitudes.models import EstadoRegistro, Servicio, Solicitud, TipoServicio
 from tests.conftest import crear_solicitud
 
 pytestmark = pytest.mark.django_db
@@ -276,3 +276,40 @@ def test_entregados_hoy_cuenta_los_servicios_entregados_desde_la_medianoche(
 
     assert entregados_hoy() == 1
     assert entregados_hoy(timezone.now() + timedelta(days=1)) == 0
+
+
+def test_el_regreso_por_asignar_usa_su_propia_hora_y_va_del_destino_al_origen(
+    client, logistica, cliente, nuevo_vehiculo
+):
+    """El regreso de un evento es para la fecha de regreso, no para la hora de la ida: no se pone
+    urgente cuando se acerca la ida, sale después de ella y su trayecto va al revés."""
+    ahora = timezone.now()
+    evento = crear_solicitud(
+        cliente,
+        tipo=TipoServicio.EVENTO,
+        origen="Concesionario Las Vegas",
+        destino="Plaza Mayor",
+        programada_para=ahora + timedelta(hours=1),
+        tiene_regreso=True,
+        fecha_regreso=ahora + timedelta(days=5),
+    )
+    vehiculo = nuevo_vehiculo(placa="ASD345")
+    ida = Servicio.objects.create(solicitud=evento, vehiculo=vehiculo)
+    regreso = Servicio.objects.create(solicitud=evento, vehiculo=vehiculo, regreso_de=ida)
+    otra = crear_solicitud(cliente, programada_para=ahora + timedelta(days=2))
+    intermedio = Servicio.objects.create(solicitud=otra, vehiculo=nuevo_vehiculo())
+
+    filas = {f.servicio.pk: f for f in datos_del_tablero(ahora)["por_asignar"]}
+    assert filas[ida.pk].urgente  # la ida es en una hora
+    assert not filas[regreso.pk].urgente  # el regreso es en cinco días
+    assert filas[regreso.pk].hora == evento.fecha_regreso
+    assert (filas[regreso.pk].recoger, filas[regreso.pk].entregar) == (
+        "Plaza Mayor",
+        "Concesionario Las Vegas",
+    )
+    assert [s.pk for s in consultas.por_asignar()] == [ida.pk, intermedio.pk, regreso.pk]
+
+    html = client.get("/").content.decode()
+    assert "Plaza Mayor → Concesionario Las Vegas" in html
+    assert f'etiqueta--regreso">Regreso del N.º {ida.pk}</span>' in html
+    assert "tarjeta--regreso" in html

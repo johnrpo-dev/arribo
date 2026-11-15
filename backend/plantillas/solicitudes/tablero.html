@@ -62,18 +62,18 @@
   <ul class="tarjetas">
     {% for fila in por_asignar %}
     {% with servicio=fila.servicio s=fila.servicio.solicitud %}
-    <li class="tarjeta{% if fila.urgente %} tarjeta--urgente{% elif s.programada_para %} tarjeta--programado{% else %} tarjeta--espera{% endif %}">
+    <li class="tarjeta{% if fila.urgente %} tarjeta--urgente{% elif fila.hora %} tarjeta--programado{% else %} tarjeta--espera{% endif %}{% if servicio.regreso_de_id %} tarjeta--regreso{% endif %}">
       <div class="tarjeta-encabezado">
-        {% if s.programada_para %}
-        <span class="etiqueta{% if fila.urgente %} etiqueta--urgente{% else %} etiqueta--programado{% endif %}">Programado <time datetime="{{ s.programada_para|date:'c' }}">{{ s.programada_para|date:"d/m H:i" }}</time></span>
+        {% if fila.hora %}
+        <span class="etiqueta{% if fila.urgente %} etiqueta--urgente{% else %} etiqueta--programado{% endif %}">Programado <time datetime="{{ fila.hora|date:'c' }}">{{ fila.hora|date:"d/m H:i" }}</time></span>
         {% else %}
         <span class="etiqueta{% if fila.urgente %} etiqueta--urgente{% else %} etiqueta--espera{% endif %}">Inmediato · espera {{ fila.espera }}</span>
         {% endif %}
         <a class="texto-secundario" href="{% url 'detalle_solicitud' s.pk %}#t-asignar" aria-label="Abrir la solicitud {{ s.pk }}">Solicitud {{ s.pk }}</a>
       </div>
       <p class="tarjeta-titulo">{{ servicio.vehiculo }} · {{ s.solicitante.nombre }}</p>
-      <p class="tarjeta-trayecto">{{ s.origen }} → {{ s.destino }}</p>
-      <p class="texto-secundario">{% if servicio.regreso_de_id %}Regreso{% else %}Ida{% endif %} · {{ s.get_tipo_display }}</p>
+      <p class="tarjeta-trayecto">{{ fila.recoger }} → {{ fila.entregar }}</p>
+      <p class="fila-etiquetas">{% if servicio.regreso_de_id %}<span class="etiqueta etiqueta--regreso">Regreso del N.º {{ servicio.regreso_de_id }}</span>{% else %}<span class="etiqueta etiqueta--ida">Ida</span>{% endif %} <span class="texto-secundario">{{ s.get_tipo_display }}</span></p>
       <form method="post" action="{% url 'asignar_servicio' s.pk servicio.pk %}" class="asignar-rapido">
         {% csrf_token %}
         <input type="hidden" name="volver" value="tablero">
@@ -156,7 +156,7 @@
       {% if t.servicios %}
       <ol class="ronda">
         {% for servicio in t.servicios %}
-        <li><a href="{% url 'detalle_solicitud' servicio.solicitud_id %}" aria-label="Abrir la solicitud {{ servicio.solicitud_id }}">{{ servicio.vehiculo }}</a>{% if servicio.regreso_de_id %} <span class="texto-secundario">(regreso)</span>{% endif %} <span class="estado estado--{{ servicio.estado }}">{{ servicio.get_estado_display }}</span></li>
+        <li><span><a href="{% url 'detalle_solicitud' servicio.solicitud_id %}" aria-label="Abrir la solicitud {{ servicio.solicitud_id }}">{{ servicio.vehiculo }}</a>{% if servicio.regreso_de_id %} <span class="etiqueta etiqueta--regreso">regreso</span>{% endif %}</span> <span class="estado estado--{{ servicio.estado }}">{{ servicio.get_estado_display }}</span></li>
         {% endfor %}
       </ol>
       {% endif %}
