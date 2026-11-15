@@ -1107,7 +1107,7 @@ La tarea 1a-16 se partió en dos: 1a-16a (modelo de línea de cobro con sus rest
   el puerto 8770 se borró al terminar.
 - Prueba que cambió: `test_las_secciones_son_las_pedidas_en_orden` (`tests/panel/test_navegacion.py`)
   incluye la sección nueva en su lista.
-- Verificado: `uv run pytest -q` (ver número en el informe de la tarea), `uv run ruff check .` y
+- Verificado: `uv run pytest -q` (1917 pruebas, 83 nuevas), `uv run ruff check .` y
   `manage.py makemigrations --check` sin cambios (la tarea no tiene migraciones). Pruebas nuevas
   contra PostgreSQL en `tests/flota/test_personal_*.py` y `tests/nucleo/test_personal.py`.
 - Sin hacer: editar nombre o celular de un conductor (sigue en `/admin/`); historial de personal.
