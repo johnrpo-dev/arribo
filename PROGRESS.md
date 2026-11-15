@@ -1259,6 +1259,17 @@ tiene botón de actualizar información".
   desde su tarjeta. Nueva solicitud sin destino y "Guardar": no se guarda y marca el destino. En Flota y personal, abrir un conductor sin grúa, elegirla y "Guardar cambios". Abrir
   /admin/ con el superusuario: todo se ve, nada se puede cambiar.
 
+### 1a-08f · Ida y regreso visibles (corrección)
+
+- El dueño reportó "se me duplicó un servicio": era un evento con regreso. La regla escrita crea por
+  cada vehículo un servicio de regreso (destino a origen, en la fecha de regreso); los datos estaban
+  bien, pero el formulario de asignar, la ronda y la tarjeta del conductor en el tablero mostraban la
+  misma placa dos veces sin decir cuál era el regreso. Ahora dicen "ida" / "regreso" (y en la tabla de
+  servicios, la fecha del regreso). La app del conductor ya lo marcaba "(regreso)".
+- Prueba nueva: `test_detalle_y_tablero_distinguen_el_regreso_de_la_ida`.
+- Cómo probar: abrir la solicitud 2; el N.º 3 dice "Regreso del N.º 2" con su fecha; en el inicio, la
+  tarjeta de Flaco muestra "ASD345 (regreso)".
+
 ## Escalamientos
 
 Ninguno todavía.

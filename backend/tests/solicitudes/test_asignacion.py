@@ -13,7 +13,7 @@ from nucleo.estados import Estado, Resolucion
 from nucleo.ronda import MovimientoInvalido
 from solicitudes import operaciones
 from solicitudes.disponibilidad import disponibilidad_de_conductores, motivos_de_bloqueo
-from solicitudes.models import EstadoRegistro, EventoEstado, Servicio
+from solicitudes.models import EstadoRegistro, EventoEstado, Servicio, TipoServicio
 from solicitudes.operaciones import ConductorBloqueado, MismoConductor
 
 from ..conftest import crear_solicitud
@@ -496,3 +496,27 @@ def test_un_servicio_de_otra_solicitud_no_se_asigna_por_esta_ruta(
     servicio = crear_servicio()
     url = f"/solicitudes/{otra.pk}/servicios/{servicio.pk}/asignar/"
     assert client.post(url, {f"s{servicio.pk}-conductor": ana.pk}).status_code == 404
+
+
+# --- Ida y regreso: la misma placa dos veces no debe parecer un duplicado ----------------------
+
+
+def test_detalle_y_tablero_distinguen_el_regreso_de_la_ida(client, logistica, cliente, ana, nuevo_vehiculo):
+    regreso_en = timezone.now() + timedelta(days=5)
+    evento = crear_solicitud(
+        cliente, tipo=TipoServicio.EVENTO, tiene_regreso=True, fecha_regreso=regreso_en
+    )
+    vehiculo = nuevo_vehiculo(placa="ASD345")
+    ida = Servicio.objects.create(solicitud=evento, vehiculo=vehiculo)
+    regreso = Servicio.objects.create(solicitud=evento, vehiculo=vehiculo, regreso_de=ida)
+    operaciones.asignar(ida, ana, actor=logistica)
+    operaciones.asignar(regreso, ana, actor=logistica)
+
+    detalle = client.get(f"/solicitudes/{evento.pk}/").content.decode()
+    assert f"<strong>Regreso del N.º {ida.pk} (destino a origen)</strong>" in detalle
+    assert timezone.localtime(regreso_en).strftime("%d/%m/%Y %H:%M") in detalle
+    assert f"N.º {ida.pk} · ASD345 · ida" in detalle
+    assert f"N.º {regreso.pk} · ASD345 · regreso" in detalle
+
+    tablero = client.get("/").content.decode()
+    assert tablero.count("(regreso)") == 1
