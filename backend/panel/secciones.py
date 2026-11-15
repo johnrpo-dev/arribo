@@ -2,7 +2,7 @@
 
 Para conectar una pantalla nueva, la tarea que la construye cambia `vista=None` por la ruta de
 importación de su vista (por ejemplo `"solicitudes.views.lista"`). Mientras `vista` sea `None`,
-la sección muestra "Aún no disponible". Los roles de cada sección los aplica `requiere_rol` en
+la sección no aparece en el menú ni en el inicio; su URL directa muestra "Aún no disponible". Los roles de cada sección los aplica `requiere_rol` en
 `panel/urls.py`; la vista no necesita repetirlos.
 """
 from dataclasses import dataclass
@@ -24,7 +24,13 @@ class Seccion:
 
 
 SECCIONES = (
-    Seccion("tablero", "Tablero", "tablero/", (LOGISTICA, ADMINISTRADOR)),
+    Seccion(
+        "tablero",
+        "Tablero",
+        "tablero/",
+        (LOGISTICA, ADMINISTRADOR),
+        vista="panel.views.tablero",
+    ),
     Seccion(
         "nueva_solicitud",
         "Nueva solicitud",
@@ -32,21 +38,20 @@ SECCIONES = (
         (LOGISTICA, ADMINISTRADOR),
         vista="solicitudes.views.nueva",
     ),
-    Seccion("solicitudes", "Solicitudes", "solicitudes/", (LOGISTICA, ADMINISTRADOR)),
+    Seccion(
+        "solicitudes",
+        "Solicitudes",
+        "solicitudes/",
+        (LOGISTICA, ADMINISTRADOR),
+        vista="solicitudes.views.lista",
+    ),
     Seccion("cobros", "Cobros", "cobros/", (FACTURACION, ADMINISTRADOR)),
     Seccion(
         "flota",
-        "Flota y documentos",
+        "Flota y personal",
         "flota/",
         (ADMINISTRADOR,),
-        vista="documentos.views.flota",
-    ),
-    Seccion(
-        "personal",
-        "Personal y grúas",
-        "personal/",
-        (ADMINISTRADOR,),
-        vista="flota.views.personal",
+        vista="flota.views.flota",
     ),
     Seccion("panel_dueno", "Panel del dueño", "dueno/", (ADMINISTRADOR,)),
     Seccion(
@@ -60,5 +65,6 @@ SECCIONES = (
 
 
 def secciones_para(usuario) -> list[Seccion]:
-    """Secciones que el usuario puede ver, en el orden de la navegación."""
-    return [s for s in SECCIONES if tiene_rol(usuario, s.roles)]
+    """Secciones que el usuario puede ver en el menú y en el inicio, en el orden de la navegación:
+    las de su rol que ya tienen pantalla."""
+    return [s for s in SECCIONES if s.disponible and tiene_rol(usuario, s.roles)]
