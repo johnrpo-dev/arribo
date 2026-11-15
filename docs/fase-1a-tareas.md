@@ -81,7 +81,7 @@ Toda tarea termina con `uv run pytest -q` y `uv run ruff check .` en verde, más
   o el VIN en la pantalla del Recogido y viajan en el evento (contrato 1.1); punto 9c de
   `docs/prueba-sin-senal.md`.
 
-- [ ] **1a-14 Push al conductor** (5 h). Depende de: 13.
+- [x] **1a-14 Push al conductor** (5 h). Depende de: 13.
   Requiere que el dueño cree un proyecto de Firebase (gratis) y descargue sus credenciales.
   La app registra su token; el servidor envía la notificación al asignar; marca "visto por el conductor".
   Verificar: prueba de que asignar encola una notificación; asignar desde el panel y que suene el celular.

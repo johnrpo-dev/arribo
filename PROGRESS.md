@@ -969,6 +969,99 @@ La tarea 1a-16 se partió en dos: 1a-16a (modelo de línea de cobro con sus rest
      Recogido se aplica, el vehículo sigue sin placa y en `/admin/` → Alertas aparece "Placa o VIN
      digitado por revisar" con lo que digitó.
 
+### 1a-14 Push al conductor (15 de noviembre de 2026)
+- Hecho: al asignar o reasignar desde el panel suena el celular del conductor con "Nuevo servicio
+  asignado" (y el del anterior, con "Servicio reasignado"). Tocar la notificación abre la lista y la
+  refresca; con la app abierta, el aviso refresca la lista. El detalle de la solicitud muestra por
+  servicio "Visto por el conductor" con la hora, o "Sin ver".
+- Contrato 1.2 (`docs/api-conductor.md`, primero): `PUT /api/v1/push/` con `{"token": ...}` (204)
+  liga el token de push a la sesión del celular; `POST /salir/` lo borra; la lista y el detalle
+  marcan "visto"; sección "Avisos push" con lo que lleva el aviso (solo `tipo` y `servicio_id`, más
+  un texto fijo, sin cobro ni datos personales). Cambio compatible: el cuerpo sigue en `"version": 1`.
+- Decidido (servidor):
+  - Tabla de salida: `solicitudes` envía la señal `servicio_asignado` dentro de la transacción de
+    asignar o reasignar. `api/receptores.py` crea una fila `NotificacionPush` por celular con push,
+    en un punto de restauración propio: si algo falla se registra y la asignación sigue. Si la
+    asignación se deshace, las filas también. El envío ocurre después de confirmar
+    (`transaction.on_commit`); un fallo ahí nunca deshace nada.
+  - Envío por la API HTTP v1 de FCM con `google-auth` (token de acceso de la cuenta de servicio) y
+    `requests`, no `firebase-admin`: para enviar un mensaje basta un POST, y `firebase-admin` trae
+    Firestore, Storage y gRPC, que no se usan.
+  - Respuestas de FCM (`nucleo/push.py`): 2xx enviado; `UNREGISTERED` o `SENDER_ID_MISMATCH`, token
+    desactivado (la sesión sigue); sin red, 401, 403, 408, 429 o 5xx, reintento; lo demás (incluido
+    un 404 sin código, que puede ser el proyecto mal escrito), fallido. Hasta 5 intentos con esperas
+    de 1, 5, 15 y 30 minutos (menos de una hora). Un aviso que ya no aplica (el servicio cambió de
+    conductor o terminó) no se envía. Cada envío bloquea su fila (`skip_locked`): el envío tras
+    confirmar y el comando nunca mandan el mismo aviso dos veces.
+  - `manage.py enviar_notificaciones_pendientes` envía los pendientes que ya tocan y dice cuántos
+    salieron. En producción va cada minuto (cron o temporizador, en la 1a-21).
+  - Sin `ARRIBO_FIREBASE_CREDENCIALES` (o con un archivo ilegible) el servidor funciona igual: el
+    aviso queda fallido con "El push no está configurado" y un aviso en el registro, que solo
+    muestra la ruta y el tipo de error, nunca el contenido de la cuenta de servicio.
+  - El token de push vive en `TokenDispositivo` (la sesión del celular): único entre sesiones (si
+    otra sesión lo tenía, se le quita), y la base exige que una sesión revocada no lo tenga.
+    Revocar (cerrar sesión, admin o nuevo ingreso en el celular) lo borra.
+  - Visto por el conductor (`Servicio.visto_por_conductor_en`): lo marca la primera respuesta de la
+    lista o del detalle que trae el servicio, también un 304, sin que la app mande nada (no se
+    puede perder ni necesita cola sin señal). Vuelve a "sin ver" al reasignar o devolver a la cola;
+    la base exige conductor cuando hay visto. No viaja a la app ni cambia el ETag.
+  - Admin: en Tokens de dispositivo se ve si la sesión tiene push (no el token). "Notificaciones
+    push" es de solo lectura, con estado, intentos y error de cada aviso.
+- Decidido (app):
+  - `firebase_core` y `firebase_messaging` con `flutter pub add`, y el plugin de Gradle
+    `com.google.gms.google-services` 4.5.0 en `android/settings.gradle.kts` y
+    `android/app/build.gradle.kts`, sin FlutterFire CLI. `google-services.json` sigue ignorado por
+    git (comprobado con `git check-ignore`) y hace falta para compilar. Permiso
+    `POST_NOTIFICATIONS` en el manifiesto; se pide al iniciar sesión.
+  - `lib/push.dart` (`RegistroPush`): registra el token al ingresar, al abrir con sesión guardada y
+    en `onTokenRefresh`; sin señal lo reintenta cuando el servidor vuelva a responder la lista; al
+    cerrarse la sesión borra el token en Firebase. Si Firebase no arranca, la app sigue sin avisos.
+- Prueba que cambió: `test_la_lista_hace_las_mismas_pocas_consultas_con_2_o_con_8_servicios`
+  (`tests/api/test_asignaciones.py`) pasa de 4 a 5 consultas como máximo: la primera vez que la app
+  baja servicios nuevos hay un solo UPDATE más, que los deja vistos. Sigue sin crecer con el número
+  de servicios.
+- En esta máquina, `backend/.env` ya tiene `ARRIBO_FIREBASE_CREDENCIALES` con la ruta a la cuenta de
+  servicio en `OneDrive\Documents\arribo` (fuera del repositorio; no se copió ni se mostró su
+  contenido). `backend/.env.example` trae la variable vacía con su explicación.
+- Riesgo: firebase_messaging 17 marca obsoletos `getToken`, `onTokenRefresh` y `deleteToken` a favor
+  del registro por identificador de instalación (`register`, `onRegistered`). Se siguen usando
+  porque son lo que la API HTTP v1 recibe en `message.token`; cambiar exige cambiar también el envío
+  del servidor. Revisarlo cuando Firebase anuncie el retiro del token.
+- Verificado: en `backend/`, `uv run pytest -q` (1834 pruebas), `uv run ruff check .`,
+  `manage.py makemigrations --check` sin cambios y `manage.py migrate` aplicado en la base local.
+  Pruebas nuevas contra PostgreSQL: asignar encola en la misma transacción y envía al confirmar; una
+  asignación deshecha no deja aviso; ni un fallo al encolar ni uno al enviar deshacen la asignación;
+  reintento acotado con el reloj detenido y el comando; token `UNREGISTERED` desactivado sin tocar
+  uno nuevo; reasignar avisa a los dos; un aviso vencido no sale; el mensaje HTTP v1 exacto y sin
+  cobro ni datos personales; un 401 de FCM renueva el token de acceso; dos envíos simultáneos
+  mandan uno; `PUT /push/` exige la sesión del celular y queda en su dispositivo; visto por lista,
+  detalle y 304, reiniciado al reasignar o volver a la cola; columna del panel. Todas con un cliente
+  HTTP y credenciales falsos: ninguna toca la red ni lee la cuenta de servicio real. Además se
+  comprobó, sin mostrar nada, que el servidor carga la cuenta de servicio desde la ruta del `.env`.
+  En `conductor/`, `flutter analyze` sin problemas, `flutter test` (437 pruebas) y
+  `flutter build apk --debug` compila con el plugin de Firebase. **No se probó en el celular.**
+- Preguntas abiertas nuevas: cinco en `QUESTIONS.md` (quién recibe aviso y cuándo, cómo suena, el
+  ícono de la barra, el permiso negado y qué significa "visto").
+- Cómo probar (5 minutos, con el Motorola por USB):
+  1. Desde `backend/`: `uv run python manage.py migrate` y `uv run python manage.py runserver` (el
+     `.env` ya trae `ARRIBO_FIREBASE_CREDENCIALES`). En otra ventana, `adb.exe reverse tcp:8000
+     tcp:8000` y, desde `conductor/`, `flutter run`.
+  2. En el celular, ingresar como un conductor y aceptar el permiso de notificaciones. En
+     `/admin/` → Api → Tokens de dispositivo, su sesión aparece con push.
+  3. Salir al inicio del celular (la app queda en segundo plano). En el panel, asignarle un servicio
+     pendiente: el celular suena con "Nuevo servicio asignado". El detalle de la solicitud dice
+     "Sin ver" en ese servicio.
+  4. Tocar la notificación: se abre la lista con el servicio. Recargar el detalle de la solicitud:
+     "Visto por el conductor" muestra la hora.
+  5. Reasignar ese servicio a otro conductor: al primero le llega "Servicio reasignado" y el
+     servicio desaparece de su lista al tocarla. En `/admin/` → Api → Notificaciones push se ve cada
+     aviso con su estado.
+  6. Reenvío: `uv run python manage.py enviar_notificaciones_pendientes` muestra "Avisos push: N
+     enviados, N por reintentar, N fallidos.". Para ver un reintento: desconectar el PC de internet,
+     asignar (el aviso queda pendiente), reconectarlo y correr el comando un minuto después.
+     Quitar la variable del `.env` no sirve para esto: sin credenciales el aviso queda fallido, no
+     pendiente.
+
 ## Escalamientos
 
 Ninguno todavía.
