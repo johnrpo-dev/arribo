@@ -65,7 +65,7 @@ def test_la_foto_se_guarda_en_disco_enlazada_a_su_evento(sesion, ana, recogido, 
     assert (evidencia.servicio, evidencia.tipo, evidencia.subida_por) == (servicio, "recogida", ana)
     assert str(evidencia.evento_id) == str(evidencia.evento_esperado) == evento_id
     assert (evidencia.sha256, evidencia.tamano) == (hashlib.sha256(JPEG).hexdigest(), len(JPEG))
-    assert evidencia.archivo.name == f"evidencias/{servicio.pk}/{evidencia_id}.jpg"
+    assert evidencia.archivo.name == f"evidencias/solicitud-{servicio.solicitud_id}/servicio-{servicio.pk}/recogida-{evidencia_id}.jpg"
     assert (media_temporal / evidencia.archivo.name).read_bytes() == JPEG
 
 
@@ -80,7 +80,7 @@ def test_el_nombre_del_archivo_lo_pone_el_servidor_nunca_el_celular(
     respuesta, evidencia_id = subir(sesion, servicio, evento_id, nombre=nombre)
 
     assert respuesta.status_code == 201
-    assert archivos_en(media_temporal) == [f"evidencias/{servicio.pk}/{evidencia_id}.jpg"]
+    assert archivos_en(media_temporal) == [f"evidencias/solicitud-{servicio.solicitud_id}/servicio-{servicio.pk}/recogida-{evidencia_id}.jpg"]
 
 
 def test_una_foto_pequena_tambien_va_a_disco_y_no_a_memoria(sesion, recogido, monkeypatch):
@@ -136,7 +136,7 @@ def test_subir_la_misma_foto_dos_veces_no_la_duplica(sesion, recogido, media_tem
     }
     assert Evidencia.objects.count() == 1
     assert Evidencia.objects.values().get(pk=evidencia_id) == guardada
-    assert archivos_en(media_temporal) == [f"evidencias/{servicio.pk}/{evidencia_id}.jpg"]
+    assert archivos_en(media_temporal) == [f"evidencias/solicitud-{servicio.solicitud_id}/servicio-{servicio.pk}/recogida-{evidencia_id}.jpg"]
 
 
 def test_el_mismo_id_con_otro_contenido_es_un_error_y_no_reemplaza_la_guardada(
@@ -155,7 +155,7 @@ def test_el_mismo_id_con_otro_contenido_es_un_error_y_no_reemplaza_la_guardada(
     }
     evidencia = Evidencia.objects.get()
     assert evidencia.sha256 == hashlib.sha256(JPEG).hexdigest()
-    assert archivos_en(media_temporal) == [f"evidencias/{servicio.pk}/{evidencia_id}.jpg"]
+    assert archivos_en(media_temporal) == [f"evidencias/solicitud-{servicio.solicitud_id}/servicio-{servicio.pk}/recogida-{evidencia_id}.jpg"]
     assert (media_temporal / evidencia.archivo.name).read_bytes() == JPEG
 
 

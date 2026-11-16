@@ -1322,6 +1322,33 @@ tiene botón de actualizar información".
   "Espera la ida" y no ofrece En camino; marcar la ida En camino, Recogido y Entregado; el regreso
   ya ofrece En camino. En el panel, la etiqueta "Espera la ida" desaparece al entregarse la ida.
 
+### 1a-08i · Fotos de evidencia en el panel
+
+- Pedido del dueño: "En los servicios completados se deben ver las fotos para hacerle auditoría. Se
+  guardan arrumadas en una carpeta, no se sabe a qué servicio pertenece ese vehículo". La base sí
+  sabía de qué servicio era cada foto; lo que faltaba era una pantalla para verlas.
+- **Panel**: sección "Fotos" en el detalle de la solicitud, agrupada por servicio (N.º, vehículo,
+  ida o regreso, estado). Cada foto dice si es de recogida o de entrega, la hora en que el conductor
+  marcó el paso en la app, quién la tomó y quién entregó o recibió el vehículo. Al tocarla se abre
+  completa en otra pestaña.
+- **Auditoría** (`nucleo.evidencia.foto_esperada`): si el conductor marcó Recogido o Entregado en la
+  app y no llegó ninguna foto de ese paso, sale en rojo "Sin foto de entrega/recogida" (puede estar
+  subiendo todavía). Lo que se cambia desde el panel no pide foto. Una foto que llega antes que su
+  toque no cuenta como faltante.
+- **Seguridad**: las fotos no tienen dirección pública. Solo se ven con sesión de logística o
+  administrador (los mismos roles del detalle) y solo desde la solicitud a la que pertenecen.
+- **Carpeta**: las fotos nuevas se guardan en
+  `media/evidencias/solicitud-<N.º>/servicio-<N.º>/<recogida|entrega>-<id>.jpg`, con los mismos
+  números del panel. Las fotos que ya estaban (`media/evidencias/<servicio>/<id>.jpg`) no se movieron;
+  el panel las muestra igual.
+- Recorrido hecho: un celular simulado por HTTP marcó la ida y el regreso de un evento y subió 4 fotos
+  de verdad; la entrega del regreso sin foto quedó señalada. Revisado a ancho de escritorio y de
+  celular.
+- Cómo probar (5 minutos): abrir una solicitud cuyo servicio ya se entregó desde la app. Bajar hasta
+  "Fotos": se ven las de recogida y entrega con hora, conductor y quién recibió; tocar una para verla
+  completa. Cerrar sesión y pegar la dirección de la foto: pide ingresar. Hacer un servicio nuevo
+  desde el celular y mirar `backend/media/evidencias/`: queda en `solicitud-N/servicio-N/`.
+
 ## Escalamientos
 
 Ninguno todavía.

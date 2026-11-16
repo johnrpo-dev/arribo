@@ -146,7 +146,10 @@ def test_la_evidencia_se_guarda_en_disco_con_su_tipo_y_evento(media_temporal, ev
         archivo=foto(),
     )
     evidencia.refresh_from_db()
-    assert evidencia.archivo.name == f"evidencias/{evento.servicio_id}/{id_del_celular}.jpg"
+    assert evidencia.archivo.name == (
+        f"evidencias/solicitud-{evento.servicio.solicitud_id}/servicio-{evento.servicio_id}/"
+        f"{evidencia.tipo}-{id_del_celular}.jpg"
+    )
     assert (media_temporal / evidencia.archivo.name).exists()
     assert evidencia.creada_en is not None
 
@@ -248,4 +251,7 @@ def test_el_nombre_del_archivo_no_usa_nada_del_que_manda_el_celular(media_tempor
         tipo=Evidencia.Tipo.RECOGIDA,
         archivo=foto("../../malo.php"),
     )
-    assert evidencia.archivo.name == f"evidencias/{evento.servicio_id}/{evidencia.pk}.jpg"
+    assert evidencia.archivo.name == (
+        f"evidencias/solicitud-{evento.servicio.solicitud_id}/servicio-{evento.servicio_id}/"
+        f"{evidencia.tipo}-{evidencia.pk}.jpg"
+    )

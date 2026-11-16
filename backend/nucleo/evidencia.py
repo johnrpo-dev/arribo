@@ -3,8 +3,9 @@
 Reglas:
 - Solo JPEG (la app comprime la foto antes de subirla) y con un tope de tamaño. El tope es un
   límite técnico del servidor, no una opción del cliente.
-- La foto de recogida acompaña al evento Recogido y la de entrega al Entregado. Se enlaza al
-  evento solo si es de su mismo servicio y lo tocó el mismo conductor que la subió.
+- La foto de recogida acompaña al evento Recogido y la de entrega al Entregado (un toque de la app
+  sin su foto se señala en el panel para auditar). Se enlaza al evento solo si es de su mismo
+  servicio y lo tocó el mismo conductor que la subió.
 - El id lo genera el celular: subir otra vez la misma foto no la duplica. El mismo id con otro
   contenido u otros datos no es la misma foto: no reemplaza a la guardada.
 """
@@ -56,3 +57,16 @@ def se_enlaza(
 def misma_foto(guardada: Foto, recibida: Foto) -> bool:
     """¿La que llega con un id ya guardado es un reenvío de la misma foto?"""
     return bool(guardada.sha256) and guardada == recibida
+
+
+TIPO_QUE_ACOMPANA = {estado: tipo for tipo, estado in EVENTO_QUE_ACOMPANA.items()}
+
+
+def foto_esperada(*, desde_la_app: bool, destino: Estado) -> str | None:
+    """Tipo de foto que debió acompañar a un toque del conductor, o None si no lleva foto.
+
+    Para auditar: un Recogido o Entregado marcado en la app trae su foto. Un cambio hecho desde
+    el panel no la trae."""
+    if not desde_la_app:
+        return None
+    return TIPO_QUE_ACOMPANA.get(destino)

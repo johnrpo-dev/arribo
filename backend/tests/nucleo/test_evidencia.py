@@ -8,6 +8,7 @@ from nucleo.evidencia import (
     acompana,
     es_jpeg,
     excede_el_tamano,
+    foto_esperada,
     misma_foto,
     se_enlaza,
 )
@@ -126,3 +127,18 @@ def test_el_mismo_id_con_otro_contenido_o_otros_datos_no_es_la_misma_foto(cambio
 def test_una_foto_guardada_sin_huella_nunca_es_igual_a_una_que_llega():
     # Evidencias anteriores a la subida por la API no tienen sha256: no se pueden comparar.
     assert not misma_foto(foto(sha256=""), foto(sha256=""))
+
+
+def test_recogido_y_entregado_desde_la_app_esperan_su_foto():
+    assert foto_esperada(desde_la_app=True, destino=Estado.RECOGIDO) == "recogida"
+    assert foto_esperada(desde_la_app=True, destino=Estado.ENTREGADO) == "entrega"
+
+
+@pytest.mark.parametrize("destino", [Estado.EN_CAMINO, Estado.NOVEDAD, Estado.CANCELADO])
+def test_los_demas_toques_no_esperan_foto(destino):
+    assert foto_esperada(desde_la_app=True, destino=destino) is None
+
+
+@pytest.mark.parametrize("destino", list(Estado))
+def test_un_cambio_desde_el_panel_no_espera_foto(destino):
+    assert foto_esperada(desde_la_app=False, destino=destino) is None

@@ -24,6 +24,11 @@ urlpatterns = [
     ),
     path("solicitudes/<int:pk>/", _con_rol(views.detalle), name="detalle_solicitud"),
     path(
+        "solicitudes/<int:pk>/fotos/<uuid:evidencia_id>/",
+        _con_rol(views.foto_evidencia),
+        name="foto_evidencia",
+    ),
+    path(
         "solicitudes/<int:pk>/completar/",
         _con_rol(views.completar),
         name="completar_solicitud",
