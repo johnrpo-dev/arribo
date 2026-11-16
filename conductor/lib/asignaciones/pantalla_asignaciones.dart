@@ -351,6 +351,7 @@ class TarjetaServicio extends StatelessWidget {
                   EtiquetaEstado(servicio.estado),
                   if (pendiente) const EtiquetaPendiente(),
                   if (fotosPendientes > 0) EtiquetaFotosPendientes(fotosPendientes),
+                  if (servicio.esperaIda) const EtiquetaEsperaIda(),
                   Text(tipoDe(servicio), style: textos.bodyLarge),
                 ],
               ),

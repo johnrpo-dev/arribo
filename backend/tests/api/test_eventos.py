@@ -886,3 +886,51 @@ def test_las_respuestas_de_eventos_no_contienen_ningun_valor_de_cobro(
             assert prohibido not in texto
 
     assert LineaCobro.objects.get(servicio=por_entregar).valor == Decimal("876543.21")
+
+
+# --- El regreso espera a su ida -----------------------------------------------------------------
+
+
+def test_regreso_con_la_ida_sin_entregar_es_conflicto_con_alerta(sesion, ana, crear_servicio):
+    ida = crear_servicio(E.EN_CAMINO)
+    regreso = crear_servicio(E.ASIGNADO, regreso_de=ida)
+    evento = evento_json(regreso, E.EN_CAMINO)
+
+    (resultado,) = enviar(sesion, evento)
+
+    assert (resultado["resultado"], resultado["motivo"]) == ("conflicto", "ida_sin_entregar")
+    assert resultado["detalle"] == "Es un regreso y su ida todavía no está entregada."
+    assert estado_de(regreso) == E.ASIGNADO  # no avanza
+    fila = guardado(evento)  # el toque no se descarta
+    assert (fila.resultado, fila.motivo_conflicto) == (
+        ResultadoEvento.CONFLICTO,
+        "ida_sin_entregar",
+    )
+    alerta = alertas_de(evento).get()
+    assert alerta.abierta
+    assert "su ida todavía no está entregada" in alerta.mensaje
+
+
+def test_regreso_con_la_ida_entregada_avanza(sesion, ana, crear_servicio):
+    ida = crear_servicio(E.ENTREGADO)
+    regreso = crear_servicio(E.ASIGNADO, regreso_de=ida)
+
+    (resultado,) = enviar(sesion, evento_json(regreso, E.EN_CAMINO))
+
+    assert resultado["resultado"] == "aplicado"
+    assert estado_de(regreso) == E.EN_CAMINO
+
+
+def test_en_el_mismo_lote_la_ida_entregada_desbloquea_su_regreso(sesion, ana, crear_servicio):
+    """Sin señal, el conductor entrega la ida y arranca el regreso; llegan juntos en orden."""
+    ida = crear_servicio(E.RECOGIDO)
+    regreso = crear_servicio(E.ASIGNADO, regreso_de=ida)
+
+    resultados = enviar(
+        sesion,
+        evento_json(ida, E.ENTREGADO, secuencia=1, nombre_quien="Portería"),
+        evento_json(regreso, E.EN_CAMINO, secuencia=2),
+    )
+
+    assert [r["resultado"] for r in resultados] == ["aplicado", "aplicado"]
+    assert estado_de(regreso) == E.EN_CAMINO

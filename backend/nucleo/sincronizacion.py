@@ -8,6 +8,8 @@ Reglas:
 - Desde la app solo llegan los cuatro botones del conductor (DESTINOS_DESDE_LA_APP).
   Cualquier otro destino (cancelar, asignar) es de logística: también es CONFLICTO.
 - El orden lo da la secuencia del dispositivo, no su reloj (puede estar mal puesto).
+- Un regreso no avanza mientras su ida no esté entregada (`nucleo.trayecto.regreso_bloqueado`):
+  la app lo bloquea antes; si llega igual (celular desactualizado), es CONFLICTO.
 - Todo conflicto lleva su motivo (`Motivo`), con un texto legible (`DETALLE`) para el
   conductor y para la alerta de logística.
 - Un id ya guardado que vuelve con otro contenido (otro servicio, destino, secuencia o
@@ -19,6 +21,7 @@ from datetime import datetime
 from enum import StrEnum
 
 from nucleo.estados import Estado, Servicio, puede_transicionar, transicionar
+from nucleo.trayecto import regreso_bloqueado
 
 # Los cuatro botones de la app del conductor.
 DESTINOS_DESDE_LA_APP = frozenset(
@@ -49,6 +52,7 @@ class Motivo(StrEnum):
     SALTO_DE_ESTADO = "salto_de_estado"
     NOVEDAD_SIN_MOTIVO = "novedad_sin_motivo"
     IDENTIFICACION_INCOMPLETA = "identificacion_incompleta"
+    IDA_SIN_ENTREGAR = "ida_sin_entregar"
     # Rechazos: el evento no se puede guardar.
     ID_REUTILIZADO = "id_reutilizado"
     SERVICIO_DESCONOCIDO = "servicio_desconocido"
@@ -68,6 +72,7 @@ MOTIVOS_DE_CONFLICTO = frozenset(
         Motivo.SALTO_DE_ESTADO,
         Motivo.NOVEDAD_SIN_MOTIVO,
         Motivo.IDENTIFICACION_INCOMPLETA,
+        Motivo.IDA_SIN_ENTREGAR,
     }
 )
 MOTIVOS_DE_RECHAZO = frozenset(
@@ -83,6 +88,7 @@ DETALLE = {
     Motivo.SALTO_DE_ESTADO: "El estado no es el que sigue al que tenía el servicio.",
     Motivo.NOVEDAD_SIN_MOTIVO: "La novedad llegó sin motivo.",
     Motivo.IDENTIFICACION_INCOMPLETA: "Al vehículo le falta la placa o el VIN para recogerlo.",
+    Motivo.IDA_SIN_ENTREGAR: "Es un regreso y su ida todavía no está entregada.",
     Motivo.ID_REUTILIZADO: "Ese id ya se usó en un evento distinto.",
     Motivo.SERVICIO_DESCONOCIDO: "El servicio no existe.",
     Motivo.DATOS_INVALIDOS: "El evento llegó con datos que no se pueden leer.",
@@ -111,7 +117,12 @@ class Decision:
 
 
 def motivo_de_conflicto(
-    servicio: Servicio, conductor_asignado: str | None, evento: Evento
+    servicio: Servicio,
+    conductor_asignado: str | None,
+    evento: Evento,
+    *,
+    es_regreso: bool = False,
+    ida_entregada: bool = True,
 ) -> Motivo | None:
     """Por qué el evento no encaja en el servicio, o None si se puede aplicar."""
     if evento.destino not in DESTINOS_DESDE_LA_APP:
@@ -126,6 +137,8 @@ def motivo_de_conflicto(
         if servicio.estado == Estado.NOVEDAD:
             return Motivo.NOVEDAD_ABIERTA
         return Motivo.SALTO_DE_ESTADO
+    if regreso_bloqueado(es_regreso, ida_entregada, evento.destino):
+        return Motivo.IDA_SIN_ENTREGAR
     if evento.destino == Estado.NOVEDAD and not (evento.motivo or "").strip():
         return Motivo.NOVEDAD_SIN_MOTIVO
     return None
@@ -136,10 +149,15 @@ def decidir(
     conductor_asignado: str | None,
     evento: Evento,
     ids_ya_aplicados: Collection[str],
+    *,
+    es_regreso: bool = False,
+    ida_entregada: bool = True,
 ) -> Decision:
     if evento.id in ids_ya_aplicados:
         return Decision(servicio, Resultado.DUPLICADO)
-    motivo = motivo_de_conflicto(servicio, conductor_asignado, evento)
+    motivo = motivo_de_conflicto(
+        servicio, conductor_asignado, evento, es_regreso=es_regreso, ida_entregada=ida_entregada
+    )
     if motivo is not None:
         return Decision(servicio, Resultado.CONFLICTO, motivo)
     nuevo = transicionar(servicio, evento.destino, motivo=evento.motivo)

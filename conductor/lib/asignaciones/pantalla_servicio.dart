@@ -16,6 +16,7 @@ import 'enlaces.dart';
 import 'estados.dart';
 import 'lista_asignaciones.dart';
 import 'servicio.dart';
+import 'trayecto.dart';
 
 class PantallaServicio extends StatelessWidget {
   const PantallaServicio({
@@ -145,6 +146,15 @@ class _AccionesState extends State<_Acciones> {
     final siguiente = siguientePaso(estado);
     final conNovedad = admiteNovedad(estado);
     if (siguiente == null && !conNovedad) return const SizedBox.shrink();
+    // Un regreso no avanza hasta que su ida esté entregada; la novedad sí se puede reportar.
+    final esperaIda =
+        siguiente != null &&
+        widget.servicio.esperaIda &&
+        regresoBloqueado(
+          esRegreso: widget.servicio.esRegreso,
+          idaEntregada: false,
+          destino: siguiente,
+        );
     return Material(
       color: Colores.superficie,
       shape: const Border(top: BorderSide(color: Colores.borde)),
@@ -155,7 +165,30 @@ class _AccionesState extends State<_Acciones> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              if (siguiente != null)
+              if (esperaIda)
+                Container(
+                  key: const Key('aviso-espera-ida'),
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colores.regresoFondo,
+                    border: Border.all(color: Colores.regreso),
+                    borderRadius: const BorderRadius.all(Radius.circular(8)),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.lock_outline, color: Colores.regreso),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          textoEsperaIda,
+                          style: Theme.of(context).textTheme.bodyLarge
+                              ?.copyWith(color: Colores.regreso),
+                        ),
+                      ),
+                    ],
+                  ),
+                )
+              else if (siguiente != null)
                 FilledButton(
                   key: Key('marcar-$siguiente'),
                   onPressed: _ocupado ? null : () => _marcar(siguiente),
@@ -233,6 +266,7 @@ class _Detalle extends StatelessWidget {
             EtiquetaEstado(servicio.estado),
             if (pendiente) const EtiquetaPendiente(),
             if (fotosPendientes > 0) EtiquetaFotosPendientes(fotosPendientes),
+            if (servicio.esperaIda) const EtiquetaEsperaIda(),
             Text(tipoDe(servicio), style: textos.bodyLarge),
           ],
         ),

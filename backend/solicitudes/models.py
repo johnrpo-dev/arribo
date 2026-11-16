@@ -502,6 +502,13 @@ class Servicio(models.Model):
     def __str__(self):
         return f"Servicio {self.pk} · {self.vehiculo}"
 
+    @property
+    def espera_su_ida(self) -> bool:
+        """Regreso cuya ida todavía no está entregada: no avanza hasta entonces
+        (`nucleo.trayecto.regreso_bloqueado`). Quien lo lea en una lista carga `regreso_de` con
+        `select_related` para no hacer una consulta por servicio."""
+        return self.regreso_de_id is not None and self.regreso_de.estado != Estado.ENTREGADO.value
+
     def como_nucleo(self) -> ServicioNucleo:
         """El servicio como lo entiende nucleo/estados.py."""
         return ServicioNucleo(

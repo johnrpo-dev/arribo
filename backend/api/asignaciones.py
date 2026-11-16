@@ -14,4 +14,5 @@ def asignaciones_de(conductor):
         "solicitud",
         "solicitud__contacto_origen",
         "solicitud__contacto_destino",
+        "regreso_de",  # para saber si el regreso espera a su ida
     )

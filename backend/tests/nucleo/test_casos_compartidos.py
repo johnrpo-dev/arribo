@@ -42,12 +42,14 @@ from nucleo.identificacion import (
     validar_vin,
 )
 from nucleo.sincronizacion import DESTINOS_DESDE_LA_APP
+from nucleo.trayecto import PASOS_QUE_ESPERAN_LA_IDA, regreso_bloqueado
 
 ARCHIVO = Path(__file__).resolve().parents[3] / "docs" / "casos-reglas.json"
 CASOS = json.loads(ARCHIVO.read_text(encoding="utf-8"))
 ESTADOS = CASOS["estados"]
 IDENTIFICACION = CASOS["identificacion"]
 EVIDENCIA = CASOS["evidencia"]
+REGRESO = CASOS["regreso"]
 
 
 def _servicio(caso) -> Servicio:
@@ -227,3 +229,26 @@ def test_foto_es_jpeg_como_dice_el_archivo(caso):
 @pytest.mark.parametrize("caso", EVIDENCIA["acompana"], ids=_nombre)
 def test_tipo_de_foto_acompana_a_su_evento_como_dice_el_archivo(caso):
     assert acompana(caso["tipo"], Estado(caso["destino"])) == caso["acompana"]
+
+
+# ---------- regreso que espera a su ida ----------
+
+
+def test_el_archivo_cubre_cada_destino_de_la_app_con_y_sin_ida_entregada():
+    vistos = {(c["es_regreso"], c["ida_entregada"], c["destino"]) for c in REGRESO["casos"]}
+    esperados = {
+        (regreso, ida, destino.value)
+        for regreso in (False, True)
+        for ida in (False, True)
+        for destino in DESTINOS_DESDE_LA_APP
+    }
+    assert vistos == esperados
+    assert PASOS_QUE_ESPERAN_LA_IDA < DESTINOS_DESDE_LA_APP
+
+
+@pytest.mark.parametrize("caso", REGRESO["casos"], ids=_nombre)
+def test_regreso_bloqueado_como_dice_el_archivo(caso):
+    assert (
+        regreso_bloqueado(caso["es_regreso"], caso["ida_entregada"], caso["destino"])
+        is caso["bloqueado"]
+    )

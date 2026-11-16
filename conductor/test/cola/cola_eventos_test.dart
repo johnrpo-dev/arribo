@@ -4,6 +4,7 @@
 import 'package:arribo_conductor/api.dart';
 import 'package:arribo_conductor/asignaciones/almacen_asignaciones.dart';
 import 'package:arribo_conductor/asignaciones/servicio.dart';
+import 'package:arribo_conductor/asignaciones/trayecto.dart';
 import 'package:arribo_conductor/base_local.dart';
 import 'package:arribo_conductor/cola/cola_eventos.dart';
 import 'package:arribo_conductor/cola/evento.dart';
@@ -553,6 +554,62 @@ void main() {
       final fila = (await prueba.base.db.query('eventos_pendientes')).single;
       expect(fila['estado_envio'], 'conflicto');
       expect(fila['visto_en'], isNotNull);
+    });
+  });
+
+  group('el regreso espera a su ida', () {
+    // 51 es la ida (ya recogida) y 52 su regreso, que según el servidor espera.
+    setUp(
+      () => AlmacenAsignaciones(prueba.base).reemplazar(
+        servicios: [
+          Servicio.desdeJson(servicioJson(id: 51, estado: 'recogido', placa: 'EVT101')),
+          Servicio.desdeJson(
+            servicioJson(id: 52, placa: 'EVT101', tipo: 'evento', regresoDe: 51, esperaIda: true),
+          ),
+        ],
+        configuracion: const ConfiguracionApp(minimoFotos: 4, momentoPlacaVin: 'recoger'),
+        etag: '"e2"',
+        hora: ahora,
+      ),
+    );
+
+    test('no deja arrancar el regreso y no guarda nada', () async {
+      await expectLater(
+        tocar(52, 'en_camino'),
+        throwsA(isA<ToqueNoValido>().having((e) => e.mensaje, 'mensaje', textoEsperaIda)),
+      );
+      expect(await prueba.base.db.query('eventos_pendientes'), isEmpty);
+    });
+
+    test('la novedad del regreso sí se puede reportar', () async {
+      await tocar(52, 'novedad', motivo: 'El concesionario cerró');
+      expect(await prueba.base.db.query('eventos_pendientes'), hasLength(1));
+    });
+
+    test('sin señal, al marcar Entregado en la ida el regreso ya puede arrancar', () async {
+      final ida = await tocar(51, 'entregado');
+      final regreso = await tocar(52, 'en_camino');
+      expect(regreso.secuencia, greaterThan(ida.secuencia)); // el servidor los aplica en ese orden
+    });
+
+    test('cuando el servidor confirma la ida entregada, el regreso deja de esperar', () async {
+      final ida = await tocar(51, 'entregado');
+
+      await cola.registrarResultados(
+        [ida],
+        [
+          ResultadoEvento(
+            id: ida.id,
+            resultado: 'aplicado',
+            servicio: const EstadoRemoto(id: 51, estado: 'entregado', enSuRonda: false),
+          ),
+        ],
+        hora: ahora,
+      );
+
+      final regreso = (await AlmacenAsignaciones(prueba.base).leer()).single;
+      expect((regreso.id, regreso.esperaIda), (52, false));
+      await tocar(52, 'en_camino');
     });
   });
 }

@@ -240,3 +240,41 @@ def test_el_orden_conserva_el_de_llegada_cuando_la_secuencia_se_repite():
     primero = evento(Estado.EN_CAMINO, id="a", secuencia=5)
     segundo = evento(Estado.RECOGIDO, id="b", secuencia=5)
     assert [e.id for e in ordenar([primero, segundo])] == ["a", "b"]
+
+
+# --- El regreso espera a su ida -----------------------------------------------------------------
+
+
+def test_regreso_con_la_ida_sin_entregar_es_conflicto_con_su_motivo():
+    decision = decidir(
+        Servicio(Estado.ASIGNADO), CONDUCTOR, evento(Estado.EN_CAMINO), set(),
+        es_regreso=True, ida_entregada=False,
+    )
+    assert (decision.resultado, decision.motivo) == (Resultado.CONFLICTO, Motivo.IDA_SIN_ENTREGAR)
+    assert decision.servicio == Servicio(Estado.ASIGNADO)  # no cambia
+    assert Motivo.IDA_SIN_ENTREGAR in MOTIVOS_DE_CONFLICTO
+    assert DETALLE[Motivo.IDA_SIN_ENTREGAR] == "Es un regreso y su ida todavía no está entregada."
+
+
+def test_regreso_con_la_ida_entregada_se_aplica():
+    decision = decidir(
+        Servicio(Estado.ASIGNADO), CONDUCTOR, evento(Estado.EN_CAMINO), set(),
+        es_regreso=True, ida_entregada=True,
+    )
+    assert (decision.servicio.estado, decision.resultado) == (Estado.EN_CAMINO, Resultado.APLICADO)
+
+
+def test_novedad_en_un_regreso_que_espera_su_ida_se_aplica():
+    decision = decidir(
+        Servicio(Estado.ASIGNADO), CONDUCTOR, evento(Estado.NOVEDAD, motivo="Llanta pinchada"),
+        set(), es_regreso=True, ida_entregada=False,
+    )
+    assert decision.resultado == Resultado.APLICADO
+
+
+def test_un_regreso_cancelado_dice_cancelado_antes_que_ida_sin_entregar():
+    decision = decidir(
+        Servicio(Estado.CANCELADO), CONDUCTOR, evento(Estado.EN_CAMINO), set(),
+        es_regreso=True, ida_entregada=False,
+    )
+    assert decision.motivo == Motivo.SERVICIO_CANCELADO

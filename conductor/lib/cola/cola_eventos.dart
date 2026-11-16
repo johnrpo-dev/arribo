@@ -20,6 +20,7 @@ import 'package:uuid/uuid.dart';
 import '../api.dart';
 import '../asignaciones/estados.dart';
 import '../asignaciones/identificacion.dart';
+import '../asignaciones/trayecto.dart';
 import '../base_local.dart';
 import 'evento.dart';
 
@@ -80,7 +81,15 @@ class ColaEventos {
     return base.db.transaction((txn) async {
       final filas = await txn.query(
         'servicios',
-        columns: ['estado', 'estado_previo', 'vehiculo_placa', 'vehiculo_vin'],
+        columns: [
+          'estado',
+          'estado_previo',
+          'vehiculo_placa',
+          'vehiculo_vin',
+          'es_regreso',
+          'regreso_de',
+          'espera_ida',
+        ],
         where: 'id = ?',
         whereArgs: [servicioId],
       );
@@ -95,6 +104,14 @@ class ColaEventos {
       ).conPendientes([for (final evento in anteriores) evento.destino]);
       if (!puedeMarcar(actual.estado, destino)) {
         throw const ToqueNoValido('Ese paso ya no corresponde al estado del servicio.');
+      }
+      if (servicio['espera_ida'] == 1 &&
+          regresoBloqueado(
+            esRegreso: servicio['es_regreso'] == 1,
+            idaEntregada: await _idaEntregadaAqui(txn, servicio['regreso_de'] as int?),
+            destino: destino,
+          )) {
+        throw const ToqueNoValido(textoEsperaIda);
       }
 
       final secuencia = await _siguienteSecuencia(txn);
@@ -261,6 +278,15 @@ class ColaEventos {
         final quedan = await pendientes(conductorId, servicioId: remoto.id, limite: 1, en: txn);
         if (quedan.isNotEmpty) continue;
         final estado = remoto.estado;
+        if (estado == Estado.entregado) {
+          // La ida quedó entregada en el servidor: su regreso ya no espera.
+          corregidos += await txn.update(
+            'servicios',
+            {'espera_ida': 0},
+            where: 'regreso_de = ? AND espera_ida = 1',
+            whereArgs: [remoto.id],
+          );
+        }
         if (estado == null || !remoto.enSuRonda) {
           corregidos += await txn.delete('servicios', where: 'id = ?', whereArgs: [remoto.id]);
         } else {
@@ -280,6 +306,31 @@ class ColaEventos {
       return resueltos;
     });
   }
+}
+
+/// ¿La ida [idaId] está entregada según este celular: su estado guardado más los toques sin enviar?
+/// Si la ida no está en la lista (es de otro conductor o ya salió), manda lo que dijo el servidor.
+Future<bool> _idaEntregadaAqui(Transaction txn, int? idaId) async {
+  if (idaId == null) return false;
+  final filas = await txn.query(
+    'servicios',
+    columns: ['estado', 'estado_previo'],
+    where: 'id = ?',
+    whereArgs: [idaId],
+  );
+  if (filas.isEmpty) return false;
+  final toques = await txn.query(
+    'eventos_pendientes',
+    columns: ['destino'],
+    where: "servicio_id = ? AND estado_envio = 'pendiente'",
+    whereArgs: [idaId],
+    orderBy: 'secuencia',
+  );
+  final visto = EstadoDeServicio(
+    filas.first['estado']! as String,
+    filas.first['estado_previo'] as String?,
+  ).conPendientes([for (final toque in toques) toque['destino']! as String]);
+  return visto.estado == Estado.entregado;
 }
 
 /// Lo digitado al recoger, en el vehículo de la lista local donde le falte (nunca sobreescribe).

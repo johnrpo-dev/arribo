@@ -71,6 +71,37 @@ class EtiquetaPendiente extends StatelessWidget {
   }
 }
 
+/// Marca de un regreso que espera a que su ida esté entregada (ver `trayecto.dart`).
+class EtiquetaEsperaIda extends StatelessWidget {
+  const EtiquetaEsperaIda({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      key: const Key('espera-ida'),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: Colores.regresoFondo,
+        border: Border.all(color: Colores.regreso),
+        borderRadius: const BorderRadius.all(Radius.circular(6)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.lock_outline, size: 18, color: Colores.regreso),
+          const SizedBox(width: 6),
+          Flexible(
+            child: Text(
+              'Espera la ida',
+              style: Theme.of(context).textTheme.labelMedium?.copyWith(color: Colores.regreso),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 /// Marca de un servicio con fotos de evidencia que aún no están en el servidor.
 class EtiquetaFotosPendientes extends StatelessWidget {
   const EtiquetaFotosPendientes(this.cantidad, {super.key});

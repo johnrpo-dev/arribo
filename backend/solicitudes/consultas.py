@@ -182,7 +182,7 @@ def por_asignar():
             estado=Estado.PENDIENTE_ASIGNAR.value,
             solicitud__estado_registro=EstadoRegistro.ABIERTA,
         )
-        .select_related("vehiculo", "solicitud__solicitante")
+        .select_related("vehiculo", "solicitud__solicitante", "regreso_de")
         .annotate(
             hora_del_servicio=Case(
                 When(regreso_de__isnull=False, then=F("solicitud__fecha_regreso")),
@@ -213,7 +213,9 @@ def en_curso() -> list[RondaEnCurso]:
     orden de su ronda."""
     servicios = (
         Servicio.objects.filter(estado__in=VALORES_EN_RONDA)
-        .select_related("conductor", "grua", "vehiculo", "solicitud__solicitante")
+        .select_related(
+            "conductor", "grua", "vehiculo", "solicitud__solicitante", "regreso_de"
+        )
         .order_by(
             "conductor__nombre", "conductor_id", F("orden_ronda").asc(nulls_last=True), "pk"
         )
