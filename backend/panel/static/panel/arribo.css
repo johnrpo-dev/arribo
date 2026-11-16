@@ -908,6 +908,60 @@ a.tarjeta-titulo:hover {
   background: linear-gradient(180deg, var(--regreso-fondo), var(--superficie) 45%);
 }
 
+/* Fotos de evidencia en el detalle de la solicitud (1a-08i). */
+.fotos-servicio {
+  padding: var(--e4) 0;
+  border-top: 1px solid var(--borde);
+}
+.fotos-servicio:first-of-type { border-top: 0; padding-top: var(--e2); }
+.fotos-titulo {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--e2);
+  margin: 0 0 var(--e3);
+  font-size: 15px;
+  font-weight: 650;
+}
+.galeria {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: var(--e3);
+  margin: var(--e3) 0 0;
+  padding: 0;
+  list-style: none;
+}
+.foto {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+  border: 1px solid var(--borde);
+  border-radius: var(--radio);
+  background: var(--superficie);
+  box-shadow: var(--sombra-1);
+}
+.foto a { display: block; background: var(--superficie-2); }
+.foto a:focus-visible { outline: 3px solid var(--acento); outline-offset: -3px; }
+.foto img {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+}
+.foto figcaption {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: var(--e2) var(--e3) var(--e3);
+  font-size: 13px;
+}
+.etiqueta--foto-recogida { --etiqueta-color: var(--recogido); --etiqueta-fondo: var(--recogido-fondo); }
+.etiqueta--foto-entrega { --etiqueta-color: var(--entregado); --etiqueta-fondo: var(--entregado-fondo); }
+
 .asignar-rapido {
   display: flex;
   gap: var(--e2);

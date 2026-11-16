@@ -98,6 +98,13 @@ Toda tarea termina con `uv run pytest -q` y `uv run ruff check .` en verde, más
   también sin señal; el panel marca "Espera la ida".
   Verificar: en la app, el regreso no ofrece En camino hasta entregar la ida; Novedad sí.
 
+- [x] **1a-08i Fotos de evidencia en el panel** (2 h). Depende de: 08h. Pedido del dueño.
+  Sección "Fotos" en el detalle de la solicitud, por servicio, con tipo, hora, conductor y quién
+  recibió; señala el Recogido o Entregado de la app sin foto (`nucleo.evidencia.foto_esperada`).
+  Las fotos solo se ven con sesión y rol. Las nuevas se guardan en
+  `evidencias/solicitud-N/servicio-N/`.
+  Verificar: en una solicitud entregada desde la app se ven sus fotos; sin sesión, la foto pide ingresar.
+
 ## Conductor
 
 - [x] **1a-09 API: ingreso y asignaciones** (2 h). Depende de: 08.

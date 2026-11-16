@@ -129,7 +129,7 @@ def test_la_misma_foto_subida_dos_veces_a_la_vez_queda_una_sola(
     assert sorted(salidas) == [200, 201], salidas
     assert Evidencia.objects.count() == 1
     archivos = [ruta for ruta in media_temporal.rglob("*") if ruta.is_file()]
-    assert [ruta.name for ruta in archivos] == [f"{evidencia_id}.jpg"]
+    assert [ruta.name for ruta in archivos] == [f"recogida-{evidencia_id}.jpg"]
 
 
 def test_la_foto_y_su_evento_a_la_vez_siempre_terminan_enlazados(clave, crear_servicio):

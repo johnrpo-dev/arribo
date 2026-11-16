@@ -88,7 +88,7 @@ def test_una_foto_de_varios_trozos_llega_entera_por_http_y_repetirla_no_la_dupli
     assert segunda[0] == 200 and segunda[1]["resultado"] == "repetida"
     assert distinta[0] == 409 and distinta[1]["error"] == "evidencia_distinta"
     assert Evidencia.objects.count() == 1
-    assert [r.name for r in media_temporal.rglob("*.jpg")] == [f"{evidencia_id}.jpg"]
+    assert [r.name for r in media_temporal.rglob("*.jpg")] == [f"recogida-{evidencia_id}.jpg"]
 
 
 @pytest.mark.parametrize("sobra", [1, 1024 * 1024])

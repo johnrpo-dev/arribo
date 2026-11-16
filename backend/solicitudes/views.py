@@ -4,6 +4,7 @@ la sección `nueva_solicitud` en `panel/urls.py` y las rutas de `solicitudes/url
 from django.contrib import messages
 from django.core.paginator import Paginator
 from django.db import IntegrityError
+from django.http import FileResponse, Http404
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
 
@@ -18,7 +19,7 @@ from nucleo.identificacion import (
 from nucleo.registro import CierreNoPermitido, Faltante, describir_faltantes
 from nucleo.ronda import MovimientoInvalido
 
-from . import consultas, operaciones
+from . import consultas, fotos, operaciones
 from .disponibilidad import disponibilidad_de_conductores
 from .formularios import (
     FormularioAsignacion,
@@ -29,7 +30,7 @@ from .formularios import (
     inicial_de,
     inicial_vehiculos,
 )
-from .models import VALORES_EN_RONDA, EstadoRegistro, Servicio, Solicitud
+from .models import VALORES_EN_RONDA, EstadoRegistro, Evidencia, Servicio, Solicitud
 from .operaciones import SolicitudNoAsignable
 from .registro import (
     SolicitudNoEditable,
@@ -215,6 +216,7 @@ def detalle(request, pk, formulario_cierre=None):
             "pk"
         )
     )
+    fotos_de_la_solicitud = fotos.fotos_de(servicios)
     faltantes = []
     if solicitud.estado_registro == EstadoRegistro.BORRADOR:
         faltantes = faltantes_de(solicitud)
@@ -224,10 +226,25 @@ def detalle(request, pk, formulario_cierre=None):
         "faltantes": describir_faltantes(faltantes),
         "puede_cerrar": puede_cerrarse_no_concretada(solicitud),
         "formulario_cierre": formulario_cierre or FormularioNoConcretada(),
+        "fotos": fotos_de_la_solicitud,
+        "hay_fotos": any(g.fotos or g.sin_foto for g in fotos_de_la_solicitud),
     }
     if solicitud.estado_registro == EstadoRegistro.ABIERTA:
         contexto.update(_contexto_asignacion(servicios))
     return render(request, "solicitudes/detalle.html", contexto)
+
+
+def foto_evidencia(request, pk, evidencia_id):
+    """Una foto de evidencia de la solicitud `pk`. No hay URL pública de MEDIA: solo se ve con
+    sesión y rol, y solo desde la solicitud a la que pertenece."""
+    evidencia = get_object_or_404(Evidencia, pk=evidencia_id, servicio__solicitud_id=pk)
+    try:
+        abierto = evidencia.archivo.open("rb")
+    except FileNotFoundError as error:
+        raise Http404("La foto no está en el servidor.") from error
+    respuesta = FileResponse(abierto, content_type="image/jpeg")
+    respuesta["Cache-Control"] = "private, max-age=3600"
+    return respuesta
 
 
 def _contexto_asignacion(servicios):

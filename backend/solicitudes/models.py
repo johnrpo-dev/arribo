@@ -732,11 +732,18 @@ class TipoEvidencia(models.TextChoices):
 
 
 def ruta_evidencia(instancia, nombre_original):
-    """evidencias/<servicio>/<id de la evidencia>.jpg, dentro de MEDIA_ROOT.
+    """evidencias/solicitud-<N.º>/servicio-<N.º>/<tipo>-<id de la evidencia>.jpg, en MEDIA_ROOT.
 
+    Con los números que muestra el panel, para que quien abra la carpeta sepa de qué solicitud y
+    servicio es cada foto (1a-08i). Las fotos guardadas antes con evidencias/<servicio>/<id>.jpg se
+    quedan donde están: la base guarda la ruta de cada una y el panel las muestra igual.
     El nombre lo pone el servidor: del que manda el celular no se usa nada, ni la extensión.
     """
-    return f"evidencias/{instancia.servicio_id}/{instancia.pk}.jpg"
+    servicio = instancia.servicio
+    return (
+        f"evidencias/solicitud-{servicio.solicitud_id}/servicio-{servicio.pk}/"
+        f"{instancia.tipo}-{instancia.pk}.jpg"
+    )
 
 
 class Evidencia(models.Model):

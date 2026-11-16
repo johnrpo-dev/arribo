@@ -81,6 +81,41 @@
   {% endif %}
 </section>
 
+{% if servicios %}
+<section class="bloque" aria-labelledby="t-fotos">
+  <h2 class="titulo-seccion" id="t-fotos">Fotos</h2>
+  <p class="ayuda">Las que tomó el conductor en la app al recoger y al entregar. Toque una foto para verla completa.</p>
+  {% for grupo in fotos %}
+  {% if grupo.fotos or grupo.sin_foto %}
+  <div class="fotos-servicio{% if grupo.servicio.regreso_de_id %} fotos-servicio--regreso{% endif %}">
+    <h3 class="fotos-titulo">N.º {{ grupo.servicio.pk }} · {{ grupo.servicio.vehiculo }} · {% if grupo.servicio.regreso_de_id %}<span class="etiqueta etiqueta--regreso">Regreso</span>{% else %}<span class="etiqueta etiqueta--ida">Ida</span>{% endif %} <span class="estado estado--{{ grupo.servicio.estado }}">{{ grupo.servicio.get_estado_display }}</span></h3>
+    {% for falta in grupo.sin_foto %}
+    <p class="aviso-corto">Sin foto de {{ falta.nombre_tipo }}: {{ falta.evento.conductor|default:"el conductor" }} marcó {{ falta.evento.get_destino_display }}{% if falta.evento.hora_dispositivo %} el <time datetime="{{ falta.evento.hora_dispositivo|date:'c' }}">{{ falta.evento.hora_dispositivo|date:"d/m/Y H:i" }}</time>{% endif %} y no llegó foto. Puede estar subiendo todavía desde el celular.</p>
+    {% endfor %}
+    {% if grupo.fotos %}
+    <ul class="galeria">
+      {% for f in grupo.fotos %}
+      {% url 'foto_evidencia' solicitud.pk f.evidencia.pk as url_foto %}
+      <li>
+        <figure class="foto">
+          <a href="{{ url_foto }}" target="_blank" rel="noopener" aria-label="Ver completa la foto de {{ f.evidencia.get_tipo_display|lower }} del servicio N.º {{ grupo.servicio.pk }}"><img src="{{ url_foto }}" alt="Foto de {{ f.evidencia.get_tipo_display|lower }} de {{ grupo.servicio.vehiculo }}" loading="lazy" width="240" height="180"></a>
+          <figcaption>
+            <span class="etiqueta etiqueta--foto-{{ f.evidencia.tipo }}">{{ f.evidencia.get_tipo_display }}</span>
+            {% if f.evento and f.evento.hora_dispositivo %}<time datetime="{{ f.evento.hora_dispositivo|date:'c' }}">{{ f.evento.hora_dispositivo|date:"d/m/Y H:i" }}</time>{% else %}<span class="texto-secundario">subida <time datetime="{{ f.evidencia.creada_en|date:'c' }}">{{ f.evidencia.creada_en|date:"d/m/Y H:i" }}</time></span>{% endif %}
+            <span class="texto-secundario">{% if f.evidencia.subida_por %}{{ f.evidencia.subida_por }}{% endif %}{% if f.evento.nombre_quien %} · {% if f.evidencia.tipo == "entrega" %}recibió{% else %}entregó{% endif %} {{ f.evento.nombre_quien }}{% endif %}{% if not f.evento %} · su paso todavía no llega al servidor{% endif %}</span>
+          </figcaption>
+        </figure>
+      </li>
+      {% endfor %}
+    </ul>
+    {% endif %}
+  </div>
+  {% endif %}
+  {% endfor %}
+  {% if not hay_fotos %}<div class="vacio"><p>Todavía no hay fotos de esta solicitud.</p></div>{% endif %}
+</section>
+{% endif %}
+
 {% if solicitud.estado_registro == "borrador" %}
 <section class="bloque" aria-labelledby="t-asignar">
   <h2 class="titulo-seccion" id="t-asignar">Asignar conductores</h2>
