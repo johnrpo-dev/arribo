@@ -149,13 +149,17 @@ Map<String, Object?> servicioJson({
   String estado = 'asignado',
   String? placa = 'ABC123',
   String tipo = 'traslado',
+  int? regresoDe,
+  bool esperaIda = false,
 }) => {
   'id': id,
   'solicitud_id': 17,
   'estado': estado,
   'estado_previo': null,
   'tipo': tipo,
-  'es_regreso': false,
+  'es_regreso': regresoDe != null,
+  'regreso_de': regresoDe,
+  'espera_ida': esperaIda,
   'orden_ronda': ordenRonda,
   'vehiculo': {
     'placa': placa,

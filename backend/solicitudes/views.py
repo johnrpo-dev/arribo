@@ -211,7 +211,9 @@ def detalle(request, pk, formulario_cierre=None):
     # Por número: el orden de ronda (orden por defecto del modelo) es de cada conductor, no de la
     # solicitud.
     servicios = list(
-        solicitud.servicios.select_related("vehiculo", "conductor", "grua").order_by("pk")
+        solicitud.servicios.select_related("vehiculo", "conductor", "grua", "regreso_de").order_by(
+            "pk"
+        )
     )
     faltantes = []
     if solicitud.estado_registro == EstadoRegistro.BORRADOR:

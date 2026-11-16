@@ -91,6 +91,13 @@ Toda tarea termina con `uv run pytest -q` y `uv run ruff check .` en verde, más
   regreso por asignar usa su propia hora (fecha de regreso) y su trayecto al revés para la urgencia y el orden.
   Verificar: el regreso se ve en verde azulado en el tablero y en el detalle; no sale urgente por la hora de la ida.
 
+- [x] **1a-08h El regreso espera a su ida** (3 h). Depende de: 08g. Decisión del dueño.
+  Regla `nucleo.trayecto.regreso_bloqueado` con casos compartidos; en el servidor, un avance de un
+  regreso con la ida sin entregar es conflicto `ida_sin_entregar` con alerta; contrato 1.3
+  (`regreso_de`, `espera_ida`); la app muestra el candado y lo quita en cuanto se entrega la ida,
+  también sin señal; el panel marca "Espera la ida".
+  Verificar: en la app, el regreso no ofrece En camino hasta entregar la ida; Novedad sí.
+
 ## Conductor
 
 - [x] **1a-09 API: ingreso y asignaciones** (2 h). Depende de: 08.

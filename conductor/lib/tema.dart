@@ -17,6 +17,10 @@ abstract final class Colores {
   static const peligroFondo = Color(0xFFFBE9E8);
   static const avisoFondo = Color(0xFFFCF1E1);
   static const aviso = Color(0xFF9A5B00);
+
+  /// Regreso de un evento (el mismo verde azulado del panel).
+  static const regreso = Color(0xFF0B6B63);
+  static const regresoFondo = Color(0xFFE1F4F1);
 }
 
 /// Texto y fondo de la etiqueta de cada estado (los mismos tonos del panel, contraste AA).

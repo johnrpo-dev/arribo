@@ -77,6 +77,8 @@ class Servicio {
     required this.tipo,
     this.estadoPrevio,
     this.esRegreso = false,
+    this.regresoDe,
+    this.esperaIda = false,
     this.ordenRonda,
     this.vehiculo = const Vehiculo(),
     this.origen = const Lugar(),
@@ -101,6 +103,13 @@ class Servicio {
 
   /// Regreso de un evento: origen y destino ya vienen invertidos.
   final bool esRegreso;
+
+  /// En un regreso, el id del servicio de ida; null en una ida.
+  final int? regresoDe;
+
+  /// Regreso cuya ida todavía no está entregada: no avanza hasta entonces (ver `trayecto.dart`).
+  /// Lo manda el servidor; la lista lo apaga en cuanto el conductor marca Entregado en la ida.
+  final bool esperaIda;
 
   final int? ordenRonda;
   final Vehiculo vehiculo;
@@ -132,6 +141,8 @@ class Servicio {
       estadoPrevio: _textoOpcional(json, 'estado_previo'),
       tipo: _texto(json, 'tipo'),
       esRegreso: _booleanoOpcional(json, 'es_regreso') ?? false,
+      regresoDe: _enteroOpcional(json, 'regreso_de'),
+      esperaIda: _booleanoOpcional(json, 'espera_ida') ?? false,
       ordenRonda: _enteroOpcional(json, 'orden_ronda'),
       vehiculo: Vehiculo(
         placa: _textoOpcional(vehiculo, 'placa'),
@@ -162,6 +173,15 @@ class Servicio {
     required bool aBordo,
   }) => _copia(estado: estado, estadoPrevio: estadoPrevio, aBordo: aBordo, vehiculo: vehiculo);
 
+  /// El mismo regreso, ya sin esperar a su ida (el conductor la marcó Entregado sin señal).
+  Servicio sinEsperarIda() => _copia(
+    estado: estado,
+    estadoPrevio: estadoPrevio,
+    aBordo: aBordo,
+    vehiculo: vehiculo,
+    esperaIda: false,
+  );
+
   /// El mismo servicio con la placa y el VIN dados donde al vehículo le faltan (los que el
   /// conductor digitó en un Recogido sin enviar). Nunca cambia uno que ya tenga.
   Servicio conIdentificacion({required String placa, required String vin}) => _copia(
@@ -182,6 +202,7 @@ class Servicio {
     required String? estadoPrevio,
     required bool aBordo,
     required Vehiculo vehiculo,
+    bool? esperaIda,
   }) => Servicio(
     id: id,
     solicitudId: solicitudId,
@@ -189,6 +210,8 @@ class Servicio {
     estadoPrevio: estadoPrevio,
     tipo: tipo,
     esRegreso: esRegreso,
+    regresoDe: regresoDe,
+    esperaIda: esperaIda ?? this.esperaIda,
     ordenRonda: ordenRonda,
     vehiculo: vehiculo,
     origen: origen,
@@ -208,6 +231,8 @@ class Servicio {
     'estado_previo': estadoPrevio,
     'tipo': tipo,
     'es_regreso': esRegreso ? 1 : 0,
+    'regreso_de': regresoDe,
+    'espera_ida': esperaIda ? 1 : 0,
     'orden_ronda': ordenRonda,
     'vehiculo_placa': vehiculo.placa,
     'vehiculo_vin': vehiculo.vin,
@@ -240,6 +265,8 @@ class Servicio {
       estadoPrevio: fila['estado_previo'] as String?,
       tipo: fila['tipo']! as String,
       esRegreso: fila['es_regreso'] == 1,
+      regresoDe: fila['regreso_de'] as int?,
+      esperaIda: fila['espera_ida'] == 1,
       ordenRonda: fila['orden_ronda'] as int?,
       vehiculo: Vehiculo(
         placa: fila['vehiculo_placa'] as String?,

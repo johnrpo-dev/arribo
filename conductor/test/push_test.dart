@@ -179,21 +179,24 @@ void main() {
   });
 
   group('sin señal', () {
-    test('si el registro falla por la red, se reintenta cuando el servidor responde la lista', () async {
-      respuestaPush = sinSenal;
-      token.token = 'token-ana';
-      await sesion.iniciar();
-      await registro.listo;
-      expect(registro.pendiente, isTrue);
-      expect(registro.tokenRegistrado, isNull);
+    test(
+      'si el registro falla por la red, se reintenta cuando el servidor responde la lista',
+      () async {
+        respuestaPush = sinSenal;
+        token.token = 'token-ana';
+        await sesion.iniciar();
+        await registro.listo;
+        expect(registro.pendiente, isTrue);
+        expect(registro.tokenRegistrado, isNull);
 
-      respuestaPush = () => http.Response('', 204);
-      await lista.actualizar();
-      await esperarHasta(() => registro.tokenRegistrado == 'fcm-1');
+        respuestaPush = () => http.Response('', 204);
+        await lista.actualizar();
+        await esperarHasta(() => registro.tokenRegistrado == 'fcm-1');
 
-      expect(registros(), hasLength(2));
-      expect(registro.pendiente, isFalse);
-    });
+        expect(registros(), hasLength(2));
+        expect(registro.pendiente, isFalse);
+      },
+    );
 
     test('si Firebase no da el token, se reintenta cuando el servidor responde la lista', () async {
       firebase.errorAlDarToken = Exception('SERVICE_NOT_AVAILABLE');

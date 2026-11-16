@@ -7,6 +7,12 @@ Formato: fecha, tarea, pregunta, qué se asumió mientras tanto (si se asumió a
 
 ## Abiertas
 
+- **2026-11-15, 1a-08h. Si la ida se cancela, ¿qué pasa con su regreso?** Decidido por el dueño: el
+  regreso no avanza hasta que su ida esté entregada. Asumido mientras tanto: si la ida se cancela, el
+  regreso no se cancela solo (nada en el sistema se cancela solo); queda bloqueado ("Espera la ida")
+  hasta que logística lo cancele con su motivo. Alternativa: cancelarlo junto con la ida. Pregunta
+  al dueño.
+
 - **2026-11-15, 1a-08b. ¿Qué grúas se ofrecen al darle o cambiarle la grúa a un conductor?**
   Asumido: todas las grúas activas, también las fuera de servicio (marcadas así en la lista); las
   inactivas no se ofrecen. Una grúa que ya tiene otro conductor no se puede elegir: la pantalla dice

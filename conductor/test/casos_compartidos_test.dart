@@ -9,6 +9,7 @@ import 'dart:io';
 import 'package:arribo_conductor/asignaciones/capacidad.dart';
 import 'package:arribo_conductor/asignaciones/estados.dart';
 import 'package:arribo_conductor/asignaciones/identificacion.dart';
+import 'package:arribo_conductor/asignaciones/trayecto.dart';
 import 'package:arribo_conductor/fotos/foto.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -235,5 +236,29 @@ void main() {
       expect(TipoFoto.para(Estado.recogido), TipoFoto.recogida);
       expect(TipoFoto.para(Estado.entregado), TipoFoto.entrega);
     });
+  });
+
+  group('regreso que espera a su ida', () {
+    final regreso = casos['regreso']! as Map<String, Object?>;
+    test('los pasos que esperan son los del servidor', () {
+      final bloqueados = {
+        for (final caso in lista(regreso['casos']))
+          if (caso['bloqueado'] == true) caso['destino'],
+      };
+      expect(bloqueados, pasosQueEsperanLaIda);
+    });
+    for (final caso in lista(regreso['casos'])) {
+      test('regreso ${caso['es_regreso']}, ida entregada ${caso['ida_entregada']}, '
+          '${caso['destino']}', () {
+        expect(
+          regresoBloqueado(
+            esRegreso: caso['es_regreso']! as bool,
+            idaEntregada: caso['ida_entregada']! as bool,
+            destino: caso['destino']! as String,
+          ),
+          caso['bloqueado'],
+        );
+      });
+    }
   });
 }

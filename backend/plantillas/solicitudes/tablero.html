@@ -73,7 +73,7 @@
       </div>
       <p class="tarjeta-titulo">{{ servicio.vehiculo }} · {{ s.solicitante.nombre }}</p>
       <p class="tarjeta-trayecto">{{ fila.recoger }} → {{ fila.entregar }}</p>
-      <p class="fila-etiquetas">{% if servicio.regreso_de_id %}<span class="etiqueta etiqueta--regreso">Regreso del N.º {{ servicio.regreso_de_id }}</span>{% else %}<span class="etiqueta etiqueta--ida">Ida</span>{% endif %} <span class="texto-secundario">{{ s.get_tipo_display }}</span></p>
+      <p class="fila-etiquetas">{% if servicio.regreso_de_id %}<span class="etiqueta etiqueta--regreso">Regreso del N.º {{ servicio.regreso_de_id }}</span>{% if servicio.espera_su_ida %} <span class="etiqueta etiqueta--espera-ida">Espera la ida</span>{% endif %}{% else %}<span class="etiqueta etiqueta--ida">Ida</span>{% endif %} <span class="texto-secundario">{{ s.get_tipo_display }}</span></p>
       <form method="post" action="{% url 'asignar_servicio' s.pk servicio.pk %}" class="asignar-rapido">
         {% csrf_token %}
         <input type="hidden" name="volver" value="tablero">
@@ -156,7 +156,7 @@
       {% if t.servicios %}
       <ol class="ronda">
         {% for servicio in t.servicios %}
-        <li><span><a href="{% url 'detalle_solicitud' servicio.solicitud_id %}" aria-label="Abrir la solicitud {{ servicio.solicitud_id }}">{{ servicio.vehiculo }}</a>{% if servicio.regreso_de_id %} <span class="etiqueta etiqueta--regreso">regreso</span>{% endif %}</span> <span class="estado estado--{{ servicio.estado }}">{{ servicio.get_estado_display }}</span></li>
+        <li><span><a href="{% url 'detalle_solicitud' servicio.solicitud_id %}" aria-label="Abrir la solicitud {{ servicio.solicitud_id }}">{{ servicio.vehiculo }}</a>{% if servicio.regreso_de_id %} <span class="etiqueta etiqueta--regreso">regreso</span>{% if servicio.espera_su_ida %} <span class="etiqueta etiqueta--espera-ida">espera la ida</span>{% endif %}{% endif %}</span> <span class="estado estado--{{ servicio.estado }}">{{ servicio.get_estado_display }}</span></li>
         {% endfor %}
       </ol>
       {% endif %}

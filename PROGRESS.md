@@ -1296,6 +1296,32 @@ tiene botón de actualizar información".
 - Cómo probar (3 minutos): recargar con Ctrl+F5. Ver el tablero y la solicitud 2: el N.º 3 aparece
   con la etiqueta verde azulada "↩ Regreso del N.º 2". En Solicitudes, los filtros son pestañas.
 
+### 1a-08h · El regreso espera a su ida
+
+- Pregunta del dueño: "¿por qué dejó llenar primero el regreso que la ida?". No había regla escrita;
+  el dueño decidió bloquearlo: no se recoge en el destino un vehículo que todavía no ha llegado allá.
+- **Regla** (`nucleo/trayecto.py`, `regreso_bloqueado`): un regreso no pasa a En camino, Recogido ni
+  Entregado hasta que su ida esté entregada; la Novedad sí se puede reportar. Casos en
+  `docs/casos-reglas.json` (`regreso`), recorridos por las pruebas del servidor y de la app.
+- **Servidor**: si llega igual (app vieja o sin actualizar), no se rechaza: se guarda como conflicto
+  `ida_sin_entregar` (motivo nuevo, migración `0007` de la restricción) y abre alerta a logística.
+  Si la ida se entrega y el regreso arranca en el mismo lote sin señal, se aplican en orden.
+- **Contrato 1.3** (`docs/api-conductor.md`): cada servicio trae `regreso_de` y `espera_ida`.
+- **App**: etiqueta "Espera la ida" con candado en la lista y el detalle; en lugar de "Marcar En
+  camino" dice "Disponible cuando se entregue la ida."; la cola no guarda ese toque. Al marcar
+  Entregado en la ida (aunque no haya señal) el regreso se desbloquea de inmediato; cuando el
+  servidor confirma la ida entregada, también. Migración local 5 (dos columnas y olvidar el ETag
+  para bajar la lista completa).
+- **Panel**: "Espera la ida" junto al regreso en el detalle, en la tarjeta "Por asignar" y en la
+  ronda del conductor. Se puede asignar con anticipación, como antes.
+- Pendiente en `QUESTIONS.md`: si la ida se cancela, por ahora logística cancela el regreso a mano.
+- No probado en el celular real: el celular no estaba conectado. Lo cubren las pruebas de la app
+  (cola, pantalla del servicio y casos compartidos).
+- Cómo probar (5 minutos): instalar la app nueva (`flutter run` con el celular conectado). Crear un
+  evento con regreso y asignar ida y regreso al mismo conductor. En el celular, el regreso dice
+  "Espera la ida" y no ofrece En camino; marcar la ida En camino, Recogido y Entregado; el regreso
+  ya ofrece En camino. En el panel, la etiqueta "Espera la ida" desaparece al entregarse la ida.
+
 ## Escalamientos
 
 Ninguno todavía.

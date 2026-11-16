@@ -66,7 +66,7 @@
         <tr{% if servicio.regreso_de_id %} class="fila--regreso"{% endif %}>
           <td class="cifra">{{ servicio.pk }}</td>
           <td>{{ servicio.vehiculo }}{% if servicio.vehiculo.color %} {{ servicio.vehiculo.color }}{% endif %}</td>
-          <td>{% if servicio.regreso_de_id %}<span class="etiqueta etiqueta--regreso">Regreso del N.º {{ servicio.regreso_de_id }} (destino a origen)</span>{% if solicitud.fecha_regreso %} <time datetime="{{ solicitud.fecha_regreso|date:'c' }}">{{ solicitud.fecha_regreso|date:"d/m/Y H:i" }}</time>{% endif %}{% else %}<span class="etiqueta etiqueta--ida">Ida</span>{% endif %}</td>
+          <td>{% if servicio.regreso_de_id %}<span class="etiqueta etiqueta--regreso">Regreso del N.º {{ servicio.regreso_de_id }} (destino a origen)</span>{% if solicitud.fecha_regreso %} <time datetime="{{ solicitud.fecha_regreso|date:'c' }}">{{ solicitud.fecha_regreso|date:"d/m/Y H:i" }}</time>{% endif %}{% if servicio.espera_su_ida %} <span class="etiqueta etiqueta--espera-ida">Espera la ida</span>{% endif %}{% else %}<span class="etiqueta etiqueta--ida">Ida</span>{% endif %}</td>
           <td>{{ servicio.referencia_externa|default:"—" }}</td>
           <td>{% if servicio.conductor %}{{ servicio.conductor }}{% if servicio.grua %} ({{ servicio.grua.placa }}){% endif %}{% else %}<span class="texto-secundario">Sin asignar</span>{% endif %}</td>
           <td>{% if not servicio.conductor_id %}—{% elif servicio.visto_por_conductor_en %}<time datetime="{{ servicio.visto_por_conductor_en|date:'c' }}">{{ servicio.visto_por_conductor_en|date:"d/m/Y H:i" }}</time>{% else %}<span class="texto-secundario">Sin ver</span>{% endif %}</td>

@@ -1180,5 +1180,106 @@
       "entrega",
       "recogida"
     ]
+  },
+  "regreso": {
+    "descripcion": "Un regreso no avanza (en camino, recogido, entregado) hasta que su ida esté entregada; la novedad se puede reportar siempre. Una ida nunca se bloquea por esto.",
+    "casos": [
+      {
+        "es_regreso": false,
+        "ida_entregada": false,
+        "destino": "en_camino",
+        "bloqueado": false
+      },
+      {
+        "es_regreso": false,
+        "ida_entregada": false,
+        "destino": "recogido",
+        "bloqueado": false
+      },
+      {
+        "es_regreso": false,
+        "ida_entregada": false,
+        "destino": "entregado",
+        "bloqueado": false
+      },
+      {
+        "es_regreso": false,
+        "ida_entregada": false,
+        "destino": "novedad",
+        "bloqueado": false
+      },
+      {
+        "es_regreso": false,
+        "ida_entregada": true,
+        "destino": "en_camino",
+        "bloqueado": false
+      },
+      {
+        "es_regreso": false,
+        "ida_entregada": true,
+        "destino": "recogido",
+        "bloqueado": false
+      },
+      {
+        "es_regreso": false,
+        "ida_entregada": true,
+        "destino": "entregado",
+        "bloqueado": false
+      },
+      {
+        "es_regreso": false,
+        "ida_entregada": true,
+        "destino": "novedad",
+        "bloqueado": false
+      },
+      {
+        "es_regreso": true,
+        "ida_entregada": false,
+        "destino": "en_camino",
+        "bloqueado": true
+      },
+      {
+        "es_regreso": true,
+        "ida_entregada": false,
+        "destino": "recogido",
+        "bloqueado": true
+      },
+      {
+        "es_regreso": true,
+        "ida_entregada": false,
+        "destino": "entregado",
+        "bloqueado": true
+      },
+      {
+        "es_regreso": true,
+        "ida_entregada": false,
+        "destino": "novedad",
+        "bloqueado": false
+      },
+      {
+        "es_regreso": true,
+        "ida_entregada": true,
+        "destino": "en_camino",
+        "bloqueado": false
+      },
+      {
+        "es_regreso": true,
+        "ida_entregada": true,
+        "destino": "recogido",
+        "bloqueado": false
+      },
+      {
+        "es_regreso": true,
+        "ida_entregada": true,
+        "destino": "entregado",
+        "bloqueado": false
+      },
+      {
+        "es_regreso": true,
+        "ida_entregada": true,
+        "destino": "novedad",
+        "bloqueado": false
+      }
+    ]
   }
 }

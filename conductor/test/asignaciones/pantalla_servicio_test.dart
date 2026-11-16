@@ -616,4 +616,54 @@ void main() {
     expect(tester.takeException(), isNull);
     expect(find.byKey(const Key('pendientes')), findsOneWidget);
   });
+
+  group('el regreso espera a su ida', () {
+    /// 41 (ABC123) es la ida, ya recogida; 42 (XYZ789) es su regreso, que espera.
+    Future<void> idaYRegreso() async {
+      eventos = ServidorDeEventos({41: 'recogido', 42: 'asignado'});
+      await AlmacenAsignaciones(prueba.base).reemplazar(
+        servicios: [
+          Servicio.desdeJson(servicioJson(id: 41, estado: 'recogido', tipo: 'evento')),
+          Servicio.desdeJson(
+            servicioJson(id: 42, placa: 'XYZ789', tipo: 'evento', regresoDe: 41, esperaIda: true),
+          ),
+        ],
+        configuracion: const ConfiguracionApp(minimoFotos: 4, momentoPlacaVin: 'recoger'),
+        etag: '"e1"',
+        hora: ahora.subtract(const Duration(minutes: 30)),
+      );
+    }
+
+    testWidgets('el regreso no ofrece En camino: dice que espera la ida; la novedad sí', (
+      tester,
+    ) async {
+      await idaYRegreso();
+      pantallaAlta(tester);
+      await abrirApp(tester);
+      expect(find.byKey(const Key('espera-ida')), findsOneWidget); // en la tarjeta de la lista
+
+      await tocar(tester, find.text('XYZ789'));
+
+      expect(find.byKey(const Key('aviso-espera-ida')), findsOneWidget);
+      expect(find.text('Disponible cuando se entregue la ida.'), findsOneWidget);
+      expect(find.text('Marcar En camino'), findsNothing);
+      expect(find.text('Reportar novedad'), findsOneWidget);
+    });
+
+    testWidgets('sin señal, al entregar la ida el regreso se desbloquea de inmediato', (
+      tester,
+    ) async {
+      await idaYRegreso();
+      await abrirDetalle(tester);
+      await tocar(tester, find.text('Marcar Entregado'));
+      await completarPaso(tester);
+      await tester.pumpAndSettle();
+      if (find.byType(BackButton).evaluate().isNotEmpty) await volver(tester);
+
+      await tocar(tester, find.text('XYZ789'));
+
+      expect(find.byKey(const Key('aviso-espera-ida')), findsNothing);
+      expect(find.text('Marcar En camino'), findsOneWidget);
+    });
+  });
 }

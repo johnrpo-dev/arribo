@@ -450,7 +450,14 @@ def _aplicar_evento(evento: EventoDelConductor) -> Aplicacion:
                 return _rechazar(evento, Motivo.SERVICIO_DESCONOCIDO, conductor=conductor)
             recibidos = {evento.id} if _ya_recibido(evento_id) else set()
             asignado = _texto_o_nada(servicio.conductor_id)
-            decision = decidir(servicio.como_nucleo(), asignado, evento, recibidos)
+            decision = decidir(
+                servicio.como_nucleo(),
+                asignado,
+                evento,
+                recibidos,
+                es_regreso=servicio.regreso_de_id is not None,
+                ida_entregada=_ida_entregada(servicio),
+            )
             if decision.resultado == Resultado.DUPLICADO:
                 return _repetido(evento)
             resultado, motivo = decision.resultado, decision.motivo
@@ -511,6 +518,15 @@ def _aplicar_evento(evento: EventoDelConductor) -> Aplicacion:
         motivo=motivo,
         capacidad_excedida=capacidad_excedida,
     )
+
+
+def _ida_entregada(servicio: Servicio) -> bool:
+    """¿La ida de este regreso ya está entregada? En una ida (sin enlace) no aplica: True."""
+    if servicio.regreso_de_id is None:
+        return True
+    return Servicio.objects.filter(
+        pk=servicio.regreso_de_id, estado=Estado.ENTREGADO.value
+    ).exists()
 
 
 def _repetido(evento: EventoDelConductor) -> Aplicacion:

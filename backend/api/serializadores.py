@@ -120,6 +120,9 @@ class ServicioDelConductorSerializer(serializers.BaseSerializer):
             "estado_previo": _texto(servicio.estado_previo),
             "tipo": solicitud.tipo,
             "es_regreso": es_regreso,
+            # Revisión 1.3: el regreso espera a que su ida esté entregada (nucleo.trayecto).
+            "regreso_de": servicio.regreso_de_id,
+            "espera_ida": servicio.espera_su_ida,
             "orden_ronda": servicio.orden_ronda,
             "vehiculo": {
                 "placa": _texto(vehiculo.placa),

@@ -164,6 +164,14 @@ const List<List<String>> migraciones = [
     'ALTER TABLE eventos_pendientes ADD COLUMN placa TEXT',
     'ALTER TABLE eventos_pendientes ADD COLUMN vin TEXT',
   ],
+  // Versión 5 (1a-08h): el regreso espera a que su ida esté entregada (contrato 1.3). Sin ETag la
+  // siguiente lista llega completa, con `regreso_de` y `espera_ida` de cada servicio.
+  [
+    'ALTER TABLE servicios ADD COLUMN regreso_de INTEGER',
+    'ALTER TABLE servicios ADD COLUMN espera_ida INTEGER NOT NULL DEFAULT 0 '
+        'CHECK (espera_ida IN (0, 1))',
+    "DELETE FROM estado_local WHERE clave = 'etag'",
+  ],
 ];
 
 /// Nombre del archivo de la base en la carpeta de bases de datos de la app.

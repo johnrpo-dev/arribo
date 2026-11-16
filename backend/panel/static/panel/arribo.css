@@ -890,6 +890,16 @@ a.tarjeta-titulo:hover {
   content: "↩";
   font-weight: 700;
 }
+/* Regreso que todavía no puede arrancar porque su ida no está entregada (1a-08h). */
+.etiqueta--espera-ida {
+  --etiqueta-color: var(--regreso);
+  --etiqueta-fondo: var(--superficie);
+  border: 1px dashed var(--regreso);
+}
+.etiqueta--espera-ida::before {
+  content: "⏸";
+  font-size: 11px;
+}
 .etiqueta--ida {
   --etiqueta-color: var(--texto-secundario);
   --etiqueta-fondo: var(--pendiente-fondo);

@@ -313,3 +313,32 @@ def test_el_regreso_por_asignar_usa_su_propia_hora_y_va_del_destino_al_origen(
     assert "Plaza Mayor → Concesionario Las Vegas" in html
     assert f'etiqueta--regreso">Regreso del N.º {ida.pk}</span>' in html
     assert "tarjeta--regreso" in html
+
+
+def test_el_regreso_dice_que_espera_la_ida_hasta_que_se_entregue(
+    client, logistica, cliente, nuevo_vehiculo, ana
+):
+    ahora = timezone.now()
+    evento = crear_solicitud(
+        cliente,
+        tipo=TipoServicio.EVENTO,
+        programada_para=ahora + timedelta(hours=1),
+        tiene_regreso=True,
+        fecha_regreso=ahora + timedelta(days=2),
+    )
+    vehiculo = nuevo_vehiculo(placa="EVT101")
+    ida = Servicio.objects.create(solicitud=evento, vehiculo=vehiculo)
+    regreso = Servicio.objects.create(solicitud=evento, vehiculo=vehiculo, regreso_de=ida)
+    operaciones.asignar(ida, ana, actor=logistica)
+
+    assert regreso.espera_su_ida
+    tablero = client.get("/").content.decode()
+    detalle = client.get(f"/solicitudes/{evento.pk}/").content.decode()
+    assert tablero.count('etiqueta--espera-ida">Espera la ida</span>') == 1  # por asignar
+    assert detalle.count('etiqueta--espera-ida">Espera la ida</span>') == 1
+
+    Servicio.objects.filter(pk=ida.pk).update(estado=Estado.ENTREGADO.value)
+    regreso.refresh_from_db()
+    assert not regreso.espera_su_ida
+    assert "etiqueta--espera-ida" not in client.get("/").content.decode()
+    assert "etiqueta--espera-ida" not in client.get(f"/solicitudes/{evento.pk}/").content.decode()

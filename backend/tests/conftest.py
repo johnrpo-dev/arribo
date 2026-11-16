@@ -125,6 +125,7 @@ def crear_servicio(solicitud, ana, nuevo_vehiculo):
         previo=None,
         vehiculo=None,
         solicitud_de=None,
+        regreso_de=None,
     ):
         estado = Estado(estado)
         if estado == Estado.NOVEDAD and previo is None:
@@ -139,6 +140,7 @@ def crear_servicio(solicitud, ana, nuevo_vehiculo):
             estado_previo=Estado(previo).value if previo else "",
             conductor=conductor,
             grua=grua,
+            regreso_de=regreso_de,
         )
 
     return crear

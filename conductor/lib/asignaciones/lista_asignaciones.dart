@@ -292,12 +292,24 @@ class ListaAsignaciones extends ChangeNotifier {
       destinos.putIfAbsent(evento.servicioId, () => []).add(evento.destino);
       if (evento.placa != null || evento.vin != null) digitados[evento.servicioId] = evento;
     }
-    _servicios = [
+    final vistos = [
       for (final servicio in servicios)
         _conDigitado(switch (destinos[servicio.id]) {
           final suyos? => _conPendientes(servicio, suyos),
           null => servicio,
         }, digitados[servicio.id]),
+    ];
+    // Un regreso deja de esperar en cuanto el conductor marca Entregado en su ida, aunque ese
+    // toque aún no haya llegado al servidor (el servidor los aplica en el mismo orden).
+    final entregadas = {
+      for (final servicio in vistos)
+        if (servicio.estado == Estado.entregado) servicio.id,
+    };
+    _servicios = [
+      for (final servicio in vistos)
+        servicio.esperaIda && entregadas.contains(servicio.regresoDe)
+            ? servicio.sinEsperarIda()
+            : servicio,
     ];
     _pendientes = {for (final MapEntry(:key, :value) in destinos.entries) key: value.length};
     _configuracion = await almacen.configuracion();

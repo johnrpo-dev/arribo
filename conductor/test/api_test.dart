@@ -333,9 +333,7 @@ void main() {
 
       await expectLater(
         servidor.api().registrarPush('token-ana', 'con espacio'),
-        throwsA(
-          isA<ErrorDeContrato>().having((e) => e.campos.keys, 'campos', ['token']),
-        ),
+        throwsA(isA<ErrorDeContrato>().having((e) => e.campos.keys, 'campos', ['token'])),
       );
     });
 

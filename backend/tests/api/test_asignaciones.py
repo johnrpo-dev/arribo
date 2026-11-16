@@ -146,6 +146,8 @@ def test_cada_servicio_trae_lo_que_la_app_necesita_para_trabajar_sin_senal(
             "estado_previo": None,
             "tipo": "traslado",
             "es_regreso": False,
+            "regreso_de": None,
+            "espera_ida": False,
             "orden_ronda": 1,
             "vehiculo": {
                 "placa": "ABC123",
@@ -454,3 +456,27 @@ def test_la_lista_hace_las_mismas_pocas_consultas_con_2_o_con_8_servicios(
     # Token (con su grupo), último uso, configuración, servicios y, como eran nuevos para la app,
     # un solo UPDATE que los deja vistos por el conductor (1a-14).
     assert len(con_pocos) <= 5
+
+
+def test_el_regreso_dice_si_espera_a_su_ida(sesion, ana_app, cliente, nuevo_vehiculo, asignado_a):
+    evento = crear_solicitud(
+        cliente,
+        tipo=TipoServicio.EVENTO,
+        tiene_regreso=True,
+        fecha_regreso=datetime(2026, 11, 22, 17, 0, tzinfo=BOGOTA),
+    )
+    vehiculo = nuevo_vehiculo()
+    ida = asignado_a(ana_app, evento, vehiculo=vehiculo)
+    regreso = asignado_a(ana_app, evento, vehiculo=vehiculo, regreso_de=ida)
+
+    servicios = {s["id"]: s for s in sesion.get(URL).json()["servicios"]}
+    assert (servicios[ida.pk]["regreso_de"], servicios[ida.pk]["espera_ida"]) == (None, False)
+    assert (servicios[regreso.pk]["regreso_de"], servicios[regreso.pk]["espera_ida"]) == (
+        ida.pk,
+        True,
+    )
+
+    Servicio.objects.filter(pk=ida.pk).update(estado=Estado.ENTREGADO.value)
+    servicios = {s["id"]: s for s in sesion.get(URL).json()["servicios"]}
+    assert ida.pk not in servicios  # entregada: sale de la lista
+    assert servicios[regreso.pk]["espera_ida"] is False
