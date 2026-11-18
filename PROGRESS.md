@@ -1412,6 +1412,38 @@ tiene botón de actualizar información".
   líneas: dice que está en la relación y no deja facturarla sola. Volver, facturar la relación con
   un número; abrir la línea: Facturada con ese número. Marcar la relación pagada.
 
+### 1a-18 · Alertas y tablero
+
+- **Alertas por umbral** (reglas en `nucleo/alertas.py`, umbrales de Configuración):
+  - Servicio sin asignar: inmediato, desde que pasan los minutos configurados (10) después de
+    registrada la solicitud; programado, desde las horas configuradas (2) antes de su hora (en un
+    regreso, la fecha de regreso). Un borrador no alerta.
+  - Recogido sin Entregado: desde las horas configuradas (4) después de marcar Recogido.
+  - Documento por vencer o vencido: según los días de anticipación de cada tipo, de grúas y
+    conductores activos.
+  - Conflicto de sincronización: ya la abría la sincronización desde la 1a-10; no cambia.
+- **Se cierran solas** cuando se atiende lo que las abrió (asignar, entregar, renovar el
+  documento); el tablero dice "Se cierra sola cuando se atiende" y no deja marcarlas resueltas a
+  mano. Una alerta no se repite mientras siga abierta (lo garantiza la base).
+- **Comando** `manage.py evaluar_alertas`: abre y cierra las alertas y dice cuántas. En producción
+  se programa cada minuto (1a-21). El tablero también las evalúa al cargarse y se recarga solo cada
+  minuto, así que en local no hace falta correr nada.
+- **Tablero**: cada alerta lleva a su solicitud; la de documento, al documento (solo el
+  administrador, que es quien entra a Flota). El tablero hace 9 consultas fijas más por la
+  evaluación (siguen sin crecer con las filas; la prueba de la cota se subió de 20 a 29).
+- **Búsqueda de solicitudes**: además de lo que ya buscaba (cliente, teléfono, placa, VIN, número,
+  referencia), ahora busca por conductor, placa de la grúa, número de factura exacto y fecha
+  ("18/11/2026", "18/11" o "2026-11-18": registrada, programada o de regreso, en hora de Colombia).
+- Supuestos en `QUESTIONS.md` (se cierran solas, desde cuándo cuenta, vencido incluido, qué fecha).
+- Sin hacer (fase 1b): las alertas de sin "En camino", sin facturar y sin pagar; avisos por correo
+  y el horario nocturno.
+- Cómo probar (5 minutos): entrar como logística. Registrar una solicitud inmediata y no
+  asignarla. En Configuración (administrador) bajar "sin asignar" a 1 minuto; volver al inicio
+  y esperar un minuto (o recargar): aparece "Servicio sin asignar" con el enlace a la solicitud.
+  Asignarla: al recargar, la alerta ya no está. En Flota, registrar a una grúa un SOAT que venza
+  en 10 días: en el inicio aparece "Documento por vencer o vencido". Buscar arriba por el nombre
+  de un conductor, la placa de una grúa o una fecha como 18/11/2026.
+
 ## Escalamientos
 
 Ninguno todavía.

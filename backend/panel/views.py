@@ -3,6 +3,7 @@ from django.contrib.auth.views import LoginView
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
 
+from alertas.evaluacion import evaluar
 from alertas.models import Alerta
 from alertas.operaciones import resolver_alerta
 from panel.formularios import FormularioIngreso
@@ -30,14 +31,25 @@ def tablero(request):
     """Lo que requiere acción ahora, de forma visual: cifras del día, servicios por asignar (con su
     espera y para asignarlos ahí mismo), alertas para resolver, borradores y una tarjeta por
     conductor. Es también el inicio de logística y del administrador. Se recarga solo cada minuto
-    (HTMX). Vive en el panel porque junta solicitudes, flota y alertas."""
-    return render(request, "solicitudes/tablero.html", datos_del_tablero())
+    (HTMX). Vive en el panel porque junta solicitudes, flota y alertas.
+
+    Antes de mostrarse evalúa las alertas por umbral, para que estén al día aunque el comando
+    programado no haya corrido."""
+    evaluar()
+    datos = datos_del_tablero()
+    datos["es_administrador"] = tiene_rol(request.user, (ADMINISTRADOR,))
+    return render(request, "solicitudes/tablero.html", datos)
 
 
 @require_POST
 @requiere_rol(LOGISTICA, ADMINISTRADOR)
 def resolver_alerta_desde_tablero(request, pk):
     alerta = get_object_or_404(Alerta, pk=pk)
+    if alerta.se_cierra_sola:
+        messages.error(
+            request, "Esta alerta se cierra sola cuando se atiende lo que la abrió."
+        )
+        return redirect("inicio")
     resolver_alerta(alerta, por=request.user)
     messages.success(request, "Alerta marcada como resuelta.")
     return redirect("inicio")

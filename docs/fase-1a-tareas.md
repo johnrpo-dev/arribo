@@ -163,7 +163,7 @@ Toda tarea termina con `uv run pytest -q` y `uv run ruff check .` en verde, más
   implementación Excel/CSV. Registrar el número de factura.
   Verificar: prueba del contenido del archivo; abrir el Excel generado.
 
-- [ ] **1a-18 Alertas y tablero** (6 h). Depende de: 15, 16.
+- [x] **1a-18 Alertas y tablero** (6 h). Depende de: 15, 16.
   App `alertas`: comando que evalúa cuatro alertas (sin asignar, Recogido sin Entregado, documento por
   vencer, conflicto de sincronización) con los umbrales configurados. La pantalla principal muestra lo
   que requiere acción. Búsqueda por cliente, teléfono, placa, VIN, conductor, grúa, caso, factura y fecha.

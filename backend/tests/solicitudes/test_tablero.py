@@ -129,9 +129,11 @@ def test_cada_conductor_muestra_su_ronda_sin_pendientes_ni_terminados(
 
 
 def test_el_tablero_no_hace_una_consulta_por_fila(client, logistica, cliente, crear_servicio, beto):
-    """Las consultas no crecen con las filas: las mismas con 2 que con 8 de cada cosa. 20 fijas:
+    """Las consultas no crecen con las filas: las mismas con 2 que con 8 de cada cosa. 29 fijas:
     sesión y usuario, configuración, disponibilidad de la flota con sus documentos, por asignar,
-    borradores, en curso, alertas y entregados de hoy."""
+    borradores, en curso, alertas y entregados de hoy (20), más la evaluación de las alertas por
+    umbral de la 1a-18 (9: alertas abiertas, por asignar, recogidos y documentos de grúas y
+    conductores)."""
 
     def crear(cantidad):
         for _ in range(cantidad):
@@ -151,7 +153,7 @@ def test_el_tablero_no_hace_una_consulta_por_fila(client, logistica, cliente, cr
     con_pocas = consultas_del_tablero()
     crear(6)
     assert consultas_del_tablero() == con_pocas
-    assert con_pocas <= 20
+    assert con_pocas <= 29
 
 
 # --- Tablero visual (1a-08e) -------------------------------------------------------------------

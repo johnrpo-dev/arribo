@@ -112,7 +112,7 @@
   <h2 class="titulo-seccion" id="t-alertas">Alertas sin resolver{% if alertas %} ({{ alertas|length }}){% endif %}</h2>
   {% if alertas %}
   <ul class="tarjetas">
-    {% for alerta, solicitud_id in alertas %}
+    {% for item in alertas %}{% with alerta=item.alerta solicitud_id=item.solicitud_id documento=item.documento %}
     <li class="tarjeta tarjeta--urgente">
       <div class="tarjeta-encabezado">
         <span class="etiqueta etiqueta--urgente">{{ alerta.get_tipo_display }}</span>
@@ -121,12 +121,17 @@
       <p>{{ alerta.mensaje }}</p>
       <div class="acciones">
         {% if solicitud_id %}<a class="boton boton--secundario" href="{% url 'detalle_solicitud' solicitud_id %}">Ver solicitud {{ solicitud_id }}</a>{% endif %}
+        {% if documento and es_administrador %}<a class="boton boton--secundario" href="{% if documento.grua_id %}{% url 'documento_de_grua' documento.grua_id documento.tipo_id %}{% else %}{% url 'documento_de_conductor' documento.conductor_id documento.tipo_id %}{% endif %}">Ver documento</a>{% endif %}
+        {% if alerta.se_cierra_sola %}
+        <p class="ayuda">Se cierra sola cuando se atiende.</p>
+        {% else %}
         <form method="post" action="{% url 'resolver_alerta' alerta.pk %}">
           {% csrf_token %}
           <button type="submit" class="boton boton--secundario">Marcar resuelta</button>
         </form>
+        {% endif %}
       </div>
-    </li>
+    </li>{% endwith %}
     {% endfor %}
   </ul>
   {% else %}
