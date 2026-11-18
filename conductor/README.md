@@ -43,6 +43,10 @@ flutter run --dart-define=ARRIBO_API=http://127.0.0.1:8000        # valor por de
 flutter build apk --release --dart-define=ARRIBO_API=https://<dominio>   # 1a-21
 ```
 
+Para repartir la app a los conductores no se usa ese comando a mano sino `compilar-apk.ps1`, que
+exige la llave de firma (`crear-llave.ps1`, una sola vez) y comprueba el servidor antes de compilar.
+Ver `docs/despliegue.md`, sección 4.
+
 La pantalla de ingreso muestra abajo, en letra pequeña, a qué servidor apunta.
 
 En desarrollo, el celular llega al backend del PC por el cable USB. `adb` no está en el PATH; está en

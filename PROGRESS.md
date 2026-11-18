@@ -1513,6 +1513,54 @@ tiene botón de actualizar información".
   4. Correr `uv run python manage.py demo_borrar` y escribir «si». El tablero vuelve a como estaba.
   5. Para probar la app con un conductor de demo, ponerle un PIN desde Flota y personal.
 
+### 1a-21 · Despliegue y APK (preparado; falta el servidor del dueño)
+
+- **Servidor con Docker Compose** (`despliegue/`):
+  - Caddy pone el HTTPS (certificado automático, http redirige a https) y entrega los estáticos.
+  - `web`: Django con gunicorn; al arrancar aplica las migraciones y junta los estáticos.
+  - `tareas`: corre cada minuto `evaluar_alertas` y `enviar_notificaciones_pendientes`.
+  - `db`: PostgreSQL 18.
+  - `respaldo`: copia diaria de la base en el servidor; se guardan 14.
+  - Las fotos y documentos quedan en un volumen que sobrevive a los despliegues.
+  - La cuenta de servicio de Firebase se monta desde una carpeta del servidor, fuera del
+    repositorio y de la imagen.
+- **Desplegar** es `./desplegar.sh` en el VPS: trae `main`, reconstruye, levanta y termina
+  comprobando `https://DOMINIO/salud/`. La guía paso a paso (VPS, dominio, Docker, `.env`,
+  administrador, APK) está en `docs/despliegue.md`.
+- **Producción en `settings.py`** (con `ARRIBO_DEBUG=0`):
+  - Cookies solo por HTTPS, HSTS de un día y orígenes de formularios desde el dominio.
+  - No arranca sin dominio ni clave secreta.
+  - Registro a la consola.
+  - Carpetas de fotos y estáticos configurables.
+  - `manage.py check --deploy` pasa sin advertencias.
+  - Se silenciaron tres avisos con su motivo: HSTS sin subdominios ni precarga, y la redirección a
+    https, que hace Caddy.
+- **Dependencia nueva: `gunicorn`.** Es el servidor de aplicaciones de Python estándar y pequeño,
+  sin dependencias propias. `runserver` no sirve para producción.
+- **APK firmado:**
+  - `conductor/crear-llave.ps1` crea la llave una sola vez. Deja el `.jks` en `Documentos\arribo`
+    y escribe `android/key.properties`; ninguno de los dos se sube.
+  - `conductor/compilar-apk.ps1 -Servidor https://DOMINIO` exige HTTPS, la llave y el
+    `google-services.json`, y comprueba que el servidor responda antes de compilar.
+  - Gradle firma con esa llave si existe; si no, con la de depuración, que sirve para pruebas.
+- **Pruebas:** `tests/test_despliegue.py` (21) comprueba:
+  - que `check --deploy` pasa y que los ajustes de producción quedan como se espera;
+  - que producción no arranca sin dominio o sin clave;
+  - que los scripts llaman comandos que existen;
+  - que `.env`, llaves, `google-services.json` y respaldos quedan fuera del repositorio, y `.env`
+    fuera de la imagen;
+  - que los scripts del servidor van con fin de línea Unix.
+
+  Docker no corre en este PC (regla del proyecto), así que la imagen no se construyó aquí. El
+  primer `./desplegar.sh` en el VPS es su prueba real.
+- **Sin hacer:** el despliegue real y la prueba de la tarea (`/salud/` en el dominio y el APK
+  instalado iniciando sesión). Para eso el dueño necesita contratar el VPS y el dominio
+  (`docs/despliegue.md`, pasos 1 a 5).
+- **Cómo probar (cuando haya VPS):**
+  1. Seguir `docs/despliegue.md`.
+  2. Abrir `https://DOMINIO/salud/`.
+  3. Compilar el APK con `compilar-apk.ps1`, instalarlo e ingresar con un conductor.
+
 ## Escalamientos
 
 Ninguno todavía.

@@ -1,0 +1,4 @@
+# Los scripts que corren en el servidor (Linux) van siempre con fin de línea LF.
+*.sh text eol=lf
+despliegue/Caddyfile text eol=lf
+despliegue/Dockerfile text eol=lf

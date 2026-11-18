@@ -193,6 +193,8 @@ Toda tarea termina con `uv run pytest -q` y `uv run ruff check .` en verde, más
   Requiere que el dueño contrate el VPS y el dominio. Docker Compose, HTTPS, APK firmado apuntando al servidor.
   Documentar el comando de despliegue en `CLAUDE.md`.
   Verificar: `/salud/` responde en el dominio; el APK instalado inicia sesión.
+  Estado (18/11/2026): preparado y probado lo que se puede sin servidor (`despliegue/`,
+  `docs/despliegue.md`, firma del APK). Falta el VPS y el dominio del dueño para desplegar y verificar.
 
 - [ ] **1a-22 Ensayo** (semanas 10 y 11). Depende de: 21.
   Checklist completo de `docs/prueba-sin-senal.md` en carretera y ensayo de la demo de principio a fin.

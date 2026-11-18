@@ -1,0 +1,19 @@
+# Caddy recibe el tráfico de internet, saca y renueva solo el certificado HTTPS (Let's Encrypt),
+# redirige http a https, entrega los estáticos y pasa lo demás al servidor de Arribo.
+{$ARRIBO_DOMINIO} {
+	encode gzip
+
+	# Las fotos llegan de a una (unos cientos de KB) y los documentos pesan pocos MB.
+	request_body {
+		max_size 25MB
+	}
+
+	handle_path /static/* {
+		root * /srv/estaticos
+		file_server
+	}
+
+	handle {
+		reverse_proxy web:8000
+	}
+}

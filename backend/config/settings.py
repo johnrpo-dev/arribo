@@ -110,7 +110,37 @@ LOGIN_REDIRECT_URL = "inicio"
 LOGOUT_REDIRECT_URL = "ingresar"
 
 STATIC_URL = "static/"
-# Fotos de evidencia en el disco del servidor durante la fase 1a (fuera del repositorio).
+# `collectstatic` deja aquí los estáticos; en el servidor los entrega Caddy (despliegue/Caddyfile).
+STATIC_ROOT = Path(os.environ.get("ARRIBO_STATIC_ROOT", "") or BASE_DIR / "estaticos")
+# Fotos de evidencia y documentos en el disco del servidor durante la fase 1a (fuera del
+# repositorio). En el servidor es un volumen de Docker que sobrevive a cada despliegue.
 MEDIA_URL = "media/"
-MEDIA_ROOT = BASE_DIR / "media"
+MEDIA_ROOT = Path(os.environ.get("ARRIBO_MEDIA_ROOT", "") or BASE_DIR / "media")
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
+# --- Producción (ARRIBO_DEBUG=0, tarea 1a-21) ---------------------------------------------------
+# El servidor queda detrás de Caddy, que recibe el HTTPS, renueva el certificado y redirige http a
+# https. Django confía en el encabezado que pone Caddy para saber que la petición vino cifrada.
+if not DEBUG:
+    if not ALLOWED_HOSTS:
+        raise RuntimeError("Falta ARRIBO_ALLOWED_HOSTS en producción (el dominio del panel)")
+    SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+    CSRF_TRUSTED_ORIGINS = [f"https://{host}" for host in ALLOWED_HOSTS]
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+    # La redirección a https la hace Caddy; en Django chocaría con la comprobación interna de
+    # /salud/ que hace Docker por http dentro del servidor.
+    SECURE_SSL_REDIRECT = False
+    # W005 y W021: HSTS solo para este dominio, sin subdominios ni lista de precarga, para no atar
+    # a https otros sitios que el dueño tenga en el mismo dominio.
+    SILENCED_SYSTEM_CHECKS = ["security.W008", "security.W005", "security.W021"]
+    # Un día al principio: si el dominio cambia, el navegador no queda atado un año a https.
+    SECURE_HSTS_SECONDS = int(os.environ.get("ARRIBO_HSTS_SEGUNDOS", "86400"))
+    SECURE_CONTENT_TYPE_NOSNIFF = True
+    # Registro a la salida estándar: Docker lo guarda (`docker compose logs web`).
+    LOGGING = {
+        "version": 1,
+        "disable_existing_loggers": False,
+        "handlers": {"consola": {"class": "logging.StreamHandler"}},
+        "root": {"handlers": ["consola"], "level": "INFO"},
+    }
