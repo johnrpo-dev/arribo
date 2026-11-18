@@ -58,7 +58,10 @@ flutter run                              # correr en el celular conectado
 flutter build apk --release              # APK para instalar
 ```
 
-Datos ficticios (tarea 1a-20): `manage.py demo_cargar` y `manage.py demo_borrar`.
+Datos ficticios (`backend/panel/demo.py`): `uv run python manage.py demo_cargar` carga la demo
+(marcada con `es_demo`; nombres con «(demo)»); `uv run python manage.py demo_borrar` la quita sin
+tocar datos reales (pide «si»; `--noinput` para no preguntar). Nunca contra la base real con datos
+del cliente sin que el dueño lo pida.
 Despliegue (tarea 1a-21): todavía no existe; al crearlo, documentar aquí el comando exacto.
 
 ## Antes de dar una tarea por terminada

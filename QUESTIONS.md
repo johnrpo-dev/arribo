@@ -7,6 +7,14 @@ Formato: fecha, tarea, pregunta, qué se asumió mientras tanto (si se asumió a
 
 ## Abiertas
 
+- **2026-11-18, 1a-20. ¿Quién figura como autor de lo que hace la demo?** Asumido: las
+  asignaciones, la cancelación y los cobros de la demo quedan sin usuario del panel (como los
+  cierres del sistema), y sus documentos los registra el usuario del primer conductor de demo. Así
+  `demo_borrar` no toca ningún usuario real. Alternativa: un usuario de oficina propio de la demo.
+- **2026-11-18, 1a-20. ¿Qué PIN tienen los conductores de demo?** Asumido: uno al azar que no se
+  muestra (un PIN conocido sería una credencial escrita en el código). Para probar la app con un
+  conductor de demo, se le pone un PIN desde Flota y personal.
+
 - **2026-11-18, 1a-19. ¿Qué son los "servicios del día" en el panel del dueño?** Asumido: los de
   solicitudes abiertas cuya fecha cae en el día (o el periodo elegido), en hora de Colombia: la
   hora programada (en un regreso, la fecha de regreso) o, si es inmediato, el día en que se

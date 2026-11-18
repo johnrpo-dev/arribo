@@ -1468,6 +1468,51 @@ tiene botón de actualizar información".
   Comparar el total por cobrar de un pagador con la sección Cobros. Elegir el periodo del mes y
   tocar Ver.
 
+### 1a-20 · Datos ficticios
+
+- **`manage.py demo_cargar`** (desde `backend/`) carga una operación de muestra:
+  - Flota: 3 grúas (DEMO01 a DEMO03) y 3 conductores (Carlos, Diana y Esteban), cada uno con su
+    grúa y su usuario para la app.
+  - Clientes: un concesionario con tarifa de traslado ($ 180.000), contacto y teléfono; una
+    aseguradora; y un particular.
+  - Servicios en los siete estados. Hay un evento de concesionario con regreso, un borrador y una
+    llamada no concretada.
+  - Líneas de cobro en cuatro estados: sin valor, por facturar, facturado (DEMO-0001) y pagado
+    (DEMO-0002).
+  - Documentos: un SOAT por vencer, una tecnomecánica vencida (Diana queda bloqueada) y los demás
+    vigentes.
+  - Alertas activas: un servicio sin asignar, uno Recogido sin Entregado, un conflicto de
+    sincronización y dos de documentos.
+  - Los nombres de clientes y conductores terminan en «(demo)», y las placas de vehículos
+    empiezan por DMO.
+- **Se carga con las operaciones reales.** Asignar, los toques del conductor en la app, facturar,
+  pagar y registrar documentos se hacen como en la operación, con horas en el pasado relativas a
+  los umbrales de la configuración. Quedan eventos, historial, líneas y alertas como en el uso
+  real.
+- **No se carga dos veces.** Tampoco se carga si una placa, un celular o un teléfono de la demo
+  ya existe en datos reales; en ese caso no carga nada y dice cuál choca.
+- **`manage.py demo_borrar`** pide escribir «si» antes de borrar (o se corre con `--noinput`).
+  - Borra lo marcado como demo y lo que cuelga de ello, en una transacción. Eso incluye eventos,
+    historial de cobro, alertas, asignaciones y el usuario de cada conductor de demo.
+  - Es la única excepción a "nada se borra": los eventos y el historial de la demo nunca fueron
+    reales.
+  - Si un dato real usa algo de la demo, no borra nada y dice qué lo impide. Ejemplos: una
+    solicitud real con un cliente de demo, o un servicio real asignado a un conductor de demo.
+- **Verificación.**
+  - `tests/panel/test_demo.py` (12 pruebas) toma una foto de todas las filas y valores de las
+    tablas, carga y borra la demo, y comprueba que la base queda idéntica.
+  - En la base del recorrido (234 filas reales) se cargó y se borró la demo, y la base quedó
+    idéntica.
+  - El código está en `backend/panel/demo.py`.
+- Supuestos en `QUESTIONS.md`: quién figura en lo que hace la demo, y el PIN de sus conductores.
+- **Cómo probar (5 minutos).** Hacerlo en una copia de la base o antes de cargar datos reales.
+  1. Correr `uv run python manage.py demo_cargar`.
+  2. Abrir el tablero: hay pendientes, conductores con servicios, Diana bloqueada por documento
+     vencido y alertas.
+  3. Abrir Panel del dueño y Cobros: aparecen los clientes «(demo)».
+  4. Correr `uv run python manage.py demo_borrar` y escribir «si». El tablero vuelve a como estaba.
+  5. Para probar la app con un conductor de demo, ponerle un PIN desde Flota y personal.
+
 ## Escalamientos
 
 Ninguno todavía.

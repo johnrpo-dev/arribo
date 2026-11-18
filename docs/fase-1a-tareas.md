@@ -184,7 +184,7 @@ Toda tarea termina con `uv run pytest -q` y `uv run ruff check .` en verde, más
 
 ## Cierre
 
-- [ ] **1a-20 Datos ficticios** (3 h). Depende de: 19.
+- [x] **1a-20 Datos ficticios** (3 h). Depende de: 19.
   `demo_cargar` y `demo_borrar`: grúas, conductores, clientes (uno con tarifa), servicios en todos los
   estados, alertas activas, documentos por vencer. Marcados para borrarse sin tocar datos reales.
   Verificar: prueba de que `demo_borrar` deja intactos los registros reales.
