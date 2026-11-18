@@ -16,6 +16,7 @@ from django.utils import timezone
 
 from flota.models import Conductor, Grua
 from nucleo import documentos as regla
+from nucleo.alertas import documento_alerta
 from nucleo.documentos import EstadoDocumento
 
 from .models import AplicaA, Documento, TipoDocumento
@@ -163,6 +164,25 @@ def documentos_por_vencer(fecha: date) -> list[EstadoDeTipo]:
                     avisos.append(estado)
     return sorted(
         avisos, key=lambda e: (e.documento.como_nucleo().ultimo_dia_valido, e.descripcion)
+    )
+
+
+def por_vencer_o_vencidos(fecha: date) -> list[EstadoDeTipo]:
+    """Documentos de grúas y conductores activos que requieren atención en el día `fecha`: los
+    por vencer (como `documentos_por_vencer`) y además los vencidos, el más urgente primero. La
+    regla es `nucleo.alertas.documento_alerta`; la usan la alerta y el panel del dueño (1a-18, 1a-19)."""
+    atender = []
+    for aplica_a, sujetos in (
+        (AplicaA.GRUA, Grua.objects.filter(activa=True)),
+        (AplicaA.CONDUCTOR, Conductor.objects.filter(activo=True)),
+    ):
+        for estados in estados_por_sujeto(aplica_a, sujetos, fecha).values():
+            for estado in estados:
+                documento = estado.documento.como_nucleo() if estado.documento else None
+                if documento_alerta(documento, fecha, estado.tipo.dias_anticipacion):
+                    atender.append(estado)
+    return sorted(
+        atender, key=lambda e: (e.documento.como_nucleo().ultimo_dia_valido, e.descripcion)
     )
 
 

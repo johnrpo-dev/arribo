@@ -53,14 +53,22 @@ def test_el_403_ofrece_salir_y_volver_al_inicio(client, crear_usuario):
     assert "Volver al inicio" in html
 
 
-def test_seccion_sin_pantalla_dice_aun_no_disponible_en_su_url_directa(client, crear_usuario):
-    client.force_login(crear_usuario("administrador"))
-    respuesta = client.get("/dueno/")
-    assert respuesta.status_code == 200
+def test_seccion_sin_pantalla_dice_aun_no_disponible(rf, crear_usuario, monkeypatch):
+    """Todas las secciones tienen pantalla desde la 1a-19; la vista genérica sigue para la próxima
+    que se registre sin pantalla."""
+    from panel import views
+    from panel.secciones import Seccion
+
+    monkeypatch.setattr(
+        views, "SECCIONES", (Seccion("futura", "Sección futura", "futura/", ("administrador",)),)
+    )
+    peticion = rf.get("/futura/")
+    peticion.user = crear_usuario("administrador")
+    respuesta = views.no_disponible(peticion, "futura")
     html = respuesta.content.decode()
-    assert "<h1 class=\"titulo-pagina\">Panel del dueño</h1>" in html
+    assert respuesta.status_code == 200
+    assert '<h1 class="titulo-pagina">Sección futura</h1>' in html
     assert "Aún no disponible" in html
-    assert 'href="/dueno/"' not in html  # no está en el menú mientras no tenga pantalla
 
 
 def test_inicio_saluda_por_nombre(client, crear_usuario):
@@ -80,7 +88,7 @@ def test_el_inicio_de_facturacion_lleva_a_cobros(client, crear_usuario):
     client.force_login(crear_usuario("facturacion"))
     html = client.get("/").content.decode()
     assert 'href="/cobros/"' in html
-    assert 'href="/dueno/"' not in html  # sección aún no disponible
+    assert 'href="/dueno/"' not in html  # el panel del dueño es solo del administrador
     assert "Aún no disponible" not in html
 
 

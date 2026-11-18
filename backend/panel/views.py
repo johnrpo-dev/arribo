@@ -1,12 +1,14 @@
 from django.contrib import messages
 from django.contrib.auth.views import LoginView
 from django.shortcuts import get_object_or_404, redirect, render
+from django.utils import timezone
 from django.views.decorators.http import require_POST
 
 from alertas.evaluacion import evaluar
 from alertas.models import Alerta
 from alertas.operaciones import resolver_alerta
-from panel.formularios import FormularioIngreso
+from panel.dueno import datos_del_panel
+from panel.formularios import FormularioIngreso, FormularioPeriodo
 from panel.roles import ADMINISTRADOR, LOGISTICA, ROLES_DEL_PANEL, requiere_rol, tiene_rol
 from panel.secciones import SECCIONES, secciones_para
 from panel.tablero import datos_del_tablero
@@ -53,6 +55,23 @@ def resolver_alerta_desde_tablero(request, pk):
     resolver_alerta(alerta, por=request.user)
     messages.success(request, "Alerta marcada como resuelta.")
     return redirect("inicio")
+
+
+def panel_dueno(request):
+    """Panel del dueño: servicios del periodo por estado, no concretadas por motivo, lo pendiente
+    de cobro por pagador y los documentos por vencer. El periodo, por defecto, es hoy. Muestra
+    valores: es solo para el administrador, que siempre los ve."""
+    hoy = timezone.localdate()
+    formulario = FormularioPeriodo(
+        request.GET if "desde" in request.GET else None, initial={"desde": hoy, "hasta": hoy}
+    )
+    desde = hasta = hoy
+    if formulario.is_bound and formulario.is_valid():
+        desde, hasta = formulario.cleaned_data["desde"], formulario.cleaned_data["hasta"]
+    datos = datos_del_panel(desde, hasta, hoy)
+    datos["formulario"] = formulario
+    datos["es_hoy"] = desde == hasta == hoy
+    return render(request, "panel/dueno.html", datos)
 
 
 def no_disponible(request, clave):

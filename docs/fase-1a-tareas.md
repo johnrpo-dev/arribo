@@ -178,7 +178,7 @@ Toda tarea termina con `uv run pytest -q` y `uv run ruff check .` en verde, más
   referencia. Falta lo de esta tarea: el comando con umbrales, las alertas nuevas, resolver alertas
   desde el panel y buscar por conductor, grúa, factura y fecha.
 
-- [ ] **1a-19 Panel del dueño mínimo** (3 h). Depende de: 18.
+- [x] **1a-19 Panel del dueño mínimo** (3 h). Depende de: 18.
   Servicios del día por estado, no concretadas por motivo, cobros pendientes por pagador, documentos por vencer.
   Verificar: pruebas de los totales con datos conocidos.
 
