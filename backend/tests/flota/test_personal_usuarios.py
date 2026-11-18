@@ -47,11 +47,18 @@ def navegacion(cliente):
     ("rol", "secciones"),
     [
         ("logistica", ["Tablero", "Nueva solicitud", "Solicitudes"]),
-        # Cobros y Panel del dueño no salen en el menú hasta tener pantalla (1a-08c).
-        ("facturacion", []),
+        # El Panel del dueño no sale en el menú hasta tener pantalla (1a-08c).
+        ("facturacion", ["Cobros"]),
         (
             "administrador",
-            ["Tablero", "Nueva solicitud", "Solicitudes", "Flota y personal", "Configuración"],
+            [
+                "Tablero",
+                "Nueva solicitud",
+                "Solicitudes",
+                "Cobros",
+                "Flota y personal",
+                "Configuración",
+            ],
         ),
     ],
 )

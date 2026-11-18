@@ -1349,6 +1349,41 @@ tiene botón de actualizar información".
   completa. Cerrar sesión y pegar la dirección de la foto: pide ingresar. Hacer un servicio nuevo
   desde el celular y mirar `backend/media/evidencias/`: queda en `solicitud-N/servicio-N/`.
 
+### 1a-16b · Cobro en el panel
+
+- **Sección Cobros** (facturación y administrador; ya aparece en el menú). Pestañas con su cuenta:
+  Pendientes (sin valor y por facturar, la más antigua primero), Sin valor, Por facturar, Facturadas
+  sin pagar, Pagadas, Todas y Cancelados. Búsqueda por pagador, placa o VIN, N.º de servicio o de
+  solicitud y número de factura.
+- **Página de cada línea**: pagador, valor, factura y el servicio (tipo, ida o regreso, vehículo,
+  trayecto, conductor y grúa, hora de entrega). Debajo, solo lo que se puede hacer en su estado:
+  digitar o ajustar el valor, facturar con número, marcar pagada, o anular la factura con motivo.
+  El historial muestra quién, cuándo, el valor anterior y el nuevo, la factura y el motivo.
+- **Tarifa propuesta**: si la línea está sin valor y el pagador tiene tarifa vigente para ese tipo
+  de servicio, la página la muestra y la deja escrita en el campo; se guarda solo al tocar "Guardar
+  valor". (Si la tarifa ya existía al entregar, la línea nace por facturar con ese valor, desde 1a-16a.)
+- **Valores escritos a mano** (`nucleo.cobro.leer_pesos` y `formato_pesos`): acepta "180000",
+  "180.000", "$ 180.000" y "180.000,50"; muestra "$ 180.000". Siempre `Decimal`.
+- **Quién ve valores** (Configuración, por defecto administrador y facturación): a quien no los ve
+  no se le muestran en ninguna pantalla, no se le propone la tarifa y no puede cambiar el valor (403).
+  Sí puede facturar, marcar pagada y anular, que no muestran ni cambian el valor. *Decidido así
+  porque no estaba escrito; si prefiere que tampoco facture, es un cambio pequeño.*
+- **Detalle de la solicitud**: columna "Cobro" con el estado de cobro de cada servicio; el valor solo
+  si el rol lo ve; y el enlace a la línea solo si el rol entra a Cobros. Con la configuración por
+  defecto, logística ve "Por facturar" pero no el valor.
+- **Cancelados**: los servicios cancelados después de asignarse (la grúa pudo salir) aparecen en su
+  pestaña con el motivo de la cancelación y el botón "Marcar cobrable", que crea su línea. Los que
+  nunca tuvieron conductor no aparecen.
+- Recorrido hecho con las vistas reales en la base del recorrido: tarifa propuesta, digitar, valor
+  mal escrito rechazado, ajustar, facturar, cambiar el valor ya facturado (rechazado), anular con
+  motivo, pagar; logística ve el estado sin el valor y no entra a Cobros.
+- Sin hacer (son de la 1a-17): relación de cobro por pagador y fechas, exportar a Excel o CSV.
+  Dos pagadores por servicio es de la fase 1b.
+- Cómo probar (5 minutos): entrar como administrador o con un usuario de facturación, abrir Cobros.
+  Abrir una línea sin valor, escribir 180.000 y guardar; facturar con un número; marcar pagada. En
+  otra, facturar y luego anular con motivo: vuelve a por facturar y el historial lo dice. Entrar con
+  un usuario de logística y abrir la solicitud: la columna Cobro dice el estado, sin valor.
+
 ## Escalamientos
 
 Ninguno todavía.

@@ -13,6 +13,7 @@ from cobros import operaciones
 from cobros.models import LineaCobro
 from nucleo.estados import Estado
 from nucleo.tipos import TipoServicio
+from tests.panel.conftest import crear_usuario  # noqa: F401
 
 VALOR = Decimal(180000)
 

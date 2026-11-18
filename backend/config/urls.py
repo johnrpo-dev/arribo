@@ -16,4 +16,5 @@ urlpatterns = [
     path("", include("solicitudes.urls")),
     path("", include("documentos.urls")),
     path("", include("flota.urls")),
+    path("", include("cobros.urls")),
 ]

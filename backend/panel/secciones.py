@@ -45,7 +45,13 @@ SECCIONES = (
         (LOGISTICA, ADMINISTRADOR),
         vista="solicitudes.views.lista",
     ),
-    Seccion("cobros", "Cobros", "cobros/", (FACTURACION, ADMINISTRADOR)),
+    Seccion(
+        "cobros",
+        "Cobros",
+        "cobros/",
+        (FACTURACION, ADMINISTRADOR),
+        vista="cobros.views.lista",
+    ),
     Seccion(
         "flota",
         "Flota y personal",

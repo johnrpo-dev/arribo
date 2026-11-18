@@ -1,0 +1,98 @@
+{% extends "base.html" %}
+{% block titulo %}Cobro del servicio {{ servicio.pk }}{% endblock %}
+{% block contenido %}
+<p class="texto-secundario"><a href="{% url 'cobros' %}">← Cobros</a></p>
+<div class="cabecera-pagina">
+  <h1 class="titulo-pagina">Cobro del servicio N.º {{ servicio.pk }}</h1>
+  <span class="cobro cobro--{{ linea.estado }} cobro--grande">{{ linea.estado_etiqueta }}</span>
+</div>
+
+<div class="cobro-resumen">
+  <div class="tabla-contenedor">
+    <table class="tabla">
+      <tbody>
+        <tr><th scope="row">Pagador</th><td><strong>{{ linea.pagador.nombre }}</strong></td></tr>
+        {% if ve_valores %}<tr><th scope="row">Valor</th><td class="cobro-valor">{{ valor }}</td></tr>{% endif %}
+        <tr><th scope="row">Factura</th><td>{{ linea.numero_factura|default:"—" }}</td></tr>
+        <tr><th scope="row">Servicio</th><td>{{ solicitud.get_tipo_display }} · solicitud {{ solicitud.pk }} · {% if es_regreso %}<span class="etiqueta etiqueta--regreso">Regreso del N.º {{ servicio.regreso_de_id }}</span>{% else %}<span class="etiqueta etiqueta--ida">Ida</span>{% endif %}</td></tr>
+        <tr><th scope="row">Pidió</th><td>{{ solicitud.solicitante.nombre }}</td></tr>
+        <tr><th scope="row">Vehículo</th><td>{{ servicio.vehiculo }}{% if servicio.vehiculo.color %} {{ servicio.vehiculo.color }}{% endif %}</td></tr>
+        <tr><th scope="row">Trayecto</th><td>{{ recoger }} → {{ entregar }}</td></tr>
+        <tr><th scope="row">Conductor</th><td>{% if servicio.conductor %}{{ servicio.conductor }}{% if servicio.grua %} (grúa {{ servicio.grua.placa }}){% endif %}{% else %}—{% endif %}</td></tr>
+        <tr><th scope="row">{% if servicio.estado == "cancelado" %}Cancelado{% else %}Entregado{% endif %}</th><td>{% if entregado_en %}<time datetime="{{ entregado_en|date:'c' }}">{{ entregado_en|date:"d/m/Y H:i" }}</time>{% else %}<span class="estado estado--{{ servicio.estado }}">{{ servicio.get_estado_display }}</span>{% endif %}</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% if puede_fijar_valor or puede_facturar or puede_pagar %}
+<section class="bloque" aria-labelledby="t-acciones">
+  <h2 class="titulo-seccion" id="t-acciones">Qué sigue</h2>
+  <div class="cobro-acciones">
+    {% if puede_fijar_valor %}
+    <form method="post" action="{% url 'fijar_valor_cobro' linea.pk %}" class="tarjeta">
+      {% csrf_token %}
+      <h3 class="tarjeta-titulo">{% if linea.estado == "sin_valor" %}Digitar el valor{% else %}Ajustar el valor{% endif %}</h3>
+      {% if tarifa %}<p class="aviso-tarifa">Tarifa vigente de {{ linea.pagador.nombre }} para {{ solicitud.get_tipo_display|lower }}: <strong>{{ tarifa }}</strong>. Ya está en el campo; se puede ajustar.</p>{% endif %}
+      {% include "parciales/campo.html" with campo=formulario_valor.valor %}
+      <button type="submit" class="boton boton--principal">Guardar valor</button>
+      <p class="ayuda">Queda en el historial quién lo cambió, cuándo y el valor anterior. Después de facturar ya no cambia.</p>
+    </form>
+    {% endif %}
+    {% if puede_facturar %}
+    <form method="post" action="{% url 'facturar_cobro' linea.pk %}" class="tarjeta">
+      {% csrf_token %}
+      <h3 class="tarjeta-titulo">Facturar</h3>
+      {% include "parciales/campo.html" with campo=formulario_factura.numero_factura %}
+      <button type="submit" class="boton boton--principal">Marcar facturada</button>
+    </form>
+    {% endif %}
+    {% if puede_pagar %}
+    <form method="post" action="{% url 'pagar_cobro' linea.pk %}" class="tarjeta">
+      {% csrf_token %}
+      <h3 class="tarjeta-titulo">Pago</h3>
+      <p>Factura {{ linea.numero_factura }}.</p>
+      <button type="submit" class="boton boton--principal">Marcar pagada</button>
+    </form>
+    <form method="post" action="{% url 'anular_factura_cobro' linea.pk %}" class="tarjeta">
+      {% csrf_token %}
+      <h3 class="tarjeta-titulo">Anular la factura</h3>
+      <p class="ayuda">La línea vuelve a por facturar y el número anulado queda en el historial.</p>
+      {% include "parciales/campo.html" with campo=formulario_anulacion.motivo %}
+      <button type="submit" class="boton boton--peligro">Anular factura</button>
+    </form>
+    {% endif %}
+  </div>
+</section>
+{% endif %}
+
+<section class="bloque" aria-labelledby="t-historial">
+  <h2 class="titulo-seccion" id="t-historial">Historial</h2>
+  <div class="tabla-contenedor">
+    <table class="tabla">
+      <thead>
+        <tr>
+          <th scope="col">Cuándo</th>
+          <th scope="col">Qué</th>
+          {% if ve_valores %}<th scope="col">Valor</th>{% endif %}
+          <th scope="col">Factura</th>
+          <th scope="col">Motivo</th>
+          <th scope="col">Quién</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for registro, anterior, nuevo in historial %}
+        <tr>
+          <td><time datetime="{{ registro.fecha|date:'c' }}">{{ registro.fecha|date:"d/m/Y H:i" }}</time></td>
+          <td>{{ registro.get_accion_display }}</td>
+          {% if ve_valores %}<td>{% if registro.accion == "valor" %}<span class="dinero">{% if registro.valor_anterior is None %}sin valor{% else %}{{ anterior }}{% endif %}</span> → <span class="dinero">{{ nuevo }}</span>{% elif registro.valor_nuevo is not None %}{{ nuevo }}{% else %}—{% endif %}</td>{% endif %}
+          <td>{{ registro.numero_factura|default:"—" }}</td>
+          <td>{{ registro.motivo|default:"—" }}</td>
+          <td>{% if registro.usuario %}{{ registro.usuario.get_full_name|default:registro.usuario.get_username }}{% else %}<span class="texto-secundario">Sistema</span>{% endif %}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endblock %}
