@@ -105,10 +105,26 @@ def fijar_valor(linea, valor, *, actor) -> HistorialCobro:
     return registro
 
 
-def facturar(linea, numero_factura, *, actor) -> HistorialCobro:
-    """Por facturar → Facturado, con número de factura obligatorio (se guarda sin espacios)."""
+class LineaReservada(cobro.CobroInvalido):
+    """La línea está en una relación armada: se factura con la relación, no suelta."""
+
+
+def facturar(linea, numero_factura, *, actor, desde_relacion=False) -> HistorialCobro:
+    """Por facturar → Facturado, con número de factura obligatorio (se guarda sin espacios).
+
+    Una línea que está en una relación armada solo se factura con la relación
+    (`cobros/relaciones.py` llama con `desde_relacion=True`).
+    """
     with transaction.atomic():
         bloqueada = _bloquear_linea(linea)
+        if not desde_relacion:
+            reservada = bloqueada.inclusiones.filter(reservada=True).values_list(
+                "relacion_id", flat=True
+            ).first()
+            if reservada is not None:
+                raise LineaReservada(
+                    f"Está en la relación de cobro N.º {reservada}; facture la relación"
+                )
         nueva = cobro.facturar(bloqueada.como_nucleo(), numero_factura)
         registro = _guardar(
             bloqueada,

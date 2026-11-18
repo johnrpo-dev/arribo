@@ -1384,6 +1384,34 @@ tiene botón de actualizar información".
   otra, facturar y luego anular con motivo: vuelve a por facturar y el historial lo dice. Entrar con
   un usuario de logística y abrir la solicitud: la columna Cobro dice el estado, sin valor.
 
+### 1a-17 · Relación de cobro y exportación
+
+- **Relaciones de cobro** (botón en Cobros, para quien ve valores): se elige pagador y fechas; la
+  pantalla muestra qué líneas por facturar entran, con número de caso, fecha, vehículo y valor, el
+  total y las que quedan por fuera por no tener valor. "Armar la relación" la guarda.
+- **Reglas** (`nucleo/relacion.py`): entra la línea por facturar del pagador cuya fecha de servicio
+  está en el rango (extremos incluidos). Armada → Facturada (número obligatorio) → Pagada; una
+  armada se puede descartar con motivo, no se borra. Una relación sin líneas no se arma.
+- **Reserva**: mientras la relación está armada, sus líneas no entran en otra ni se facturan
+  sueltas (la página de la línea lleva a la relación). PostgreSQL impide que una línea esté reservada
+  en dos relaciones. Al facturar o descartar, la línea queda libre: si después le anulan la
+  factura, puede entrar en otra relación.
+- **Facturar la relación** factura cada línea con el mismo número y su historial (quién, cuándo).
+  **Marcarla pagada** marca pagadas las líneas que siguen con esa factura; si a alguna le anularon
+  la factura, la deja y lo avisa.
+- **Fecha del servicio**: la de Entregado (hora del celular si la mandó) en hora de Colombia. Un
+  servicio entregado a las 10 p. m. del 31 de octubre es de octubre aunque en UTC ya sea noviembre.
+- **Exportación** (`nucleo/exportacion.py`): una interfaz `Exportador` y una implementación,
+  `CsvGenerico`, elegida por `formato_exportacion` de la configuración. UTF-8 con BOM, punto y
+  coma, valores sin miles y con coma decimal (Excel los suma), fila de total. Un texto que empiece
+  con `=`, `+`, `-` o `@` va con apóstrofo para que Excel no lo ejecute como fórmula.
+- Supuestos anotados en `QUESTIONS.md` (fecha que cuenta, quién arma, columnas del archivo).
+- Cómo probar (5 minutos): entrar como administrador, abrir Cobros → Relaciones de cobro. Elegir
+  un pagador con líneas por facturar y las fechas; revisar la lista y el total; Armar. Descargar y
+  abrir el archivo en Excel: una fila por servicio, tildes bien y el total sumado. Abrir una de sus
+  líneas: dice que está en la relación y no deja facturarla sola. Volver, facturar la relación con
+  un número; abrir la línea: Facturada con ese número. Marcar la relación pagada.
+
 ## Escalamientos
 
 Ninguno todavía.

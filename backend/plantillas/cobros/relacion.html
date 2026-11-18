@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+{% block titulo %}Relación de cobro {{ relacion.pk }}{% endblock %}
+{% block contenido %}
+<p class="texto-secundario"><a href="{% url 'relaciones_cobro' %}">← Relaciones de cobro</a></p>
+<div class="cabecera-pagina">
+  <h1 class="titulo-pagina">Relación de cobro N.º {{ relacion.pk }}</h1>
+  <span class="cobro cobro--{{ relacion.estado }} cobro--grande">{{ relacion.estado_etiqueta }}</span>
+</div>
+
+<div class="tabla-contenedor">
+  <table class="tabla">
+    <tbody>
+      <tr><th scope="row">Pagador</th><td><strong>{{ relacion.pagador.nombre }}</strong>{% if relacion.pagador.documento %} · {{ relacion.pagador.documento }}{% endif %}</td></tr>
+      <tr><th scope="row">Fechas del servicio</th><td>{{ relacion.desde|date:"d/m/Y" }} – {{ relacion.hasta|date:"d/m/Y" }}</td></tr>
+      <tr><th scope="row">Total</th><td class="cobro-valor dinero">{{ total }}</td></tr>
+      <tr><th scope="row">Factura</th><td>{{ relacion.numero_factura|default:"—" }}</td></tr>
+      {% if relacion.motivo_descarte %}<tr><th scope="row">Motivo del descarte</th><td>{{ relacion.motivo_descarte }}</td></tr>{% endif %}
+      <tr><th scope="row">Armada</th><td>{{ relacion.creada_en|date:"d/m/Y H:i" }}{% if relacion.creada_por %} · {{ relacion.creada_por.get_full_name|default:relacion.creada_por.get_username }}{% endif %}</td></tr>
+      {% if relacion.cerrada_en %}<tr><th scope="row">{{ relacion.estado_etiqueta }}</th><td>{{ relacion.cerrada_en|date:"d/m/Y H:i" }}{% if relacion.cerrada_por %} · {{ relacion.cerrada_por.get_full_name|default:relacion.cerrada_por.get_username }}{% endif %}</td></tr>{% endif %}
+    </tbody>
+  </table>
+</div>
+
+<p><a class="boton" href="{% url 'descargar_relacion' relacion.pk %}" download>Descargar ({{ exportador.nombre }})</a></p>
+
+{% if puede_facturar or puede_pagar %}
+<section class="bloque" aria-labelledby="t-acciones">
+  <h2 class="titulo-seccion" id="t-acciones">Qué sigue</h2>
+  <div class="cobro-acciones">
+    {% if puede_facturar %}
+    <form method="post" action="{% url 'facturar_relacion' relacion.pk %}" class="tarjeta">
+      {% csrf_token %}
+      <h3 class="tarjeta-titulo">Facturar la relación</h3>
+      {% include "parciales/campo.html" with campo=formulario_factura.numero_factura %}
+      <button type="submit" class="boton boton--principal">Facturar todas las líneas</button>
+      <p class="ayuda">Cada línea queda facturada con este número, con su historial.</p>
+    </form>
+    <form method="post" action="{% url 'descartar_relacion' relacion.pk %}" class="tarjeta">
+      {% csrf_token %}
+      <h3 class="tarjeta-titulo">Descartar</h3>
+      <p class="ayuda">Si se armó mal. No se borra: queda con el motivo y sus líneas vuelven a estar libres.</p>
+      {% include "parciales/campo.html" with campo=formulario_descarte.motivo %}
+      <button type="submit" class="boton boton--peligro">Descartar la relación</button>
+    </form>
+    {% endif %}
+    {% if puede_pagar %}
+    <form method="post" action="{% url 'pagar_relacion' relacion.pk %}" class="tarjeta">
+      {% csrf_token %}
+      <h3 class="tarjeta-titulo">Pago</h3>
+      <p>Factura {{ relacion.numero_factura }}.</p>
+      <button type="submit" class="boton boton--principal">Marcar pagada</button>
+      <p class="ayuda">Marca pagadas las líneas que siguen con esta factura.</p>
+    </form>
+    {% endif %}
+  </div>
+</section>
+{% endif %}
+
+<section class="bloque" aria-labelledby="t-lineas">
+  <h2 class="titulo-seccion" id="t-lineas">Líneas</h2>
+  <div class="tabla-contenedor">
+    <table class="tabla">
+      <thead>
+        <tr>
+          <th scope="col">Servicio</th>
+          <th scope="col">Número de caso</th>
+          <th scope="col">Fecha</th>
+          <th scope="col">Vehículo</th>
+          <th scope="col">Tipo</th>
+          <th scope="col">Estado</th>
+          <th scope="col">Valor</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for linea, valor in lineas %}
+        <tr>
+          <td><a href="{% url 'linea_cobro' linea.pk %}">N.º {{ linea.servicio_id }}</a></td>
+          <td>{{ linea.servicio.referencia_externa|default:"—" }}</td>
+          <td>{{ linea.fecha_servicio|date:"d/m/Y" }}</td>
+          <td>{{ linea.servicio.vehiculo }}</td>
+          <td>{{ linea.servicio.solicitud.get_tipo_display }}</td>
+          <td><span class="cobro cobro--{{ linea.estado }}">{{ linea.estado_etiqueta }}</span>{% if linea.numero_factura and linea.numero_factura != relacion.numero_factura %} <span class="texto-secundario">({{ linea.numero_factura }})</span>{% endif %}</td>
+          <td class="dinero">{{ valor }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endblock %}

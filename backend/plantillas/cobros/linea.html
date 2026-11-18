@@ -25,6 +25,10 @@
   </div>
 </div>
 
+{% if en_relacion %}
+<p class="aviso">Esta línea está en la <a href="{% url 'relacion_cobro' en_relacion %}">relación de cobro N.º {{ en_relacion }}</a>: se factura desde la relación.</p>
+{% endif %}
+
 {% if puede_fijar_valor or puede_facturar or puede_pagar %}
 <section class="bloque" aria-labelledby="t-acciones">
   <h2 class="titulo-seccion" id="t-acciones">Qué sigue</h2>

@@ -37,3 +37,45 @@ class FormularioAnulacion(forms.Form):
         error_messages={"required": "Escriba por qué se anula la factura."},
         widget=forms.Textarea(attrs={"rows": 2}),
     )
+
+
+class FormularioRelacion(forms.Form):
+    """Pagador y rango de fechas para armar una relación. Las opciones de pagador son los clientes
+    con líneas por facturar libres; la vista las pasa."""
+
+    pagador = forms.ModelChoiceField(
+        label="Pagador",
+        queryset=None,
+        empty_label="Elija el pagador",
+        error_messages={"required": "Elija el pagador.", "invalid_choice": "Elija el pagador."},
+    )
+    desde = forms.DateField(
+        label="Desde",
+        widget=forms.DateInput(attrs={"type": "date"}, format="%Y-%m-%d"),
+        error_messages={"required": "Elija la fecha inicial.", "invalid": "Fecha no válida."},
+    )
+    hasta = forms.DateField(
+        label="Hasta",
+        widget=forms.DateInput(attrs={"type": "date"}, format="%Y-%m-%d"),
+        error_messages={"required": "Elija la fecha final.", "invalid": "Fecha no válida."},
+    )
+
+    def __init__(self, *args, pagadores, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["pagador"].queryset = pagadores
+
+    def clean(self):
+        datos = super().clean()
+        desde, hasta = datos.get("desde"), datos.get("hasta")
+        if desde and hasta and desde > hasta:
+            self.add_error("hasta", "La fecha final va después de la inicial.")
+        return datos
+
+
+class FormularioDescarte(forms.Form):
+    motivo = forms.CharField(
+        label="Motivo del descarte",
+        max_length=500,
+        error_messages={"required": "Escriba por qué se descarta la relación."},
+        widget=forms.Textarea(attrs={"rows": 2}),
+    )

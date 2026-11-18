@@ -7,23 +7,38 @@
 - Las vistas solo validan lo digitado y llaman a `cobros/operaciones.py`, que aplica
   `nucleo/cobro.py` y deja el historial.
 """
+from decimal import Decimal
+
 from django.contrib import messages
 from django.core.exceptions import PermissionDenied
 from django.core.paginator import Paginator
+from django.db.models import Count, Sum
+from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
+from django.utils import timezone
+from django.utils.text import slugify
 from django.views.decorators.http import require_POST
 
-from clientes.models import tarifa_propuesta
+from clientes.models import Cliente, tarifa_propuesta
 from configuracion.operaciones import puede_ver_valores
 from nucleo.cobro import CobroInvalido, EstadoCobro, formato_pesos
 from nucleo.estados import Estado
+from nucleo.relacion import EstadoRelacion
 from nucleo.trayecto import puntos_del_servicio
 from solicitudes.models import EventoEstado, Servicio
 
 from . import consultas, operaciones
-from .formularios import FormularioAnulacion, FormularioFactura, FormularioValor
-from .models import LineaCobro
+from . import relaciones as relaciones_op
+from .exportacion import exportador_configurado
+from .formularios import (
+    FormularioAnulacion,
+    FormularioDescarte,
+    FormularioFactura,
+    FormularioRelacion,
+    FormularioValor,
+)
+from .models import LineaCobro, RelacionCobro
 
 
 def lista(request):
@@ -85,6 +100,7 @@ def detalle(request, pk, formularios=None):
     inicial = {"valor": formato_pesos(propuesto).removeprefix("$ ")} if propuesto else {}
 
     historial = list(linea.historial.select_related("usuario"))
+    reserva = linea.inclusiones.filter(reservada=True).first()
     return render(
         request,
         "cobros/linea.html",
@@ -101,8 +117,9 @@ def detalle(request, pk, formularios=None):
             "tarifa": formato_pesos(tarifa) if tarifa else None,
             "puede_fijar_valor": ve_valores
             and estado in (EstadoCobro.SIN_VALOR, EstadoCobro.POR_FACTURAR),
-            "puede_facturar": estado == EstadoCobro.POR_FACTURAR,
+            "puede_facturar": estado == EstadoCobro.POR_FACTURAR and reserva is None,
             "puede_pagar": estado == EstadoCobro.FACTURADO,
+            "en_relacion": reserva.relacion_id if reserva else None,
             "formulario_valor": formularios.get("valor") or FormularioValor(initial=inicial),
             "formulario_factura": formularios.get("factura") or FormularioFactura(),
             "formulario_anulacion": formularios.get("anulacion") or FormularioAnulacion(),
@@ -211,3 +228,160 @@ def _entregado_en(servicio):
     if evento is None:
         return None
     return evento.hora_dispositivo or evento.hora_sincronizacion
+
+
+# --- Relaciones de cobro (1a-17) ---------------------------------------------------------------
+
+
+def _exigir_valores(request):
+    """Una relación es una cuenta de valores: quien no los ve no la arma ni la descarga."""
+    if not puede_ver_valores(request.user):
+        raise PermissionDenied("Su rol no ve los valores de cobro.")
+
+
+def _pagadores_con_pendientes():
+    """Clientes con alguna línea por facturar que no esté ya en una relación armada."""
+    libres = LineaCobro.objects.filter(estado=EstadoCobro.POR_FACTURAR.value).exclude(
+        inclusiones__reservada=True
+    )
+    return Cliente.objects.filter(pk__in=libres.values("pagador")).order_by("nombre")
+
+
+def relaciones(request, formulario=None):
+    """Relaciones armadas y facturadas, y el formulario para armar una nueva. Con pagador y fechas
+    elegidos (GET), muestra qué líneas entrarían antes de armarla."""
+    _exigir_valores(request)
+    hoy = timezone.localdate()
+    pagadores = _pagadores_con_pendientes()
+    if formulario is None:
+        datos = request.GET if "pagador" in request.GET else None
+        formulario = FormularioRelacion(
+            datos,
+            pagadores=pagadores,
+            initial={"desde": hoy.replace(day=1), "hasta": hoy},
+        )
+    vista_previa = None
+    if formulario.is_bound and formulario.is_valid():
+        d = formulario.cleaned_data
+        lineas = list(relaciones_op.candidatas(d["pagador"], d["desde"], d["hasta"]))
+        vista_previa = {
+            "lineas": [(linea, formato_pesos(linea.valor)) for linea in lineas],
+            "total": formato_pesos(sum((linea.valor for linea in lineas), Decimal(0))),
+            "sin_valor": list(relaciones_op.sin_valor(d["pagador"], d["desde"], d["hasta"])),
+            "datos": d,
+        }
+    lista = RelacionCobro.objects.select_related("pagador").annotate(
+        cuantas=Count("incluidas"), total=Sum("incluidas__linea__valor")
+    )[:50]
+    return render(
+        request,
+        "cobros/relaciones.html",
+        {
+            "formulario": formulario,
+            "hay_pagadores": pagadores.exists(),
+            "vista_previa": vista_previa,
+            "relaciones": [(r, formato_pesos(r.total)) for r in lista],
+        },
+    )
+
+
+@require_POST
+def armar_relacion(request):
+    _exigir_valores(request)
+    formulario = FormularioRelacion(request.POST, pagadores=_pagadores_con_pendientes())
+    if not formulario.is_valid():
+        return relaciones(request, formulario)
+    d = formulario.cleaned_data
+    try:
+        relacion = relaciones_op.armar(d["pagador"], d["desde"], d["hasta"], actor=request.user)
+    except CobroInvalido as error:
+        messages.error(request, f"No se armó: {error}.")
+        return redirect("relaciones_cobro")
+    messages.success(request, f"Relación N.º {relacion.pk} armada. Descárguela y envíela al pagador.")
+    return redirect("relacion_cobro", pk=relacion.pk)
+
+
+def ver_relacion(request, pk, formularios=None):
+    _exigir_valores(request)
+    relacion = get_object_or_404(
+        RelacionCobro.objects.select_related("pagador", "creada_por", "cerrada_por"), pk=pk
+    )
+    lineas = list(relaciones_op.lineas_de(relacion))
+    formularios = formularios or {}
+    estado = EstadoRelacion(relacion.estado)
+    return render(
+        request,
+        "cobros/relacion.html",
+        {
+            "relacion": relacion,
+            "lineas": [(linea, formato_pesos(linea.valor)) for linea in lineas],
+            "total": formato_pesos(sum((linea.valor or 0 for linea in lineas), Decimal(0))),
+            "exportador": exportador_configurado(),
+            "puede_facturar": estado == EstadoRelacion.ARMADA,
+            "puede_pagar": estado == EstadoRelacion.FACTURADA,
+            "formulario_factura": formularios.get("factura") or FormularioFactura(),
+            "formulario_descarte": formularios.get("descarte") or FormularioDescarte(),
+        },
+    )
+
+
+def descargar_relacion(request, pk):
+    _exigir_valores(request)
+    relacion = get_object_or_404(RelacionCobro.objects.select_related("pagador"), pk=pk)
+    exportador = exportador_configurado()
+    contenido = exportador.exportar(relaciones_op.datos_para_exportar(relacion))
+    nombre = f"relacion-{relacion.pk}-{slugify(relacion.pagador.nombre)}.{exportador.extension}"
+    respuesta = HttpResponse(contenido, content_type=exportador.tipo_contenido)
+    respuesta["Content-Disposition"] = f'attachment; filename="{nombre}"'
+    return respuesta
+
+
+@require_POST
+def facturar_relacion(request, pk):
+    _exigir_valores(request)
+    relacion = get_object_or_404(RelacionCobro, pk=pk)
+    formulario = FormularioFactura(request.POST)
+    if not formulario.is_valid():
+        return ver_relacion(request, pk, {"factura": formulario})
+    numero = formulario.cleaned_data["numero_factura"].strip()
+    try:
+        relaciones_op.facturar(relacion, numero, actor=request.user)
+    except CobroInvalido as error:
+        messages.error(request, f"No se facturó: {error}.")
+    else:
+        messages.success(request, f"Relación facturada con el número {numero}: cada línea quedó facturada.")
+    return redirect("relacion_cobro", pk=pk)
+
+
+@require_POST
+def pagar_relacion(request, pk):
+    _exigir_valores(request)
+    relacion = get_object_or_404(RelacionCobro, pk=pk)
+    try:
+        pago = relaciones_op.pagar(relacion, actor=request.user)
+    except CobroInvalido as error:
+        messages.error(request, f"No se marcó pagada: {error}.")
+    else:
+        messages.success(request, "Relación pagada: sus líneas quedaron pagadas.")
+        if pago.sin_marcar:
+            servicios = ", ".join(f"N.º {n}" for n in pago.sin_marcar)
+            messages.warning(
+                request, f"No se marcaron porque ya no tienen esta factura: servicio {servicios}."
+            )
+    return redirect("relacion_cobro", pk=pk)
+
+
+@require_POST
+def descartar_relacion(request, pk):
+    _exigir_valores(request)
+    relacion = get_object_or_404(RelacionCobro, pk=pk)
+    formulario = FormularioDescarte(request.POST)
+    if not formulario.is_valid():
+        return ver_relacion(request, pk, {"descarte": formulario})
+    try:
+        relaciones_op.descartar(relacion, formulario.cleaned_data["motivo"], actor=request.user)
+    except CobroInvalido as error:
+        messages.error(request, f"No se descartó: {error}.")
+    else:
+        messages.success(request, "Relación descartada: sus líneas quedaron libres.")
+    return redirect("relacion_cobro", pk=pk)

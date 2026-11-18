@@ -617,6 +617,11 @@ h3.titulo-seccion {
 .cobro--facturado { color: var(--en-camino); background: var(--en-camino-fondo); }
 .cobro--pagado { color: var(--entregado); background: var(--entregado-fondo); }
 .cobro--no_cobrable { color: var(--pendiente); background: var(--pendiente-fondo); }
+/* Estados de la relación de cobro (1a-17), con los colores de su par en la línea. */
+.cobro--armada { color: var(--asignado); background: var(--asignado-fondo); }
+.cobro--facturada { color: var(--en-camino); background: var(--en-camino-fondo); }
+.cobro--pagada { color: var(--entregado); background: var(--entregado-fondo); }
+.cobro--descartada { color: var(--pendiente); background: var(--pendiente-fondo); }
 .cobro--grande { padding: 4px 14px; font-size: 14px; }
 .dinero { white-space: nowrap; font-variant-numeric: tabular-nums; }
 .cobro-valor {

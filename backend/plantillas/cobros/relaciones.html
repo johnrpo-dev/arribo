@@ -1,0 +1,107 @@
+{% extends "base.html" %}
+{% block titulo %}Relaciones de cobro{% endblock %}
+{% block contenido %}
+<p class="texto-secundario"><a href="{% url 'cobros' %}">← Cobros</a></p>
+<div class="cabecera-pagina">
+  <h1 class="titulo-pagina">Relaciones de cobro</h1>
+</div>
+<p class="ayuda">Una relación junta las líneas por facturar de un pagador en unas fechas, para mandárselas en un archivo y facturarlas con un solo número. Mientras está armada, sus líneas no se facturan sueltas ni entran en otra relación.</p>
+
+<section class="bloque" aria-labelledby="t-armar">
+  <h2 class="titulo-seccion" id="t-armar">Armar una relación</h2>
+  {% if hay_pagadores %}
+  <form method="get" action="{% url 'relaciones_cobro' %}" class="tarjeta">
+    {% for error in formulario.non_field_errors %}<p class="aviso aviso--error">{{ error }}</p>{% endfor %}
+    {% include "parciales/campo.html" with campo=formulario.pagador %}
+    {% include "parciales/campo.html" with campo=formulario.desde %}
+    {% include "parciales/campo.html" with campo=formulario.hasta %}
+    <button type="submit" class="boton">Ver qué líneas entran</button>
+  </form>
+  {% else %}
+  <p class="texto-secundario">No hay líneas por facturar libres: todas están sin valor, ya facturadas o en una relación armada.</p>
+  {% endif %}
+
+  {% if vista_previa %}
+  <h3 class="titulo-seccion">{{ vista_previa.datos.pagador.nombre }}, del {{ vista_previa.datos.desde|date:"d/m/Y" }} al {{ vista_previa.datos.hasta|date:"d/m/Y" }}</h3>
+  {% if vista_previa.lineas %}
+  <div class="tabla-contenedor">
+    <table class="tabla">
+      <thead>
+        <tr>
+          <th scope="col">Servicio</th>
+          <th scope="col">Número de caso</th>
+          <th scope="col">Fecha</th>
+          <th scope="col">Vehículo</th>
+          <th scope="col">Tipo</th>
+          <th scope="col">Valor</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for linea, valor in vista_previa.lineas %}
+        <tr>
+          <td><a href="{% url 'linea_cobro' linea.pk %}">N.º {{ linea.servicio_id }}</a></td>
+          <td>{{ linea.servicio.referencia_externa|default:"—" }}</td>
+          <td>{{ linea.fecha_servicio|date:"d/m/Y" }}</td>
+          <td>{{ linea.servicio.vehiculo }}</td>
+          <td>{{ linea.servicio.solicitud.get_tipo_display }}</td>
+          <td class="dinero">{{ valor }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+      <tfoot>
+        <tr><th scope="row" colspan="5">Total ({{ vista_previa.lineas|length }} línea{{ vista_previa.lineas|length|pluralize }})</th><td class="dinero"><strong>{{ vista_previa.total }}</strong></td></tr>
+      </tfoot>
+    </table>
+  </div>
+  <form method="post" action="{% url 'armar_relacion' %}">
+    {% csrf_token %}
+    <input type="hidden" name="pagador" value="{{ vista_previa.datos.pagador.pk }}">
+    <input type="hidden" name="desde" value="{{ vista_previa.datos.desde|date:'Y-m-d' }}">
+    <input type="hidden" name="hasta" value="{{ vista_previa.datos.hasta|date:'Y-m-d' }}">
+    <button type="submit" class="boton boton--principal">Armar la relación</button>
+  </form>
+  {% else %}
+  <p class="texto-secundario">No hay líneas por facturar de ese pagador en esas fechas.</p>
+  {% endif %}
+  {% if vista_previa.sin_valor %}
+  <p class="aviso aviso--advertencia">Quedan por fuera porque no tienen valor: {% for linea in vista_previa.sin_valor %}<a href="{% url 'linea_cobro' linea.pk %}">servicio N.º {{ linea.servicio_id }}</a>{% if not forloop.last %}, {% endif %}{% endfor %}. Digíteles el valor y vuelva a consultar.</p>
+  {% endif %}
+  {% endif %}
+</section>
+
+<section class="bloque" aria-labelledby="t-lista">
+  <h2 class="titulo-seccion" id="t-lista">Relaciones</h2>
+  {% if relaciones %}
+  <div class="tabla-contenedor">
+    <table class="tabla">
+      <thead>
+        <tr>
+          <th scope="col">N.º</th>
+          <th scope="col">Pagador</th>
+          <th scope="col">Fechas</th>
+          <th scope="col">Líneas</th>
+          <th scope="col">Total</th>
+          <th scope="col">Estado</th>
+          <th scope="col">Factura</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for relacion, total in relaciones %}
+        <tr>
+          <td><a href="{% url 'relacion_cobro' relacion.pk %}">N.º {{ relacion.pk }}</a></td>
+          <td>{{ relacion.pagador.nombre }}</td>
+          <td>{{ relacion.desde|date:"d/m/Y" }} – {{ relacion.hasta|date:"d/m/Y" }}</td>
+          <td>{{ relacion.cuantas }}</td>
+          <td class="dinero">{{ total }}</td>
+          <td><span class="cobro cobro--{{ relacion.estado }}">{{ relacion.estado_etiqueta }}</span></td>
+          <td>{{ relacion.numero_factura|default:"—" }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <p class="texto-secundario">Todavía no hay relaciones.</p>
+  {% endif %}
+</section>
+{% endblock %}
