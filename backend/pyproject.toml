@@ -11,6 +11,7 @@ dependencies = [
     "python-dotenv>=1",
     "google-auth>=2.62.2",           # token de la cuenta de servicio para la API HTTP v1 de FCM
     "requests>=2.34.2",              # cliente HTTP del push (y transporte de google-auth)
+    "gunicorn>=27.0.1",              # servidor de la app en producción (despliegue, 1a-21)
 ]
 
 [dependency-groups]

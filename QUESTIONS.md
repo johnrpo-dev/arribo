@@ -7,6 +7,11 @@ Formato: fecha, tarea, pregunta, qué se asumió mientras tanto (si se asumió a
 
 ## Abiertas
 
+- **2026-11-18, 1a-21. ¿Dónde quedan los respaldos y cuántos?** Asumido: uno diario de la base, en
+  el mismo VPS (`/opt/arribo/respaldos`), y se guardan 14. Si el VPS se pierde, se pierden con él:
+  la copia fuera del servidor y la restauración probada son de la fase 3. Mientras tanto, el dueño
+  puede bajarlos de vez en cuando con `scp`. Cambia si quiere copia externa desde ya.
+
 - **2026-11-18, 1a-20. ¿Quién figura como autor de lo que hace la demo?** Asumido: las
   asignaciones, la cancelación y los cobros de la demo quedan sin usuario del panel (como los
   cierres del sistema), y sus documentos los registra el usuario del primer conductor de demo. Así

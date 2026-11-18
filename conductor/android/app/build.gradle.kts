@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     // Firebase (push, 1a-14). Exige app/google-services.json, que no va al repositorio.
@@ -31,11 +33,33 @@ android {
         versionName = flutter.versionName
     }
 
+    // Firma del APK que se instala a los conductores (1a-21). La llave y sus claves están en
+    // android/key.properties y en un .jks fuera del repositorio (conductor/crear-llave.ps1). Sin ese
+    // archivo, el release se firma con la llave de depuración: sirve para probar, no para repartir,
+    // porque un APK firmado con otra llave no se instala encima del anterior.
+    val propiedadesLlave = Properties()
+    val archivoLlave = rootProject.file("key.properties")
+    if (archivoLlave.exists()) {
+        archivoLlave.inputStream().use { propiedadesLlave.load(it) }
+    }
+    signingConfigs {
+        if (archivoLlave.exists()) {
+            create("release") {
+                storeFile = file(propiedadesLlave.getProperty("storeFile"))
+                storePassword = propiedadesLlave.getProperty("storePassword")
+                keyAlias = propiedadesLlave.getProperty("keyAlias")
+                keyPassword = propiedadesLlave.getProperty("keyPassword")
+            }
+        }
+    }
+
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = if (archivoLlave.exists()) {
+                signingConfigs.getByName("release")
+            } else {
+                signingConfigs.getByName("debug")
+            }
         }
     }
 }

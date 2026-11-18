@@ -1,0 +1,19 @@
+# Lo que no entra a la imagen del servidor (despliegue/Dockerfile): secretos, bases y archivos
+# locales, la app del conductor y lo que se regenera.
+.git
+.claude
+conductor
+docs
+**/.env
+**/.env.*
+**/__pycache__
+**/*.pyc
+backend/.venv
+backend/.pytest_cache
+backend/.ruff_cache
+backend/media
+backend/estaticos
+backend/tests
+despliegue/respaldos
+*.jks
+*.keystore

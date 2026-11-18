@@ -62,7 +62,17 @@ Datos ficticios (`backend/panel/demo.py`): `uv run python manage.py demo_cargar`
 (marcada con `es_demo`; nombres con «(demo)»); `uv run python manage.py demo_borrar` la quita sin
 tocar datos reales (pide «si»; `--noinput` para no preguntar). Nunca contra la base real con datos
 del cliente sin que el dueño lo pida.
-Despliegue (tarea 1a-21): todavía no existe; al crearlo, documentar aquí el comando exacto.
+Despliegue (guía completa en `docs/despliegue.md`; desplegar solo con permiso del dueño):
+
+```
+cd /opt/arribo/codigo/despliegue && ./desplegar.sh          # en el VPS: trae main, reconstruye, migra y comprueba /salud/
+```
+
+APK firmado, desde `conductor/` (la llave se crea una vez con `crear-llave.ps1`; nunca va al repositorio):
+
+```
+powershell -ExecutionPolicy Bypass -File .\compilar-apk.ps1 -Servidor https://DOMINIO
+```
 
 ## Antes de dar una tarea por terminada
 

@@ -1,0 +1,111 @@
+# Arribo en un VPS: base de datos, servidor web, tareas de cada minuto, respaldo diario y Caddy
+# (HTTPS). Se despliega con `./desplegar.sh` desde esta carpeta; los valores salen de `.env`
+# (copiar `.env.ejemplo`). Ver docs/despliegue.md.
+name: arribo
+
+x-servidor: &servidor
+  build:
+    context: ..
+    dockerfile: despliegue/Dockerfile
+  image: arribo-servidor
+  restart: unless-stopped
+  environment:
+    ARRIBO_SECRET_KEY: ${ARRIBO_SECRET_KEY:?Falta ARRIBO_SECRET_KEY en despliegue/.env}
+    ARRIBO_ALLOWED_HOSTS: ${ARRIBO_DOMINIO:?Falta ARRIBO_DOMINIO en despliegue/.env}
+    DATABASE_URL: postgres://arribo:${POSTGRES_PASSWORD}@db:5432/arribo
+    ARRIBO_FIREBASE_CREDENCIALES: ${ARRIBO_FIREBASE_CREDENCIALES:-}
+    ARRIBO_PERMITIR_RESTABLECER: "0"
+    TZ: America/Bogota
+  volumes:
+    - media:/datos/media
+    - estaticos:/datos/estaticos
+    # La cuenta de servicio de Firebase vive en el servidor, fuera del repositorio.
+    - ${ARRIBO_SECRETOS:-/opt/arribo/secretos}:/run/secretos:ro
+  depends_on:
+    db:
+      condition: service_healthy
+
+services:
+  db:
+    image: postgres:18
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: arribo
+      POSTGRES_DB: arribo
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Falta POSTGRES_PASSWORD en despliegue/.env}
+      TZ: America/Bogota
+    volumes:
+      - basedatos:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U arribo -d arribo"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  web:
+    <<: *servidor
+    healthcheck:
+      # /salud/ por http dentro del servidor, con el dominio como Host (ALLOWED_HOSTS).
+      test:
+        - CMD
+        - python
+        - -c
+        - >-
+          import os, urllib.request;
+          urllib.request.urlopen(urllib.request.Request("http://127.0.0.1:8000/salud/",
+          headers={"Host": os.environ["ARRIBO_ALLOWED_HOSTS"]}), timeout=5)
+      interval: 10s
+      timeout: 10s
+      retries: 30
+      start_period: 30s
+
+  tareas:
+    <<: *servidor
+    command: ["sh", "/usr/local/bin/tareas.sh"]
+    healthcheck:
+      disable: true
+    depends_on:
+      web:
+        condition: service_healthy
+
+  respaldo:
+    image: postgres:18
+    restart: unless-stopped
+    entrypoint: ["sh", "/respaldo.sh"]
+    environment:
+      PGHOST: db
+      PGUSER: arribo
+      PGDATABASE: arribo
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+      TZ: America/Bogota
+    volumes:
+      - ./respaldo.sh:/respaldo.sh:ro
+      - ${ARRIBO_RESPALDOS:-/opt/arribo/respaldos}:/respaldos
+    depends_on:
+      db:
+        condition: service_healthy
+
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      ARRIBO_DOMINIO: ${ARRIBO_DOMINIO}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - estaticos:/srv/estaticos:ro
+      - caddy_datos:/data
+      - caddy_config:/config
+    depends_on:
+      web:
+        condition: service_healthy
+
+volumes:
+  basedatos:
+  media:
+  estaticos:
+  caddy_datos:
+  caddy_config:
