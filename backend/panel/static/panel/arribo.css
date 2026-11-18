@@ -560,7 +560,8 @@ h3.titulo-seccion {
    El modificador es el valor del estado: class="estado estado--{{ servicio.estado }}".
    Siempre lleva el nombre del estado como texto; el color solo acompaña. */
 
-.estado {
+.estado,
+.cobro {
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -572,7 +573,8 @@ h3.titulo-seccion {
   line-height: 1.5;
   white-space: nowrap;
 }
-.estado::before {
+.estado::before,
+.cobro::before {
   content: "";
   width: 6px;
   height: 6px;
@@ -607,6 +609,46 @@ h3.titulo-seccion {
   color: var(--pendiente);
   background: var(--pendiente-fondo);
   text-decoration: line-through;
+}
+
+/* Estado de cobro de una línea (1a-16b): class="cobro cobro--{{ linea.estado }}". */
+.cobro--sin_valor { color: var(--recogido); background: var(--recogido-fondo); }
+.cobro--por_facturar { color: var(--asignado); background: var(--asignado-fondo); }
+.cobro--facturado { color: var(--en-camino); background: var(--en-camino-fondo); }
+.cobro--pagado { color: var(--entregado); background: var(--entregado-fondo); }
+.cobro--no_cobrable { color: var(--pendiente); background: var(--pendiente-fondo); }
+.cobro--grande { padding: 4px 14px; font-size: 14px; }
+.dinero { white-space: nowrap; font-variant-numeric: tabular-nums; }
+.cobro-valor {
+  font-size: 18px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.cobro-acciones {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: var(--e4);
+  align-items: start;
+}
+.cobro-acciones .tarjeta {
+  display: flex;
+  flex-direction: column;
+  gap: var(--e3);
+}
+.cobro-acciones .tarjeta .boton { align-self: flex-start; }
+.aviso-tarifa {
+  padding: var(--e2) var(--e3);
+  border-radius: var(--radio);
+  background: var(--acento-suave);
+  font-size: 13.5px;
+}
+.pestana-cuenta {
+  margin-left: 6px;
+  padding: 0 7px;
+  border-radius: 999px;
+  background: color-mix(in srgb, currentColor 14%, transparent);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
 }
 
 .fila-etiquetas {

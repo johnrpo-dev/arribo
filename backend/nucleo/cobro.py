@@ -73,3 +73,42 @@ def validar_division(total: Decimal, partes: Sequence[Decimal]) -> None:
         raise CobroInvalido("Cada parte debe ser mayor que cero")
     if sum(partes) != total:
         raise CobroInvalido("Las partes no suman el valor del servicio")
+
+
+# --- Pesos escritos a mano ---------------------------------------------------------------------
+
+_DIGITOS_DE_MILES = 3
+_MAX_DECIMALES = 2
+
+
+def leer_pesos(texto: str) -> Decimal:
+    """Lo que digitan en el panel, a Decimal: "180000", "180.000", "$ 180.000", "180.000,50".
+
+    El punto o la coma con tres dígitos después separan miles; con uno o dos, son los centavos.
+    Lo que no tenga esa forma (letras, grupos mal hechos, más de dos decimales) es CobroInvalido.
+    """
+    limpio = "".join((texto or "").replace("$", "").split())
+    if not limpio or not all(c.isdigit() or c in ".," for c in limpio):
+        raise CobroInvalido("Escriba el valor en números, por ejemplo 180.000")
+    entero, centavos = limpio, ""
+    ultimo = max(limpio.rfind("."), limpio.rfind(","))
+    if ultimo >= 0 and 0 < len(limpio) - ultimo - 1 <= _MAX_DECIMALES:
+        entero, centavos = limpio[:ultimo], limpio[ultimo + 1 :]
+    grupos = entero.replace(",", ".").split(".")
+    bien_agrupado = (
+        len(grupos) == 1
+        or (1 <= len(grupos[0]) <= _DIGITOS_DE_MILES
+            and all(len(g) == _DIGITOS_DE_MILES for g in grupos[1:]))
+    )
+    if not entero or not all(g.isdigit() for g in grupos) or not bien_agrupado:
+        raise CobroInvalido("Escriba el valor en números, por ejemplo 180.000")
+    return Decimal("".join(grupos) + (f".{centavos}" if centavos else ""))
+
+
+def formato_pesos(valor: Decimal | None) -> str:
+    """Como se lee en Colombia: "$ 180.000" o, con centavos, "$ 180.000,50". Sin valor: "—"."""
+    if valor is None:
+        return "—"
+    entero, _, centavos = f"{valor:,.2f}".partition(".")
+    texto = "$ " + entero.replace(",", ".")
+    return texto if centavos == "00" else f"{texto},{centavos}"

@@ -9,6 +9,8 @@ from nucleo.cobro import (
     anular_factura,
     facturar,
     fijar_valor,
+    formato_pesos,
+    leer_pesos,
     linea_inicial,
     pagar,
     validar_division,
@@ -89,3 +91,52 @@ def test_division_admite_maximo_dos_pagadores_y_partes_positivas():
         validar_division(D("300"), [])
     with pytest.raises(CobroInvalido):
         validar_division(D("300"), [D("300"), D("0")])
+
+
+# --- Pesos escritos a mano ---------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("texto", "valor"),
+    [
+        ("180000", "180000"),
+        ("180.000", "180000"),
+        ("180,000", "180000"),
+        ("$ 180.000", "180000"),
+        ("$180.000", "180000"),
+        (" 1.250.000 ", "1250000"),
+        ("180.000,50", "180000.50"),
+        ("180000,5", "180000.5"),
+        ("180000.50", "180000.50"),
+        ("950", "950"),
+    ],
+)
+def test_leer_pesos_entiende_como_se_escriben_en_colombia(texto, valor):
+    assert leer_pesos(texto) == Decimal(valor)
+
+
+@pytest.mark.parametrize(
+    "texto",
+    ["", "   ", "$", "ciento ochenta", "180.00.0", "18.0000", "1.80.000", "180000,505", "-5", "1e5", ","],
+)
+def test_leer_pesos_rechaza_lo_que_no_es_un_valor(texto):
+    with pytest.raises(CobroInvalido, match="números"):
+        leer_pesos(texto)
+
+
+def test_leer_pesos_devuelve_decimal_nunca_float():
+    assert type(leer_pesos("180.000")) is Decimal
+
+
+@pytest.mark.parametrize(
+    ("valor", "texto"),
+    [
+        (Decimal(180000), "$ 180.000"),
+        (Decimal("180000.00"), "$ 180.000"),
+        (Decimal("1250000.5"), "$ 1.250.000,50"),
+        (Decimal(950), "$ 950"),
+        (None, "—"),
+    ],
+)
+def test_formato_pesos(valor, texto):
+    assert formato_pesos(valor) == texto

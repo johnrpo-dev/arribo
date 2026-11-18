@@ -12,8 +12,8 @@ from panel.secciones import SECCIONES
 pytestmark = pytest.mark.django_db
 
 TODAS = [s.nombre for s in SECCIONES]
-# Con pantalla hoy; Cobros y Panel del dueño llegan en sus tareas.
-DISPONIBLES = ["Tablero", "Nueva solicitud", "Solicitudes", "Flota y personal", "Configuración"]
+# Con pantalla hoy; el Panel del dueño llega en su tarea.
+DISPONIBLES = ["Tablero", "Nueva solicitud", "Solicitudes", "Cobros", "Flota y personal", "Configuración"]
 
 
 def nombres_en_la_navegacion(html):
@@ -41,7 +41,7 @@ def test_navegacion_de_logistica(client, crear_usuario):
 
 
 def test_navegacion_de_facturacion(client, crear_usuario):
-    comprobar_navegacion(client, crear_usuario("facturacion"), [], ["Cobros"])
+    comprobar_navegacion(client, crear_usuario("facturacion"), ["Cobros"], ["Cobros"])
 
 
 def test_navegacion_del_administrador(client, crear_usuario):
@@ -50,7 +50,10 @@ def test_navegacion_del_administrador(client, crear_usuario):
 
 def test_navegacion_de_logistica_y_facturacion_juntas(client, crear_usuario):
     comprobar_navegacion(
-        client, crear_usuario("logistica", "facturacion"), LOGISTICA, [*LOGISTICA, "Cobros"]
+        client,
+        crear_usuario("logistica", "facturacion"),
+        [*LOGISTICA, "Cobros"],
+        [*LOGISTICA, "Cobros"],
     )
 
 

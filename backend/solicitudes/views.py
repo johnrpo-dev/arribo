@@ -10,6 +10,8 @@ from django.views.decorators.http import require_POST
 
 from clientes.models import buscar_cliente_por_telefono
 from configuracion.models import MomentoPlacaVin, configuracion_vigente
+from configuracion.operaciones import puede_ver_valores
+from nucleo.cobro import formato_pesos
 from nucleo.estados import REASIGNABLE_DESDE, Estado, TransicionInvalida
 from nucleo.identificacion import (
     IdentificacionIncompleta,
@@ -18,6 +20,8 @@ from nucleo.identificacion import (
 )
 from nucleo.registro import CierreNoPermitido, Faltante, describir_faltantes
 from nucleo.ronda import MovimientoInvalido
+from panel.roles import tiene_rol
+from panel.secciones import SECCIONES
 
 from . import consultas, fotos, operaciones
 from .disponibilidad import disponibilidad_de_conductores
@@ -45,6 +49,8 @@ from .registro import (
     registrar_solicitud,
     servicios_de_ida,
 )
+
+ROLES_COBROS = next(s for s in SECCIONES if s.clave == "cobros").roles
 
 BUSQUEDAS = (("solicitante", "telefono"), ("pagador", "pagador_telefono"))
 CAMPO_CONFIRMACION = "duplicados_confirmados"
@@ -212,11 +218,12 @@ def detalle(request, pk, formulario_cierre=None):
     # Por número: el orden de ronda (orden por defecto del modelo) es de cada conductor, no de la
     # solicitud.
     servicios = list(
-        solicitud.servicios.select_related("vehiculo", "conductor", "grua", "regreso_de").order_by(
-            "pk"
-        )
+        solicitud.servicios.select_related("vehiculo", "conductor", "grua", "regreso_de")
+        .prefetch_related("lineas_cobro")
+        .order_by("pk")
     )
     fotos_de_la_solicitud = fotos.fotos_de(servicios)
+    ve_cobros = _anotar_cobro(request.user, servicios)
     faltantes = []
     if solicitud.estado_registro == EstadoRegistro.BORRADOR:
         faltantes = faltantes_de(solicitud)
@@ -228,10 +235,26 @@ def detalle(request, pk, formulario_cierre=None):
         "formulario_cierre": formulario_cierre or FormularioNoConcretada(),
         "fotos": fotos_de_la_solicitud,
         "hay_fotos": any(g.fotos or g.sin_foto for g in fotos_de_la_solicitud),
+        "ve_cobros": ve_cobros,
     }
     if solicitud.estado_registro == EstadoRegistro.ABIERTA:
         contexto.update(_contexto_asignacion(servicios))
     return render(request, "solicitudes/detalle.html", contexto)
+
+
+def _anotar_cobro(usuario, servicios) -> bool:
+    """Pone en cada servicio su línea de cobro (`cobro`) y el valor que el usuario puede ver
+    (`cobro_valor`, None si no lo ve). Devuelve si el usuario puede abrir la sección Cobros."""
+    ve_valores = puede_ver_valores(usuario)
+    for servicio in servicios:
+        # Por la relación inversa (precargada en `detalle`): solicitudes no importa cobros.
+        servicio.cobro = next(
+            (linea for linea in servicio.lineas_cobro.all() if linea.posicion == 1), None
+        )
+        servicio.cobro_valor = (
+            formato_pesos(servicio.cobro.valor) if servicio.cobro and ve_valores else None
+        )
+    return tiene_rol(usuario, ROLES_COBROS)
 
 
 def foto_evidencia(request, pk, evidencia_id):

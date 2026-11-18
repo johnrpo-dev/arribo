@@ -1,0 +1,108 @@
+{% extends "base.html" %}
+{% block titulo %}Cobros{% endblock %}
+{% block contenido %}
+<div class="cabecera-pagina">
+  <h1 class="titulo-pagina">Cobros</h1>
+</div>
+<p class="ayuda">Cada servicio entregado tiene su línea de cobro: sin valor → por facturar → facturada → pagada.{% if not ve_valores %} Su rol no ve los valores; eso se cambia en Configuración.{% endif %}</p>
+
+<form method="get" class="buscador" role="search">
+  <input type="hidden" name="filtro" value="{% if filtro == 'cancelados' %}todas{% else %}{{ filtro }}{% endif %}">
+  <label class="oculto" for="buscar-cobros">Buscar cobros</label>
+  <div class="buscador-fila">
+    <input id="buscar-cobros" type="search" name="q" value="{{ texto }}" placeholder="Pagador, placa, N.º de servicio o solicitud, factura">
+    <button type="submit" class="boton boton--principal">Buscar</button>
+  </div>
+</form>
+
+<nav class="pestanas" aria-label="Filtros">
+  {% for clave, nombre, cuenta in pestanas %}
+  <a class="pestana" href="?filtro={{ clave }}{% if texto and clave != 'cancelados' %}&amp;q={{ texto|urlencode }}{% endif %}"{% if clave == filtro %} aria-current="page"{% endif %}>{{ nombre }} <span class="pestana-cuenta">{{ cuenta }}</span></a>
+  {% endfor %}
+</nav>
+
+{% if filtro == "cancelados" %}
+<p class="ayuda">Servicios cancelados después de asignarse, sin cobro. Si la grúa salió y se cobra el desplazamiento, márquelo cobrable: nace su línea, como si se hubiera entregado.</p>
+{% if cancelados %}
+<div class="tabla-contenedor">
+  <table class="tabla">
+    <thead>
+      <tr>
+        <th scope="col">Servicio</th>
+        <th scope="col">Vehículo</th>
+        <th scope="col">Pagador</th>
+        <th scope="col">Conductor</th>
+        <th scope="col">Motivo de la cancelación</th>
+        <th scope="col"><span class="oculto">Acción</span></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for servicio, motivo in cancelados %}
+      <tr>
+        <th scope="row" class="cifra">N.º {{ servicio.pk }} <span class="texto-secundario">· solicitud {{ servicio.solicitud_id }}</span></th>
+        <td>{{ servicio.vehiculo }}</td>
+        <td>{{ servicio.solicitud.pagador.nombre|default:"—" }}</td>
+        <td>{{ servicio.conductor }}</td>
+        <td>{{ motivo|default:"—" }}</td>
+        <td>
+          <form method="post" action="{% url 'marcar_cobrable' servicio.pk %}">
+            {% csrf_token %}
+            <button type="submit" class="boton boton--secundario" aria-label="Marcar cobrable el servicio N.º {{ servicio.pk }}">Marcar cobrable</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<div class="vacio"><p>No hay servicios cancelados por revisar.</p></div>
+{% endif %}
+
+{% else %}
+{% if texto %}<p class="ayuda">Resultados de «{{ texto }}» en {{ nombre_filtro }}. <a href="?filtro={{ filtro }}">Quitar la búsqueda</a></p>{% endif %}
+{% if filas %}
+<div class="tabla-contenedor">
+  <table class="tabla">
+    <thead>
+      <tr>
+        <th scope="col">Servicio</th>
+        <th scope="col">Desde</th>
+        <th scope="col">Pagador</th>
+        <th scope="col">Vehículo</th>
+        <th scope="col">Tipo</th>
+        {% if ve_valores %}<th scope="col" class="cifra">Valor</th>{% endif %}
+        <th scope="col">Factura</th>
+        <th scope="col">Estado</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for fila in filas %}
+      {% with l=fila.linea %}
+      <tr>
+        <th scope="row" class="cifra"><a href="{% url 'linea_cobro' l.pk %}" aria-label="Abrir el cobro del servicio N.º {{ l.servicio_id }}">N.º {{ l.servicio_id }}</a> <span class="texto-secundario">· solicitud {{ l.servicio.solicitud_id }}</span></th>
+        <td><time datetime="{{ l.creada_en|date:'c' }}">{{ l.creada_en|date:"d/m/Y" }}</time></td>
+        <td>{{ l.pagador.nombre }}</td>
+        <td>{{ l.servicio.vehiculo }}</td>
+        <td>{{ l.servicio.solicitud.get_tipo_display }}</td>
+        {% if ve_valores %}<td class="cifra dinero">{{ fila.valor }}</td>{% endif %}
+        <td>{{ l.numero_factura|default:"—" }}</td>
+        <td><span class="cobro cobro--{{ l.estado }}">{{ l.estado_etiqueta }}</span></td>
+      </tr>
+      {% endwith %}
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% if pagina.has_other_pages %}
+<nav class="acciones" aria-label="Páginas">
+  {% if pagina.has_previous %}<a class="boton boton--secundario" href="?filtro={{ filtro }}{% if texto %}&amp;q={{ texto|urlencode }}{% endif %}&amp;pagina={{ pagina.previous_page_number }}">Anterior</a>{% endif %}
+  <span class="texto-secundario">Página {{ pagina.number }} de {{ pagina.paginator.num_pages }} · {{ pagina.paginator.count }} líneas</span>
+  {% if pagina.has_next %}<a class="boton boton--secundario" href="?filtro={{ filtro }}{% if texto %}&amp;q={{ texto|urlencode }}{% endif %}&amp;pagina={{ pagina.next_page_number }}">Siguiente</a>{% endif %}
+</nav>
+{% endif %}
+{% else %}
+<div class="vacio">{% if texto %}<p>No hay cobros con «{{ texto }}» en {{ nombre_filtro|lower }}.</p><p><a href="?filtro=todas&amp;q={{ texto|urlencode }}">Buscar en todas</a></p>{% else %}<p>No hay cobros en {{ nombre_filtro|lower }}.</p>{% endif %}</div>
+{% endif %}
+{% endif %}
+{% endblock %}
