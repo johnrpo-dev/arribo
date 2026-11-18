@@ -15,6 +15,8 @@ from django.db.models import Q
 
 from nucleo.cobro import MAX_PAGADORES, EstadoCobro
 from nucleo.cobro import LineaCobro as LineaNucleo
+from nucleo.relacion import EstadoRelacion
+from nucleo.relacion import Relacion as RelacionNucleo
 
 # Un número de factura hecho solo de espacios (o vacío) no cuenta como número.
 EN_BLANCO = r"^\s*$"
@@ -310,3 +312,136 @@ class HistorialCobro(models.Model):
 
     def delete(self, *args, **kwargs):
         raise HistorialInmutable(MENSAJE_HISTORIAL_INMUTABLE)
+
+
+# --- Relación de cobro (1a-17) -----------------------------------------------------------------
+
+ETIQUETAS_ESTADO_RELACION = {
+    EstadoRelacion.ARMADA: "Armada",
+    EstadoRelacion.FACTURADA: "Facturada",
+    EstadoRelacion.PAGADA: "Pagada",
+    EstadoRelacion.DESCARTADA: "Descartada",
+}
+VALORES_ESTADO_RELACION = [estado.value for estado in EstadoRelacion]
+RELACION_CON_FACTURA = [EstadoRelacion.FACTURADA.value, EstadoRelacion.PAGADA.value]
+
+
+class RelacionCobro(models.Model):
+    """Las líneas por facturar de un pagador en un rango de fechas, que se le mandan juntas y se
+    facturan con un solo número. Reglas en `nucleo/relacion.py`; solo cambia con
+    `cobros/relaciones.py`. Nada se borra: una relación que sobra se descarta con motivo.
+    """
+
+    pagador = models.ForeignKey(
+        "clientes.Cliente",
+        verbose_name="pagador",
+        on_delete=models.PROTECT,
+        related_name="relaciones_cobro",
+    )
+    desde = models.DateField("desde")
+    hasta = models.DateField("hasta")
+    estado = models.CharField(
+        "estado",
+        max_length=20,
+        choices=[(e.value, ETIQUETAS_ESTADO_RELACION[e]) for e in EstadoRelacion],
+        default=EstadoRelacion.ARMADA.value,
+    )
+    numero_factura = models.CharField("número de factura", max_length=60, blank=True)
+    motivo_descarte = models.TextField("motivo del descarte", blank=True)
+    creada_en = models.DateTimeField("armada en", auto_now_add=True)
+    creada_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        verbose_name="armada por",
+        on_delete=models.PROTECT,
+        related_name="relaciones_armadas",
+    )
+    cerrada_en = models.DateTimeField("facturada, pagada o descartada en", null=True, blank=True)
+    cerrada_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        verbose_name="facturada, pagada o descartada por",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="relaciones_cerradas",
+    )
+    lineas = models.ManyToManyField(
+        LineaCobro, through="LineaEnRelacion", related_name="relaciones", verbose_name="líneas"
+    )
+
+    class Meta:
+        verbose_name = "relación de cobro"
+        verbose_name_plural = "relaciones de cobro"
+        ordering = ("-creada_en", "-pk")
+        constraints = (
+            models.CheckConstraint(
+                condition=Q(estado__in=VALORES_ESTADO_RELACION),
+                name="relacion_cobro_estado_valido",
+                violation_error_message="Estado de relación desconocido.",
+            ),
+            models.CheckConstraint(
+                condition=Q(desde__lte=models.F("hasta")),
+                name="relacion_cobro_rango_valido",
+                violation_error_message="La fecha inicial va antes de la final.",
+            ),
+            models.CheckConstraint(
+                condition=~Q(estado__in=RELACION_CON_FACTURA) | CON_NUMERO_DE_FACTURA,
+                name="relacion_cobro_facturada_con_numero",
+                violation_error_message="Una relación facturada o pagada lleva número de factura.",
+            ),
+            models.CheckConstraint(
+                condition=Q(estado__in=RELACION_CON_FACTURA) | SIN_FACTURA,
+                name="relacion_cobro_sin_factura_si_no_esta_facturada",
+                violation_error_message="Solo una relación facturada o pagada lleva factura.",
+            ),
+            models.CheckConstraint(
+                condition=~Q(estado=EstadoRelacion.DESCARTADA.value)
+                | ~Q(motivo_descarte__regex=EN_BLANCO),
+                name="relacion_cobro_descarte_con_motivo",
+                violation_error_message="Descartar una relación exige motivo.",
+            ),
+        )
+
+    def __str__(self):
+        return f"Relación {self.pk} · {self.pagador}"
+
+    @property
+    def estado_etiqueta(self) -> str:
+        return ETIQUETAS_ESTADO_RELACION[EstadoRelacion(self.estado)]
+
+    def como_nucleo(self) -> RelacionNucleo:
+        return RelacionNucleo(
+            estado=EstadoRelacion(self.estado),
+            numero_factura=self.numero_factura or None,
+            motivo_descarte=self.motivo_descarte or None,
+        )
+
+
+class LineaEnRelacion(models.Model):
+    """Una línea dentro de una relación. `reservada` mientras la relación está armada: PostgreSQL no
+    deja que la misma línea esté reservada en dos relaciones. Al facturar o descartar la relación
+    deja de estar reservada (y la fila queda, como registro de en qué relación estuvo)."""
+
+    relacion = models.ForeignKey(
+        RelacionCobro, verbose_name="relación", on_delete=models.PROTECT, related_name="incluidas"
+    )
+    linea = models.ForeignKey(
+        LineaCobro, verbose_name="línea", on_delete=models.PROTECT, related_name="inclusiones"
+    )
+    reservada = models.BooleanField("reservada", default=True)
+
+    class Meta:
+        verbose_name = "línea en relación"
+        verbose_name_plural = "líneas en relación"
+        constraints = (
+            models.UniqueConstraint(
+                fields=("relacion", "linea"),
+                name="linea_en_relacion_una_vez",
+                violation_error_message="La línea ya está en esa relación.",
+            ),
+            models.UniqueConstraint(
+                fields=("linea",),
+                condition=Q(reservada=True),
+                name="linea_reservada_en_una_sola_relacion",
+                violation_error_message="La línea ya está en otra relación armada.",
+            ),
+        )

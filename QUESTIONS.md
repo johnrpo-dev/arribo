@@ -7,6 +7,19 @@ Formato: fecha, tarea, pregunta, qué se asumió mientras tanto (si se asumió a
 
 ## Abiertas
 
+- **2026-11-18, 1a-17. ¿Qué fecha cuenta para meter un servicio en una relación de cobro?**
+  Asumido: la fecha (en hora de Colombia) en que se marcó Entregado, con la hora del celular si la
+  mandó; un cancelado marcado cobrable usa la fecha en que nació su línea. Alternativa: la fecha de
+  la solicitud o la programada. Si cambia, se cambia en `cobros/relaciones.py` y su prueba.
+- **2026-11-18, 1a-17. ¿Quién arma y factura relaciones de cobro?** Asumido: facturación y
+  administrador, y solo si su rol ve los valores (una relación es una cuenta con valores y total).
+  Quien no los ve no entra (403). Las líneas sueltas siguen como en la 1a-16b.
+- **2026-11-18, 1a-17. ¿Qué columnas lleva el archivo para el pagador?** Asumido: relación, pagador
+  y su documento, factura, servicio, solicitud, número de caso (la referencia externa del servicio),
+  fecha del servicio, tipo, placa, VIN, vehículo, origen, destino y valor, con una fila de total.
+  CSV con punto y coma que abre Excel en español. Si una aseguradora pide otro formato, se agrega
+  como otro exportador sin tocar lo demás.
+
 - **2026-11-15, 1a-08h. Si la ida se cancela, ¿qué pasa con su regreso?** Decidido por el dueño: el
   regreso no avanza hasta que su ida esté entregada. Asumido mientras tanto: si la ida se cancela, el
   regreso no se cancela solo (nada en el sistema se cancela solo); queda bloqueado ("Espera la ida")

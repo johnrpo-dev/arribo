@@ -158,7 +158,7 @@ Toda tarea termina con `uv run pytest -q` y `uv run ruff check .` en verde, más
   facturar, pagar, anular con motivo, historial); los cancelados asignados se marcan cobrables; el
   detalle de la solicitud muestra el estado de cobro y el valor solo a quien lo ve.
 
-- [ ] **1a-17 Relación de cobro y exportación** (3 h). Depende de: 16.
+- [x] **1a-17 Relación de cobro y exportación** (3 h). Depende de: 16.
   Agrupar líneas por pagador y fechas, con número de caso. Exportador con una interfaz única y una
   implementación Excel/CSV. Registrar el número de factura.
   Verificar: prueba del contenido del archivo; abrir el Excel generado.
