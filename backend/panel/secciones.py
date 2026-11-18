@@ -59,7 +59,13 @@ SECCIONES = (
         (ADMINISTRADOR,),
         vista="flota.views.flota",
     ),
-    Seccion("panel_dueno", "Panel del dueño", "dueno/", (ADMINISTRADOR,)),
+    Seccion(
+        "panel_dueno",
+        "Panel del dueño",
+        "dueno/",
+        (ADMINISTRADOR,),
+        vista="panel.views.panel_dueno",
+    ),
     Seccion(
         "configuracion",
         "Configuración",

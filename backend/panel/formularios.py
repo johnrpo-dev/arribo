@@ -19,3 +19,21 @@ class FormularioIngreso(AuthenticationForm):
         self.fields["password"].widget = forms.PasswordInput(
             attrs={"autocomplete": "current-password"}
         )
+
+
+class FormularioPeriodo(forms.Form):
+    """Del día tal al día tal (los dos incluidos), para el panel del dueño. Vacío = hoy."""
+
+    desde = forms.DateField(
+        label="Desde", widget=forms.DateInput(attrs={"type": "date"}, format="%Y-%m-%d")
+    )
+    hasta = forms.DateField(
+        label="Hasta", widget=forms.DateInput(attrs={"type": "date"}, format="%Y-%m-%d")
+    )
+
+    def clean(self):
+        datos = super().clean()
+        desde, hasta = datos.get("desde"), datos.get("hasta")
+        if desde and hasta and desde > hasta:
+            raise forms.ValidationError("La fecha inicial va antes de la final.")
+        return datos

@@ -1444,6 +1444,30 @@ tiene botón de actualizar información".
   en 10 días: en el inicio aparece "Documento por vencer o vencido". Buscar arriba por el nombre
   de un conductor, la placa de una grúa o una fecha como 18/11/2026.
 
+### 1a-19 · Panel del dueño mínimo
+
+- **Sección Panel del dueño** (solo administrador; ya sale en el menú). Por defecto muestra hoy;
+  se puede elegir otro día o un periodo.
+- **Cifras arriba**: servicios, no concretadas, cuánto hay por cobrar hoy (y cuántas líneas sin
+  valor) y documentos por atender.
+- **Servicios por estado**: todos los estados, también en cero, con el total. Un servicio es del
+  día para el que se programó (un regreso, el de su fecha de regreso) o, si es inmediato, del día
+  en que se registró, en hora de Colombia. Los borradores no cuentan.
+- **No concretadas por motivo**: todos los motivos con su cuenta, por el día de la llamada.
+- **Por cobrar por pagador**: sin valor, por facturar y facturado sin pagar de cada pagador, del
+  que más debe al que menos, con la fila de total. Es lo pendiente hoy, sin importar el periodo.
+- **Documentos por vencer o vencidos**, el más urgente primero, con enlace a cada documento.
+- Los totales salen de `nucleo/resumen.py` (pruebas puras) y se comprueban contra la base con
+  datos conocidos en `tests/panel/test_dueno.py`.
+- Con esto todas las secciones tienen pantalla; la vista "Aún no disponible" sigue para la próxima
+  que se registre sin pantalla (su prueba usa una sección inventada).
+- Supuestos en `QUESTIONS.md` (qué es "del día", periodo de no concretadas y de cobros).
+- Sin hacer (fase 1b): el panel del dueño completo (tendencias, comparaciones, por conductor).
+- Cómo probar (5 minutos): entrar como administrador y abrir Panel del dueño. Comparar con lo que
+  sabe del día: cuántos servicios entregados y en curso, cuántas llamadas no concretadas y por qué.
+  Comparar el total por cobrar de un pagador con la sección Cobros. Elegir el periodo del mes y
+  tocar Ver.
+
 ## Escalamientos
 
 Ninguno todavía.

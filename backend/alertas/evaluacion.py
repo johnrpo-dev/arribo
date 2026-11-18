@@ -20,9 +20,7 @@ from django.db.models.functions import Coalesce
 from django.utils import timezone
 
 from configuracion.models import configuracion_vigente
-from documentos.consultas import estados_por_sujeto
-from documentos.models import AplicaA
-from flota.models import Conductor, Grua
+from documentos.consultas import por_vencer_o_vencidos
 from nucleo import alertas as reglas
 from nucleo.documentos import EstadoDocumento
 from nucleo.estados import Estado
@@ -122,24 +120,15 @@ def _recogidos(ahora, configuracion) -> dict:
 def _documentos(ahora) -> dict:
     hoy = timezone.localdate(ahora)
     deben = {}
-    for aplica_a, sujetos in (
-        (AplicaA.GRUA, Grua.objects.filter(activa=True)),
-        (AplicaA.CONDUCTOR, Conductor.objects.filter(activo=True)),
-    ):
-        for estados in estados_por_sujeto(aplica_a, sujetos, hoy).values():
-            for estado in estados:
-                documento = estado.documento
-                nucleo = documento.como_nucleo() if documento else None
-                if not reglas.documento_alerta(nucleo, hoy, estado.tipo.dias_anticipacion):
-                    continue
-                dia = nucleo.ultimo_dia_valido.strftime("%d/%m/%Y")
-                if estado.estado == EstadoDocumento.VENCIDO:
-                    detalle = "está vencido: bloquea asignaciones nuevas"
-                elif nucleo.aplica_desde is not None:
-                    detalle = f"se exige desde el {nucleo.aplica_desde.strftime('%d/%m/%Y')}"
-                else:
-                    detalle = f"vence el {dia}"
-                deben[documento] = f"{estado.descripcion} {detalle}."
+    for estado in por_vencer_o_vencidos(hoy):
+        nucleo = estado.documento.como_nucleo()
+        if estado.estado == EstadoDocumento.VENCIDO:
+            detalle = "está vencido: bloquea asignaciones nuevas"
+        elif nucleo.aplica_desde is not None:
+            detalle = f"se exige desde el {nucleo.aplica_desde.strftime('%d/%m/%Y')}"
+        else:
+            detalle = f"vence el {nucleo.ultimo_dia_valido.strftime('%d/%m/%Y')}"
+        deben[estado.documento] = f"{estado.descripcion} {detalle}."
     return deben
 
 

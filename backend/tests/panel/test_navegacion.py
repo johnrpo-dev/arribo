@@ -12,8 +12,8 @@ from panel.secciones import SECCIONES
 pytestmark = pytest.mark.django_db
 
 TODAS = [s.nombre for s in SECCIONES]
-# Con pantalla hoy; el Panel del dueño llega en su tarea.
-DISPONIBLES = ["Tablero", "Nueva solicitud", "Solicitudes", "Cobros", "Flota y personal", "Configuración"]
+# Todas tienen pantalla desde la 1a-19 (Panel del dueño).
+DISPONIBLES = TODAS
 
 
 def nombres_en_la_navegacion(html):

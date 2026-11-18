@@ -1,0 +1,136 @@
+{% extends "base.html" %}
+{% block titulo %}Panel del dueño{% endblock %}
+{% block contenido %}
+<div class="cabecera-pagina">
+  <div>
+    <h1 class="titulo-pagina">Panel del dueño</h1>
+    <p class="texto-secundario">{% if es_hoy %}Hoy, {{ desde|date:"d/m/Y" }}{% elif desde == hasta %}{{ desde|date:"d/m/Y" }}{% else %}Del {{ desde|date:"d/m/Y" }} al {{ hasta|date:"d/m/Y" }}{% endif %}</p>
+  </div>
+</div>
+
+<form method="get" class="tarjeta" aria-label="Periodo">
+  {% for error in formulario.non_field_errors %}<p class="aviso aviso--error">{{ error }}</p>{% endfor %}
+  {% include "parciales/campo.html" with campo=formulario.desde %}
+  {% include "parciales/campo.html" with campo=formulario.hasta %}
+  <div class="acciones">
+    <button type="submit" class="boton boton--secundario">Ver</button>
+    {% if not es_hoy %}<a class="boton boton--secundario" href="{% url 'panel_dueno' %}">Hoy</a>{% endif %}
+  </div>
+</form>
+
+<ul class="cifras" aria-label="Resumen">
+  <li class="cifra-tarjeta cifra-tarjeta--en-curso">
+    <a href="#t-servicios"><span class="cifra-valor">{{ total_servicios }}</span><span class="cifra-nombre">Servicios</span></a>
+  </li>
+  <li class="cifra-tarjeta{% if total_no_concretadas %} cifra-tarjeta--aviso{% else %} cifra-tarjeta--bien{% endif %}">
+    <a href="#t-no-concretadas"><span class="cifra-valor">{{ total_no_concretadas }}</span><span class="cifra-nombre">No concretadas</span></a>
+  </li>
+  {% with total=total_por_cobrar %}
+  <li class="cifra-tarjeta{% if total.0.total %} cifra-tarjeta--aviso{% else %} cifra-tarjeta--bien{% endif %}">
+    <a href="#t-por-cobrar"><span class="cifra-valor dinero">{{ total.3 }}</span><span class="cifra-nombre">Por cobrar hoy</span>{% if total.0.sin_valor %}<span class="cifra-detalle">y {{ total.0.sin_valor }} sin valor</span>{% endif %}</a>
+  </li>
+  {% endwith %}
+  <li class="cifra-tarjeta{% if documentos %} cifra-tarjeta--alerta{% else %} cifra-tarjeta--bien{% endif %}">
+    <a href="#t-documentos"><span class="cifra-valor">{{ documentos|length }}</span><span class="cifra-nombre">Documentos por atender</span></a>
+  </li>
+</ul>
+
+<div class="tablero-columnas">
+  <section class="bloque" aria-labelledby="t-servicios">
+    <h2 class="titulo-seccion" id="t-servicios">Servicios por estado</h2>
+    <p class="ayuda">Los programados cuentan el día para el que son; los inmediatos, el día en que se registraron.</p>
+    <div class="tabla-contenedor">
+      <table class="tabla">
+        <tbody>
+          {% for estado, etiqueta, cuantos in servicios %}
+          <tr><th scope="row"><span class="estado estado--{{ estado }}">{{ etiqueta }}</span></th><td>{{ cuantos }}</td></tr>
+          {% endfor %}
+        </tbody>
+        <tfoot><tr><th scope="row">Total</th><td><strong>{{ total_servicios }}</strong></td></tr></tfoot>
+      </table>
+    </div>
+  </section>
+
+  <section class="bloque" aria-labelledby="t-no-concretadas">
+    <h2 class="titulo-seccion" id="t-no-concretadas">No concretadas por motivo</h2>
+    <p class="ayuda">Llamadas que no terminaron en servicio, por el día en que se registraron.</p>
+    <div class="tabla-contenedor">
+      <table class="tabla">
+        <tbody>
+          {% for motivo, cuantas in no_concretadas %}
+          <tr><th scope="row">{{ motivo }}</th><td>{{ cuantas }}</td></tr>
+          {% endfor %}
+        </tbody>
+        <tfoot><tr><th scope="row">Total</th><td><strong>{{ total_no_concretadas }}</strong></td></tr></tfoot>
+      </table>
+    </div>
+  </section>
+</div>
+
+<section class="bloque" aria-labelledby="t-por-cobrar">
+  <h2 class="titulo-seccion" id="t-por-cobrar">Por cobrar por pagador</h2>
+  <p class="ayuda">Lo pendiente hoy, sin importar el periodo: por facturar más facturado sin pagar. Las líneas sin valor se cuentan aparte.</p>
+  {% if por_cobrar %}
+  <div class="tabla-contenedor">
+    <table class="tabla">
+      <thead>
+        <tr>
+          <th scope="col">Pagador</th>
+          <th scope="col">Sin valor</th>
+          <th scope="col">Por facturar</th>
+          <th scope="col">Facturado sin pagar</th>
+          <th scope="col">Total por cobrar</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for fila, por_facturar, facturado, total in por_cobrar %}
+        <tr>
+          <th scope="row">{{ fila.nombre }}</th>
+          <td>{{ fila.sin_valor }}</td>
+          <td><span class="dinero">{{ por_facturar }}</span> <span class="texto-secundario">({{ fila.por_facturar }})</span></td>
+          <td><span class="dinero">{{ facturado }}</span> <span class="texto-secundario">({{ fila.facturadas }})</span></td>
+          <td class="dinero"><strong>{{ total }}</strong></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+      <tfoot>
+        {% with fila=total_por_cobrar.0 %}
+        <tr>
+          <th scope="row">Total</th>
+          <td>{{ fila.sin_valor }}</td>
+          <td><span class="dinero">{{ total_por_cobrar.1 }}</span> <span class="texto-secundario">({{ fila.por_facturar }})</span></td>
+          <td><span class="dinero">{{ total_por_cobrar.2 }}</span> <span class="texto-secundario">({{ fila.facturadas }})</span></td>
+          <td class="dinero"><strong>{{ total_por_cobrar.3 }}</strong></td>
+        </tr>
+        {% endwith %}
+      </tfoot>
+    </table>
+  </div>
+  <p><a href="{% url 'cobros' %}">Ir a Cobros</a></p>
+  {% else %}
+  <div class="vacio"><p>No hay nada pendiente de cobro.</p></div>
+  {% endif %}
+</section>
+
+<section class="bloque" aria-labelledby="t-documentos">
+  <h2 class="titulo-seccion" id="t-documentos">Documentos por vencer o vencidos</h2>
+  {% if documentos %}
+  <div class="tabla-contenedor">
+    <table class="tabla">
+      <thead><tr><th scope="col">Documento</th><th scope="col">Estado</th><th scope="col">Vence</th></tr></thead>
+      <tbody>
+        {% for estado in documentos %}
+        <tr>
+          <td><a href="{% if estado.documento.grua_id %}{% url 'documento_de_grua' estado.documento.grua_id estado.tipo.pk %}{% else %}{% url 'documento_de_conductor' estado.documento.conductor_id estado.tipo.pk %}{% endif %}">{{ estado.descripcion }}</a></td>
+          <td><span class="estado estado--{{ estado.clase }}">{{ estado.nombre_estado }}</span></td>
+          <td>{% if estado.documento.vence %}{{ estado.documento.vence|date:"d/m/Y" }}{% else %}Se exige desde {{ estado.documento.aplica_desde|date:"d/m/Y" }}{% endif %}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="vacio"><p>Todos los documentos están al día.</p></div>
+  {% endif %}
+</section>
+{% endblock %}

@@ -7,6 +7,15 @@ Formato: fecha, tarea, pregunta, qué se asumió mientras tanto (si se asumió a
 
 ## Abiertas
 
+- **2026-11-18, 1a-19. ¿Qué son los "servicios del día" en el panel del dueño?** Asumido: los de
+  solicitudes abiertas cuya fecha cae en el día (o el periodo elegido), en hora de Colombia: la
+  hora programada (en un regreso, la fecha de regreso) o, si es inmediato, el día en que se
+  registró. Se muestran en su estado actual. Alternativa: contar lo que pasó ese día (por ejemplo,
+  entregados ese día aunque se registraran antes).
+- **2026-11-18, 1a-19. Las no concretadas y lo pendiente de cobro, ¿de qué periodo?** Asumido: las
+  no concretadas, por el día en que se registró la llamada. Lo pendiente de cobro es lo de hoy, sin
+  importar el periodo (por facturar más facturado sin pagar; las sin valor se cuentan aparte).
+
 - **2026-11-18, 1a-18. ¿Las alertas por umbral se cierran solas?** Asumido: sí. Sin asignar,
   Recogido sin Entregado y documento por vencer se cierran cuando la condición deja de cumplirse
   (se asigna, se entrega, se registra el documento nuevo); el tablero no ofrece "Marcar resuelta"
