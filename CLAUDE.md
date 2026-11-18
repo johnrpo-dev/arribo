@@ -40,6 +40,7 @@ uv run ruff check .                      # linter
 uv run python manage.py check            # comprobación de Django
 uv run python manage.py migrate          # aplicar migraciones
 uv run python manage.py runserver        # panel en http://127.0.0.1:8000
+uv run python manage.py evaluar_alertas  # alertas por umbral (en producción, cada minuto)
 ```
 
 Para probar con el celular por USB, desde la raíz del repositorio (deja el panel corriendo y

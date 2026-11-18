@@ -7,6 +7,20 @@ Formato: fecha, tarea, pregunta, qué se asumió mientras tanto (si se asumió a
 
 ## Abiertas
 
+- **2026-11-18, 1a-18. ¿Las alertas por umbral se cierran solas?** Asumido: sí. Sin asignar,
+  Recogido sin Entregado y documento por vencer se cierran cuando la condición deja de cumplirse
+  (se asigna, se entrega, se registra el documento nuevo); el tablero no ofrece "Marcar resuelta"
+  porque volverían a abrirse en la siguiente revisión. Las de sincronización (conflicto, capacidad,
+  evento rechazado, placa o VIN) siguen resolviéndose a mano.
+- **2026-11-18, 1a-18. ¿Desde cuándo cuenta "sin asignar" de un inmediato?** Asumido: desde que se
+  registró la solicitud, igual que la espera que ya mostraba el tablero. Un borrador no alerta.
+- **2026-11-18, 1a-18. ¿Un documento vencido también alerta?** Asumido: sí, en la misma alerta
+  "Documento por vencer o vencido" (el vencido bloquea asignaciones, es lo más urgente). Lo que
+  falta no alerta: Flota y personal ya lo muestran como "Falta".
+- **2026-11-18, 1a-18. Buscar por fecha, ¿qué fecha?** Asumido: la fecha en que se registró la
+  solicitud, la programada o la de regreso, en hora de Colombia. Buscar por factura pide el número
+  exacto.
+
 - **2026-11-18, 1a-17. ¿Qué fecha cuenta para meter un servicio en una relación de cobro?**
   Asumido: la fecha (en hora de Colombia) en que se marcó Entregado, con la hora del celular si la
   mandó; un cancelado marcado cobrable usa la fecha en que nació su línea. Alternativa: la fecha de

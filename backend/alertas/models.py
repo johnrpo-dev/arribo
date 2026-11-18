@@ -1,7 +1,7 @@
 """Alertas para logística: algo que una persona debe revisar.
 
 Lo mínimo para la sincronización (tarea 1a-10): el modelo y `alertas/operaciones.py`. El comando
-que evalúa las alertas por umbral y el tablero son de la tarea 1a-18.
+que evalúa las alertas por umbral (`alertas/evaluacion.py`) es de la tarea 1a-18.
 
 Una alerta apunta a un registro cualquiera (un evento de estado, un conductor, más adelante un
 servicio o un documento) y está abierta hasta que alguien la resuelve. No se borra. Mientras siga
@@ -22,6 +22,20 @@ class TipoAlerta(models.TextChoices):
         "identificacion_por_revisar",
         "Placa o VIN digitado por revisar",
     )
+    # Por umbral (1a-18): las abre y las cierra `manage.py evaluar_alertas` según la condición.
+    SIN_ASIGNAR = "sin_asignar", "Servicio sin asignar"
+    RECOGIDO_SIN_ENTREGADO = "recogido_sin_entregado", "Recogido sin Entregado"
+    DOCUMENTO_POR_VENCER = "documento_por_vencer", "Documento por vencer o vencido"
+
+
+# Las que se cierran solas cuando la condición deja de cumplirse: no se resuelven a mano.
+TIPOS_POR_CONDICION = frozenset(
+    {
+        TipoAlerta.SIN_ASIGNAR,
+        TipoAlerta.RECOGIDO_SIN_ENTREGADO,
+        TipoAlerta.DOCUMENTO_POR_VENCER,
+    }
+)
 
 
 class Alerta(models.Model):
@@ -82,3 +96,7 @@ class Alerta(models.Model):
     @property
     def abierta(self) -> bool:
         return self.resuelta_en is None
+
+    @property
+    def se_cierra_sola(self) -> bool:
+        return TipoAlerta(self.tipo) in TIPOS_POR_CONDICION

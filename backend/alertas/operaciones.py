@@ -1,5 +1,6 @@
 """Abrir y resolver alertas. Quien necesita avisar a logística llama a `abrir_alerta`."""
 import uuid
+from dataclasses import dataclass
 
 from django.contrib.contenttypes.models import ContentType
 from django.db import transaction
@@ -52,33 +53,65 @@ def alertas_abiertas(registro=None, tipo=None):
     return alertas
 
 
-# Las alertas abiertas que se muestran en el tablero de inicio (adelanto mínimo de la 1a-18).
+# Las alertas abiertas que se muestran en el tablero de inicio.
 LIMITE_TABLERO = 50
 
 
-def alertas_para_tablero(limite: int = LIMITE_TABLERO) -> list[tuple[Alerta, int | None]]:
-    """Alertas abiertas, la más reciente primero, con la solicitud a la que llevan (o None).
+@dataclass(frozen=True)
+class AlertaEnTablero:
+    alerta: Alerta
+    solicitud_id: int | None = None  # a qué solicitud lleva (evento o servicio)
+    documento: object | None = None  # el documento al que apunta (documento por vencer)
 
-    Una alerta que apunta a un evento de estado lleva a la solicitud de su servicio; una que apunta
-    a un conductor no lleva a ninguna. Dos consultas en total.
+
+def alertas_para_tablero(limite: int = LIMITE_TABLERO) -> list[AlertaEnTablero]:
+    """Alertas abiertas, la más reciente primero, con la solicitud o el documento a que llevan.
+
+    Una alerta que apunta a un evento de estado o a un servicio lleva a su solicitud; una de
+    documento, a ese documento; una que apunta a un conductor no lleva a ninguna parte. Una
+    consulta por tipo de registro.
     """
-    from solicitudes.models import EventoEstado
+    from documentos.models import Documento
+    from solicitudes.models import EventoEstado, Servicio
 
     alertas = list(
         alertas_abiertas().select_related("tipo_registro").order_by("-creada_en", "-pk")[:limite]
     )
-    tipo_evento = ContentType.objects.get_for_model(EventoEstado)
-    eventos = {
-        a.pk: _uuid(a.registro_id) for a in alertas if a.tipo_registro_id == tipo_evento.pk
-    }
-    solicitudes = {}
-    if any(eventos.values()):
-        solicitudes = dict(
-            EventoEstado.objects.filter(pk__in=[e for e in eventos.values() if e]).values_list(
-                "pk", "servicio__solicitud_id"
-            )
+
+    def ids_de(modelo, convertir=str):
+        tipo = ContentType.objects.get_for_model(modelo).pk
+        ids = {a.pk: convertir(a.registro_id) for a in alertas if a.tipo_registro_id == tipo}
+        return {k: v for k, v in ids.items() if v is not None}
+
+    eventos = ids_de(EventoEstado, _uuid)
+    servicios = ids_de(Servicio, _entero)
+    documentos = ids_de(Documento, _entero)
+    solicitud_de_evento = dict(
+        EventoEstado.objects.filter(pk__in=eventos.values()).values_list(
+            "pk", "servicio__solicitud_id"
         )
-    return [(a, solicitudes.get(eventos.get(a.pk))) for a in alertas]
+    ) if eventos else {}
+    solicitud_de_servicio = dict(
+        Servicio.objects.filter(pk__in=servicios.values()).values_list("pk", "solicitud_id")
+    ) if servicios else {}
+    documento = (
+        Documento.objects.select_related("tipo", "grua", "conductor").in_bulk(documentos.values())
+        if documentos
+        else {}
+    )
+    return [
+        AlertaEnTablero(
+            a,
+            solicitud_de_evento.get(eventos.get(a.pk))
+            or solicitud_de_servicio.get(servicios.get(a.pk)),
+            documento.get(documentos.get(a.pk)),
+        )
+        for a in alertas
+    ]
+
+
+def _entero(texto: str) -> int | None:
+    return int(texto) if texto.isdigit() else None
 
 
 def _uuid(texto: str) -> uuid.UUID | None:

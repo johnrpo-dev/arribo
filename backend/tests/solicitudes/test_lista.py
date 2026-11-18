@@ -1,7 +1,7 @@
 """Lista de solicitudes (1a-08c) contra PostgreSQL: filtros por estado derivado, búsqueda, páginas
 y una cota de consultas."""
 import itertools
-from datetime import timedelta
+from datetime import UTC, date, datetime, timedelta
 
 import pytest
 from django.utils import timezone
@@ -147,6 +147,57 @@ def test_la_busqueda_respeta_el_filtro(para_buscar):
     buscada, _ = para_buscar
     assert ids("borradores", "klm") == set()
     assert ids("activas", "klm") == {buscada.pk}
+
+
+@pytest.fixture
+def atendida(cliente, crear_servicio, beto):
+    """Una solicitud atendida por Beto (grúa GRU002) con su línea facturada FE-7788, y otra
+    atendida por Ana (GRU001) sin factura."""
+    from cobros.models import LineaCobro
+
+    de_beto = crear_solicitud(cliente)
+    servicio = crear_servicio(Estado.ENTREGADO, solicitud_de=de_beto, conductor=beto)
+    LineaCobro.objects.create(
+        servicio=servicio, pagador=cliente, posicion=1, valor=1000, estado="facturado",
+        numero_factura="FE-7788",
+    )
+    de_ana = crear_solicitud(cliente)
+    crear_servicio(Estado.ASIGNADO, solicitud_de=de_ana)
+    return de_beto, de_ana
+
+
+@pytest.mark.parametrize("texto", ["beto", "gru002", "GRU-002", "fe-7788"])
+def test_buscar_por_conductor_grua_o_factura(atendida, texto):
+    de_beto, _ = atendida
+    assert ids("todas", texto) == {de_beto.pk}
+
+
+def test_buscar_por_factura_es_el_numero_exacto(atendida):
+    assert ids("todas", "FE-77") == set()
+
+
+def test_buscar_por_fecha_registrada_o_programada_en_hora_de_colombia(cliente):
+    # 19/11 a las 2:00 UTC son las 21:00 del 18/11 en Medellín.
+    registrada = crear_solicitud(cliente)
+    Solicitud.objects.filter(pk=registrada.pk).update(
+        creada_en=datetime(2026, 11, 19, 2, 0, tzinfo=UTC)
+    )
+    programada = crear_solicitud(
+        cliente, programada_para=datetime(2026, 11, 18, 15, 0, tzinfo=UTC)
+    )
+    for texto in ("18/11/2026", "18-11-2026", "2026-11-18"):
+        assert ids("todas", texto) == {registrada.pk, programada.pk}, texto
+    assert registrada.pk not in ids("todas", "19/11/2026")
+
+
+@pytest.mark.parametrize(
+    ("texto", "fecha"),
+    [("18/11/2026", (2026, 11, 18)), ("5/1", (2026, 1, 5)), ("2026-02-03", (2026, 2, 3)),
+     ("31/02/2026", None), ("abc", None), ("123", None)],
+)
+def test_leer_fecha(texto, fecha):
+    esperado = date(*fecha) if fecha else None
+    assert consultas.leer_fecha(texto, date(2026, 11, 18)) == esperado
 
 
 def test_la_busqueda_del_tablero_sin_filtro_busca_en_todas(client, logistica, para_buscar):

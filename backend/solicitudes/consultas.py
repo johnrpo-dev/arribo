@@ -12,9 +12,11 @@
 """
 import re
 from dataclasses import dataclass
+from datetime import date
 from itertools import groupby
 
 from django.db.models import Case, Exists, F, OuterRef, Prefetch, Q, When
+from django.utils import timezone
 
 from clientes.models import TelefonoCliente
 from nucleo.estados import TERMINALES, Estado
@@ -87,13 +89,40 @@ def filtrar(solicitudes, filtro: str):
     return solicitudes.order_by(*_RECIENTES)
 
 
+_FECHA = re.compile(r"^(\d{1,2})[/-](\d{1,2})(?:[/-](\d{4}))?$")
+_FECHA_ISO = re.compile(r"^(\d{4})-(\d{1,2})-(\d{1,2})$")
+
+
+def leer_fecha(texto: str, hoy: date) -> date | None:
+    """"18/11/2026", "18-11-2026", "18/11" (de este año) o "2026-11-18"; None si no es fecha."""
+    if coincide := _FECHA_ISO.match(texto):
+        anio, mes, dia = (int(g) for g in coincide.groups())
+    elif coincide := _FECHA.match(texto):
+        dia, mes = int(coincide[1]), int(coincide[2])
+        anio = int(coincide[3]) if coincide[3] else hoy.year
+    else:
+        return None
+    try:
+        return date(anio, mes, dia)
+    except ValueError:
+        return None
+
+
 def buscar(solicitudes, texto: str):
     """Por nombre o teléfono del cliente (quien pide o quien paga), número de solicitud, placa,
-    VIN o referencia externa de alguno de sus vehículos."""
+    VIN o referencia externa de alguno de sus vehículos, nombre del conductor o placa de la grúa
+    que lo atiende, número de factura de su cobro, o fecha (registrada, programada o de regreso,
+    en hora de Colombia)."""
     texto = (texto or "").strip()
     if not texto:
         return solicitudes
     condicion = Q(solicitante__nombre__icontains=texto) | Q(pagador__nombre__icontains=texto)
+
+    dia = leer_fecha(texto, timezone.localdate())
+    if dia is not None:
+        condicion |= (
+            Q(creada_en__date=dia) | Q(programada_para__date=dia) | Q(fecha_regreso__date=dia)
+        )
 
     numero = texto.lstrip("#").strip()
     if numero.isdigit():
@@ -108,13 +137,19 @@ def buscar(solicitudes, texto: str):
         clientes = TelefonoCliente.objects.filter(numero__contains=digitos).values("cliente_id")
         condicion |= Q(solicitante_id__in=clientes) | Q(pagador_id__in=clientes)
 
-    de_servicios = Q(referencia_externa__icontains=texto)
+    de_servicios = (
+        Q(referencia_externa__icontains=texto)
+        | Q(conductor__nombre__icontains=texto)
+        # La línea de cobro es de la app `cobros`: se busca por la relación inversa, sin importarla.
+        | Q(lineas_cobro__numero_factura__iexact=texto)
+    )
     alfanumerico = normalizar_placa(texto)
     if len(alfanumerico) >= MINIMO_PARCIAL:
         de_servicios |= Q(vehiculo__placa__contains=alfanumerico)
         de_servicios |= Q(vehiculo__vin__contains=alfanumerico)
+        de_servicios |= Q(grua__placa__contains=alfanumerico)
     elif alfanumerico:
-        de_servicios |= Q(vehiculo__placa=alfanumerico)
+        de_servicios |= Q(vehiculo__placa=alfanumerico) | Q(grua__placa=alfanumerico)
     condicion |= Q(pk__in=Servicio.objects.filter(de_servicios).values("solicitud_id"))
     return solicitudes.filter(condicion)
 
