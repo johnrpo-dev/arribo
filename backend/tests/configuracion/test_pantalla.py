@@ -29,6 +29,7 @@ def datos_validos(**cambios):
         "nocturno_inicio": "19:00",
         "nocturno_fin": "06:00",
         "formato_exportacion": "csv_generico",
+        "porcentaje_iva": "19",
     }
     datos.update(cambios)
     return {k: v for k, v in datos.items() if v is not None}

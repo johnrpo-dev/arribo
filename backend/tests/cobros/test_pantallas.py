@@ -183,7 +183,7 @@ def test_facturar_exige_numero(client, facturacion, linea):
 
 def test_facturar_pagar_y_todo_queda_en_el_historial(client, facturacion, linea):
     operaciones.fijar_valor(linea, VALOR, actor=facturacion)
-    client.post(url(linea, "facturar"), {"numero_factura": " FE-120 "})
+    client.post(url(linea, "facturar"), {"numero_factura": " FE-120 ", "total_factura": "214.200"})
     linea.refresh_from_db()
     assert (linea.estado, linea.numero_factura) == (C.FACTURADO, "FE-120")
 
@@ -203,7 +203,7 @@ def test_facturar_pagar_y_todo_queda_en_el_historial(client, facturacion, linea)
 
 
 def test_no_se_factura_una_linea_sin_valor(client, facturacion, linea):
-    respuesta = client.post(url(linea, "facturar"), {"numero_factura": "FE-1"}, follow=True)
+    respuesta = client.post(url(linea, "facturar"), {"numero_factura": "FE-1", "total_factura": "214.200"}, follow=True)
     assert "No se guardó" in respuesta.content.decode()
     linea.refresh_from_db()
     assert linea.estado == C.SIN_VALOR
@@ -316,7 +316,7 @@ def test_facturacion_sin_permiso_de_valores_no_los_ve_ni_los_cambia(client, fact
     assert linea.valor == VALOR
 
     # Facturar no muestra ni cambia el valor: lo puede hacer.
-    client.post(url(linea, "facturar"), {"numero_factura": "FE-5"})
+    client.post(url(linea, "facturar"), {"numero_factura": "FE-5", "total_factura": "214.200"})
     linea.refresh_from_db()
     assert linea.estado == C.FACTURADO
 

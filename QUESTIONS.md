@@ -7,23 +7,27 @@ Formato: fecha, tarea, pregunta, qué se asumió mientras tanto (si se asumió a
 
 ## Abiertas
 
-### Orden de facturación (propuesta 1a-19b, `docs/propuesta-orden-facturacion.md`)
+### Orden de facturación (1a-19b, borrador hecho; `docs/propuesta-orden-facturacion.md`)
 
-Sin estas respuestas la tarea no empieza; no se asume nada.
-
-- **2026-11-21, 1a-19b. ¿Cómo va el IVA?** Hoy el valor de un cobro es uno solo, sin impuestos.
-  ¿Las tarifas ya incluyen IVA o se suma al facturar? ¿Qué porcentaje? ¿Hay clientes o tipos de
-  servicio exentos? Cambia cómo se calcula el total de la orden y qué se compara al registrar la
-  factura.
-- **2026-11-21, 1a-19b. ¿Qué datos de facturación necesita el facturador de cada cliente?** Hoy el
-  cliente tiene nombre y documento o NIT. ¿Hace falta razón social distinta del nombre, dirección,
-  ciudad, correo de facturación o responsabilidad fiscal? Los que hagan falta se agregan al cliente.
-- **2026-11-21, 1a-19b. ¿Quién factura?** ¿Un empleado que entra a Arribo con el rol de facturación,
-  o alguien de afuera (contador) a quien se le entrega la orden impresa? Cambia si basta la pantalla
-  o si la orden impresa es lo principal.
-- **2026-11-21, 1a-19b. ¿Qué programa de facturación usan?** (Siigo, Alegra, World Office u otro.)
-  Si permite importar renglones desde Excel, un archivo de ejemplo de su plantilla de importación
-  permite hacer la parte B.
+- **2026-11-21, 1a-19b. ¿Quién factura?** El dueño lo confirma después ("por ahora hagamos un
+  borrador"). Mientras tanto la orden sirve para los dos casos: se ve en Arribo (rol de facturación)
+  y se imprime o guarda en PDF para alguien de afuera.
+- **2026-11-21, 1a-19b. ¿Qué programa de facturación usan?** Sin información todavía. Sin él no se
+  hace la parte B (archivo en el formato de importación del programa).
+- **2026-11-21, 1a-19b. ¿Qué datos de la empresa van en el encabezado?** Asumido: nombre o razón
+  social, NIT, dirección y teléfono, editables en Configuración → Facturación (vacíos hasta que el
+  dueño los escriba; la orden dice "Datos de la empresa sin configurar"). Logo, después si se pide.
+- **2026-11-21, 1a-19b. Cómo se redondea el IVA.** Asumido: 19 % sobre el subtotal de lo que se
+  factura junto, redondeado al peso (la mitad hacia arriba). Si el programa de facturación lo
+  calcula renglón por renglón, el total puede diferir en algún peso y Arribo no dejaría registrar
+  la factura: en ese caso se cambia `nucleo/facturacion.liquidar` y su prueba.
+- **2026-11-21, 1a-19b. Número de factura repetido y anulado.** Asumido: no se registra un número
+  que ya tenga una línea facturada o pagada (sin importar mayúsculas); el de una factura anulada
+  queda libre, para poder registrarla en la línea correcta si se puso en la equivocada.
+- **2026-11-21, 1a-19b. Datos de facturación del cliente sin historial.** Se editan desde la
+  relación de cobro y se guardan en el cliente, sin historial de cambios (el cliente aún no tiene
+  historial ni pantalla propia en el panel). Una pantalla de Clientes (datos, teléfonos y tarifas)
+  sería otra tarea.
 
 - **2026-11-18, 1a-21. ¿Dónde quedan los respaldos y cuántos?** Asumido: uno diario de la base, en
   el mismo VPS (`/opt/arribo/respaldos`), y se guardan 14. Si el VPS se pierde, se pierden con él:
@@ -362,6 +366,13 @@ Sin estas respuestas la tarea no empieza; no se asume nada.
   contrato y su cola sin señal.
 
 ## Resueltas
+
+- **2026-11-21, 1a-19b. ¿Cómo va el IVA?** Decidido por el dueño: se suma al facturar, el 19 %,
+  sobre todo. Los valores de cobro y las tarifas son sin IVA. El porcentaje es configuración
+  (Configuración → Facturación) y queda fijo en cada relación al armarla.
+- **2026-11-21, 1a-19b. ¿Qué datos de facturación necesita el facturador?** Decidido por el dueño:
+  los guarda el cliente y la orden los trae. Se agregaron razón social, dirección, ciudad y correo
+  de facturación al NIT que ya había.
 
 - **2026-11-15, 1a-08b → resuelta en 1a-08c. ¿Se puede corregir el nombre o el celular de un
   conductor desde el panel?** Sí: en su página, "Corregir nombre o celular". El celular se normaliza y

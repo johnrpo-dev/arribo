@@ -8,6 +8,7 @@ Lo que se configura por cliente (modalidad de cobro, firma) vive en `clientes.Cl
 en `clientes.Tarifa`; los tipos de documento llegan con la tarea 1a-15.
 """
 from datetime import time
+from decimal import Decimal
 
 from django.conf import settings
 from django.core.validators import MaxValueValidator, MinValueValidator
@@ -107,6 +108,21 @@ class Configuracion(models.Model):
         default=FormatoExportacion.CSV_GENERICO,
     )
 
+    # Facturación (1a-19b). Los valores de cobro son sin IVA; se suma al facturar.
+    porcentaje_iva = models.DecimalField(
+        "IVA (%)",
+        max_digits=5,
+        decimal_places=2,
+        default=Decimal(19),
+        validators=[MinValueValidator(Decimal(0)), MaxValueValidator(Decimal(100))],
+        help_text="Se suma al subtotal al facturar. De 0 a 100.",
+    )
+    # Encabezado de la orden de facturación. Hasta 60 caracteres: el historial guarda el valor.
+    empresa_nombre = models.CharField("nombre o razón social de la empresa", max_length=60, blank=True)
+    empresa_nit = models.CharField("NIT de la empresa", max_length=30, blank=True)
+    empresa_direccion = models.CharField("dirección de la empresa", max_length=60, blank=True)
+    empresa_telefono = models.CharField("teléfono de la empresa", max_length=30, blank=True)
+
     class Meta:
         verbose_name = "configuración"
         verbose_name_plural = "configuración"
@@ -158,6 +174,11 @@ class Configuracion(models.Model):
                 condition=Q(formato_exportacion__in=FormatoExportacion.values),
                 name="configuracion_formato_exportacion_valido",
                 violation_error_message="Formato de exportación desconocido.",
+            ),
+            models.CheckConstraint(
+                condition=Q(porcentaje_iva__gte=0, porcentaje_iva__lte=100),
+                name="configuracion_iva_en_rango",
+                violation_error_message="El IVA va de 0 % a 100 %.",
             ),
         )
 

@@ -9,7 +9,8 @@ El CSV genérico:
 - UTF-8 con BOM, para que Excel muestre bien tildes y eñes.
 - Separado por punto y coma y con coma decimal, como lo espera Excel configurado en español.
 - Valores sin signo ni separador de miles, para que Excel los tome como números y pueda sumarlos.
-- Una fila por línea de cobro y al final una fila con el total.
+- Una fila por línea de cobro y al final tres filas: subtotal (los valores son sin IVA), IVA con su
+  porcentaje y total a facturar (1a-19b).
 - Un texto que empiece con =, +, -, @ (o tabulador/retorno) va precedido de un apóstrofo: así Excel
   no lo ejecuta como fórmula (una dirección o un nombre digitado no debe poder correr nada).
 """
@@ -19,6 +20,8 @@ from dataclasses import dataclass
 from datetime import date
 from decimal import Decimal
 from typing import Protocol
+
+from nucleo.facturacion import Liquidacion, formato_porcentaje, liquidar
 
 BOM = "﻿"
 
@@ -47,10 +50,15 @@ class DatosRelacion:
     hasta: date
     numero_factura: str
     filas: tuple[FilaRelacion, ...]
+    porcentaje_iva: Decimal = Decimal(0)
+
+    @property
+    def liquidacion(self) -> Liquidacion:
+        return liquidar((fila.valor for fila in self.filas), self.porcentaje_iva)
 
     @property
     def total(self) -> Decimal:
-        return sum((fila.valor for fila in self.filas), Decimal(0))
+        return self.liquidacion.total
 
 
 class Exportador(Protocol):
@@ -129,5 +137,9 @@ class CsvGenerico:
                 )
             )
         vacias = [""] * (len(COLUMNAS) - 2)
-        escritor.writerow(["Total", *vacias, numero_para_excel(datos.total)])
+        cuenta = datos.liquidacion
+        escritor.writerow(["Subtotal", *vacias, numero_para_excel(cuenta.subtotal)])
+        iva = f"IVA {formato_porcentaje(cuenta.porcentaje_iva)}"
+        escritor.writerow([iva, *vacias, numero_para_excel(cuenta.iva)])
+        escritor.writerow(["Total", *vacias, numero_para_excel(cuenta.total)])
         return (BOM + salida.getvalue()).encode("utf-8")

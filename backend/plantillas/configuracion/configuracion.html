@@ -76,6 +76,16 @@
     {% include "parciales/campo.html" with campo=formulario.formato_exportacion ayuda="Por ahora es el único formato disponible." %}
   </section>
 
+  <section class="bloque" aria-labelledby="t-facturacion">
+    <h2 class="titulo-seccion" id="t-facturacion">Facturación</h2>
+    {% include "parciales/campo.html" with campo=formulario.porcentaje_iva ayuda="Los valores de cobro son sin IVA: este porcentaje se suma al facturar." %}
+    <p class="ayuda">Encabezado de la orden de facturación:</p>
+    {% include "parciales/campo.html" with campo=formulario.empresa_nombre %}
+    {% include "parciales/campo.html" with campo=formulario.empresa_nit %}
+    {% include "parciales/campo.html" with campo=formulario.empresa_direccion %}
+    {% include "parciales/campo.html" with campo=formulario.empresa_telefono %}
+  </section>
+
   <div class="acciones">
     <button type="submit" class="boton boton--principal">Guardar configuración</button>
   </div>

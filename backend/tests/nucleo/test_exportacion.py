@@ -78,9 +78,24 @@ def test_el_csv_trae_encabezado_una_fila_por_linea_y_el_total():
     ]
     assert filas[2][4] == "42"
     assert filas[2][-1] == "95000,50"
-    assert filas[3][0] == "Total"
+    assert filas[3][0] == "Subtotal"
     assert filas[3][-1] == "275000,50"
-    assert len(filas) == 4
+    assert filas[4][0] == "IVA 0 %"
+    assert filas[4][-1] == "0"
+    assert filas[5][0] == "Total"
+    assert filas[5][-1] == "275000,50"
+    assert len(filas) == 6
+
+
+def test_el_csv_suma_el_iva_al_subtotal():
+    con_iva = DatosRelacion(**{**datos(fila(), fila(servicio=42)).__dict__,
+                               "porcentaje_iva": Decimal(19)})
+    filas = leer(CsvGenerico().exportar(con_iva))
+    assert filas[-3] == ["Subtotal", *[""] * (len(COLUMNAS) - 2), "360000"]
+    assert filas[-2][0] == "IVA 19 %"
+    assert filas[-2][-1] == "68400"
+    assert filas[-1][0] == "Total"
+    assert filas[-1][-1] == "428400"
 
 
 def test_usa_punto_y_coma_y_fin_de_linea_de_windows():

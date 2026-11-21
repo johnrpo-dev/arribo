@@ -18,7 +18,6 @@ from nucleo.cobro import CobroInvalido, EstadoCobro
 from nucleo.estados import Estado
 from nucleo.exportacion import BOM, COLUMNAS
 from nucleo.relacion import EstadoRelacion
-from solicitudes.models import EventoEstado
 
 from .conftest import VALOR, guardar_linea
 
@@ -26,41 +25,6 @@ pytestmark = pytest.mark.django_db
 
 C, R = EstadoCobro, EstadoRelacion
 NOV_1, NOV_15 = date(2026, 11, 1), date(2026, 11, 15)
-EL_5_DE_NOVIEMBRE = datetime(2026, 11, 5, 15, 0, tzinfo=UTC)
-
-
-@pytest.fixture
-def facturacion(client, crear_usuario):
-    usuario = crear_usuario("facturacion", first_name="Laura", last_name="Caja")
-    client.force_login(usuario)
-    return usuario
-
-
-@pytest.fixture
-def por_facturar(crear_servicio, facturacion):
-    """Fábrica: un servicio entregado en `momento` (hora del celular) con su línea por facturar del
-    pagador de la solicitud, con `valor`."""
-
-    def crear(momento=EL_5_DE_NOVIEMBRE, valor=VALOR, referencia=""):
-        servicio = crear_servicio(Estado.ENTREGADO)
-        if referencia:
-            servicio.referencia_externa = referencia
-            servicio.save(update_fields=["referencia_externa"])
-        EventoEstado.objects.create(
-            servicio=servicio,
-            destino=Estado.ENTREGADO.value,
-            origen=EventoEstado.Origen.APP,
-            resultado=EventoEstado.Resultado.APLICADO,
-            conductor=servicio.conductor,
-            hora_dispositivo=momento,
-        )
-        linea = operaciones.crear_linea_al_entregar(servicio)
-        if valor is not None:
-            operaciones.fijar_valor(linea, valor, actor=facturacion)
-        linea.refresh_from_db()
-        return linea
-
-    return crear
 
 
 def armar(cliente, actor, desde=NOV_1, hasta=NOV_15) -> RelacionCobro:
@@ -154,7 +118,9 @@ def test_una_linea_reservada_no_se_factura_suelta(client, por_facturar, cliente,
     html = client.get(f"/cobros/{linea.pk}/").content.decode()
     assert f"/cobros/relaciones/{relacion.pk}/" in html
     assert "Marcar facturada" not in html
-    client.post(f"/cobros/{linea.pk}/facturar/", {"numero_factura": "FE-1"})
+    client.post(
+        f"/cobros/{linea.pk}/facturar/", {"numero_factura": "FE-1", "total_factura": "214.200"}
+    )
     assert estado(linea) == C.POR_FACTURAR
 
 
@@ -292,8 +258,12 @@ def test_el_archivo_trae_cada_linea_con_numero_de_caso_y_el_total(
     assert primera[columna["Valor"]] == "180000"
     assert segunda[columna["Servicio"]] == str(b.servicio_id)
     assert segunda[columna["Valor"]] == "95000,50"
-    assert filas[3][0] == "Total"
+    assert filas[3][0] == "Subtotal"
     assert filas[3][-1] == "275000,50"
+    assert filas[4][0] == "IVA 19 %"
+    assert filas[4][-1] == "52250"
+    assert filas[5][0] == "Total"
+    assert filas[5][-1] == "327250,50"
 
 
 def test_el_archivo_de_una_facturada_lleva_el_numero_de_factura(
@@ -340,7 +310,10 @@ def test_armar_facturar_y_pagar_desde_el_panel(client, por_facturar, cliente, fa
     assert "Armada" in html
     assert "$ 180.000" in html
 
-    client.post(f"/cobros/relaciones/{relacion.pk}/facturar/", {"numero_factura": "FE-9"})
+    client.post(
+        f"/cobros/relaciones/{relacion.pk}/facturar/",
+        {"numero_factura": "FE-9", "total_factura": "214.200"},
+    )
     assert estado(linea) == C.FACTURADO
     client.post(f"/cobros/relaciones/{relacion.pk}/pagar/")
     assert estado(linea) == C.PAGADO
