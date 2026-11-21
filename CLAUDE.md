@@ -39,7 +39,7 @@ uv run pytest tests/nucleo -q            # solo reglas de negocio (menos de 1 s)
 uv run ruff check .                      # linter
 uv run python manage.py check            # comprobación de Django
 uv run python manage.py migrate          # aplicar migraciones
-uv run python manage.py runserver        # panel en http://127.0.0.1:8000
+uv run python manage.py runserver        # panel en http://127.0.0.1:8000 (en desarrollo aplica antes las migraciones pendientes)
 uv run python manage.py evaluar_alertas  # alertas por umbral (en producción, cada minuto)
 ```
 
