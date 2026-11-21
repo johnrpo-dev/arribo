@@ -1587,6 +1587,25 @@ tiene botón de actualizar información".
   2. Desconectar y volver a conectar el cable: la consola dice "se volvió a crear el túnel USB" y la
      app entra sin hacer nada más.
 
+### Corrección (21/11/2026) · Cobros no abría: migraciones sin aplicar
+
+- **Causa.** La base del PC no tenía tres migraciones de las últimas tareas
+  (`cobros.0002_relacion_de_cobro`, `alertas.0003_alertas_por_umbral`,
+  `solicitudes.0007_ida_sin_entregar_es_conflicto`). Al traer el código nuevo nadie corrió
+  `manage.py migrate`, el panel arrancó igual y Cobros falló porque su tabla nueva
+  (`cobros_relacioncobro`) no existía. Las tres solo cambian la estructura: no tocan datos.
+- **Solución de raíz.** En desarrollo, `runserver` aplica las migraciones pendientes antes de
+  atender y lo dice en la consola ("Aplicando 1 migración(es) pendiente(s): ..."), igual que
+  producción ya lo hace al arrancar (`despliegue/servidor.sh`). Es un `runserver` propio en
+  `backend/panel/management/commands/runserver.py` (el de Django con estáticos, más la migración);
+  para que gane, `panel` va antes que `django.contrib.staticfiles` en `INSTALLED_APPS`. Si la
+  migración falla, la consola lo dice con el comando a correr y el panel arranca igual.
+- **Verificado** en la base de recorrido: se desaplicó `cobros.0002`, se arrancó `runserver`, la
+  consola avisó y aplicó la migración, y `/cobros/` respondió 200. 7 pruebas nuevas en
+  `tests/panel/test_runserver.py`.
+- **Cómo probar (1 minuto).** Cerrar el panel (Ctrl+C) y volver a arrancarlo. La consola dice
+  "Aplicando 3 migración(es) pendiente(s)" y "Migraciones aplicadas". Entrar a Cobros: abre.
+
 ## Escalamientos
 
 Ninguno todavía.
