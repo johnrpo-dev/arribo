@@ -33,6 +33,16 @@ urlpatterns = [
         _con_rol(views.facturar_relacion),
         name="facturar_relacion",
     ),
+    path(
+        "cobros/relaciones/<int:pk>/orden/",
+        _con_rol(views.orden_de_facturacion),
+        name="orden_de_facturacion",
+    ),
+    path(
+        "cobros/relaciones/<int:pk>/pagador/",
+        _con_rol(views.datos_facturacion_pagador),
+        name="datos_facturacion_pagador",
+    ),
     path("cobros/relaciones/<int:pk>/pagar/", _con_rol(views.pagar_relacion), name="pagar_relacion"),
     path(
         "cobros/relaciones/<int:pk>/descartar/",

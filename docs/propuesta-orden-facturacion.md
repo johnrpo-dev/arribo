@@ -1,8 +1,15 @@
 # Propuesta: orden de facturación
 
-Estado: **propuesta, sin aprobar.** No se construye hasta que el dueño la apruebe y responda las
-preguntas de `QUESTIONS.md` (sección "Orden de facturación"). Tarea: 1a-19b en
-`docs/fase-1a-tareas.md`.
+Estado: **parte A hecha como borrador** (21/11/2026, tarea 1a-19b). Pendientes del dueño en
+`QUESTIONS.md`: quién factura, datos de la empresa y qué programa de facturación usan (parte B).
+
+Cómo quedó el borrador, frente a lo propuesto abajo:
+- La orden **es la relación de cobro armada** y lleva su mismo número (no un consecutivo `OF-`
+  aparte): una relación ya congela sus líneas y se factura con un solo número.
+- El IVA (19 %, Configuración → Facturación) se guarda en la relación al armarla.
+- Los datos de facturación del pagador se completan desde la relación y se guardan en el cliente.
+- La verificación de total y número aplica también a la línea suelta.
+- No se hicieron los botones de copiar cada dato: se puede seleccionar y copiar de la orden.
 
 ## El problema
 

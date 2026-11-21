@@ -54,6 +54,13 @@ class Cliente(models.Model):
         choices=ModalidadCobro.choices,
         default=ModalidadCobro.POR_SERVICIO,
     )
+    # Datos de facturación (1a-19b): salen en la orden de facturación de lo que este cliente paga.
+    razon_social = models.CharField(
+        "razón social", max_length=200, blank=True, help_text="Si es distinta del nombre."
+    )
+    direccion = models.CharField("dirección de facturación", max_length=200, blank=True)
+    ciudad = models.CharField("ciudad", max_length=80, blank=True)
+    correo_facturacion = models.EmailField("correo de facturación", blank=True)
     firma_obligatoria = models.BooleanField("firma obligatoria", default=False)
     notas = models.TextField("notas", blank=True)
     activo = models.BooleanField("activo", default=True)
@@ -83,6 +90,21 @@ class Cliente(models.Model):
 
     def __str__(self):
         return self.nombre
+
+    @property
+    def nombre_para_facturar(self) -> str:
+        return self.razon_social or self.nombre
+
+    def datos_de_facturacion_que_faltan(self) -> list[str]:
+        """Lo que el facturador necesita y el cliente aún no tiene."""
+        faltan = []
+        if not self.documento.strip():
+            faltan.append("NIT o documento")
+        if not self.direccion.strip():
+            faltan.append("dirección")
+        if not self.ciudad.strip():
+            faltan.append("ciudad")
+        return faltan
 
 
 class TelefonoCliente(models.Model):

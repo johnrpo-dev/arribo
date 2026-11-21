@@ -10,12 +10,14 @@ cambiando las operaciones de `cobros/operaciones.py`, que dejan su historial.
   líneas que siguen con esa factura (si a una le anularon la factura, se deja y se avisa).
 """
 from dataclasses import dataclass
+from decimal import Decimal
 
 from django.db import IntegrityError, transaction
 from django.db.models import OuterRef, Subquery
 from django.db.models.functions import Coalesce, TruncDate
 from django.utils import timezone
 
+from configuracion.models import configuracion_vigente
 from nucleo import relacion as reglas
 from nucleo.cobro import CobroInvalido, EstadoCobro
 from nucleo.estados import Estado
@@ -74,7 +76,12 @@ def armar(pagador, desde, hasta, *, actor) -> RelacionCobro:
         lineas = list(candidatas(pagador, desde, hasta).select_for_update(of=("self",)))
         nueva = reglas.armar(len(lineas))
         relacion = RelacionCobro.objects.create(
-            pagador=pagador, desde=desde, hasta=hasta, estado=nueva.estado.value, creada_por=actor
+            pagador=pagador,
+            desde=desde,
+            hasta=hasta,
+            estado=nueva.estado.value,
+            creada_por=actor,
+            porcentaje_iva=configuracion_vigente().porcentaje_iva,
         )
         try:
             with transaction.atomic():
@@ -176,7 +183,15 @@ def datos_para_exportar(relacion) -> DatosRelacion:
         hasta=relacion.hasta,
         numero_factura=relacion.numero_factura,
         filas=tuple(filas),
+        porcentaje_iva=porcentaje_iva_de(relacion),
     )
+
+
+def porcentaje_iva_de(relacion) -> Decimal:
+    """El IVA con que se armó la relación (o el de la configuración si es anterior al IVA)."""
+    if relacion.porcentaje_iva is not None:
+        return relacion.porcentaje_iva
+    return configuracion_vigente().porcentaje_iva
 
 
 def _bloquear(relacion) -> RelacionCobro:

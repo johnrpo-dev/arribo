@@ -348,6 +348,11 @@ class RelacionCobro(models.Model):
     )
     numero_factura = models.CharField("número de factura", max_length=60, blank=True)
     motivo_descarte = models.TextField("motivo del descarte", blank=True)
+    # IVA vigente cuando se armó (1a-19b): la orden no cambia si después cambia la configuración.
+    # Vacío en las relaciones armadas antes de existir el IVA: usan el de la configuración.
+    porcentaje_iva = models.DecimalField(
+        "IVA (%)", max_digits=5, decimal_places=2, null=True, blank=True
+    )
     creada_en = models.DateTimeField("armada en", auto_now_add=True)
     creada_por = models.ForeignKey(
         settings.AUTH_USER_MODEL,

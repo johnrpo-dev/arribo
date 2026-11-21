@@ -21,18 +21,21 @@ from django.utils.text import slugify
 from django.views.decorators.http import require_POST
 
 from clientes.models import Cliente, tarifa_propuesta
+from configuracion.models import configuracion_vigente
 from configuracion.operaciones import puede_ver_valores
 from nucleo.cobro import CobroInvalido, EstadoCobro, formato_pesos
 from nucleo.estados import Estado
+from nucleo.facturacion import formato_porcentaje
 from nucleo.relacion import EstadoRelacion
 from nucleo.trayecto import puntos_del_servicio
 from solicitudes.models import EventoEstado, Servicio
 
-from . import consultas, operaciones
+from . import consultas, facturacion, operaciones
 from . import relaciones as relaciones_op
 from .exportacion import exportador_configurado
 from .formularios import (
     FormularioAnulacion,
+    FormularioDatosFacturacion,
     FormularioDescarte,
     FormularioFactura,
     FormularioRelacion,
@@ -101,6 +104,9 @@ def detalle(request, pk, formularios=None):
 
     historial = list(linea.historial.select_related("usuario"))
     reserva = linea.inclusiones.filter(reservada=True).first()
+    cuenta = None
+    if ve_valores and estado == EstadoCobro.POR_FACTURAR:
+        cuenta = _cuenta_para_mostrar(facturacion.liquidar_lineas([linea]))
     return render(
         request,
         "cobros/linea.html",
@@ -115,6 +121,7 @@ def detalle(request, pk, formularios=None):
             "ve_valores": ve_valores,
             "valor": formato_pesos(linea.valor) if ve_valores else None,
             "tarifa": formato_pesos(tarifa) if tarifa else None,
+            "cuenta": cuenta,
             "puede_fijar_valor": ve_valores
             and estado in (EstadoCobro.SIN_VALOR, EstadoCobro.POR_FACTURAR),
             "puede_facturar": estado == EstadoCobro.POR_FACTURAR and reserva is None,
@@ -163,7 +170,13 @@ def facturar(request, pk):
     return _aplicar(
         request,
         linea,
-        lambda: operaciones.facturar(linea, numero, actor=request.user),
+        lambda: facturacion.facturar_linea(
+            linea,
+            numero,
+            formulario.cleaned_data["total_factura"],
+            actor=request.user,
+            mostrar_valores=puede_ver_valores(request.user),
+        ),
         f"Facturada con el número {numero.strip()}.",
     )
 
@@ -216,6 +229,15 @@ def _aplicar(request, linea, operacion, exito):
     else:
         messages.success(request, exito)
     return redirect("linea_cobro", pk=linea.pk)
+
+
+def _cuenta_para_mostrar(cuenta):
+    return {
+        "subtotal": formato_pesos(cuenta.subtotal),
+        "porcentaje": formato_porcentaje(cuenta.porcentaje_iva),
+        "iva": formato_pesos(cuenta.iva),
+        "total": formato_pesos(cuenta.total),
+    }
 
 
 def _entregado_en(servicio):
@@ -315,7 +337,10 @@ def ver_relacion(request, pk, formularios=None):
         {
             "relacion": relacion,
             "lineas": [(linea, formato_pesos(linea.valor)) for linea in lineas],
-            "total": formato_pesos(sum((linea.valor or 0 for linea in lineas), Decimal(0))),
+            "cuenta": _cuenta_para_mostrar(facturacion.liquidar_relacion(relacion, lineas)),
+            "faltan": relacion.pagador.datos_de_facturacion_que_faltan(),
+            "formulario_pagador": formularios.get("pagador")
+            or FormularioDatosFacturacion(instance=relacion.pagador),
             "exportador": exportador_configurado(),
             "puede_facturar": estado == EstadoRelacion.ARMADA,
             "puede_pagar": estado == EstadoRelacion.FACTURADA,
@@ -345,11 +370,48 @@ def facturar_relacion(request, pk):
         return ver_relacion(request, pk, {"factura": formulario})
     numero = formulario.cleaned_data["numero_factura"].strip()
     try:
-        relaciones_op.facturar(relacion, numero, actor=request.user)
+        facturacion.facturar_relacion(
+            relacion, numero, formulario.cleaned_data["total_factura"], actor=request.user
+        )
     except CobroInvalido as error:
         messages.error(request, f"No se facturó: {error}.")
     else:
         messages.success(request, f"Relación facturada con el número {numero}: cada línea quedó facturada.")
+    return redirect("relacion_cobro", pk=pk)
+
+
+def orden_de_facturacion(request, pk):
+    """La orden de facturación de una relación: lo que el facturador pasa a su programa, con el
+    subtotal, el IVA y el total calculados por Arribo. Se imprime desde el navegador."""
+    _exigir_valores(request)
+    relacion = get_object_or_404(RelacionCobro.objects.select_related("pagador"), pk=pk)
+    lineas = list(relaciones_op.lineas_de(relacion))
+    datos = relaciones_op.datos_para_exportar(relacion)
+    return render(
+        request,
+        "cobros/orden.html",
+        {
+            "relacion": relacion,
+            "pagador": relacion.pagador,
+            "faltan": relacion.pagador.datos_de_facturacion_que_faltan(),
+            "empresa": configuracion_vigente(),
+            "filas": [(fila, formato_pesos(fila.valor)) for fila in datos.filas],
+            "cuenta": _cuenta_para_mostrar(facturacion.liquidar_relacion(relacion, lineas)),
+            "hoy": timezone.localdate(),
+        },
+    )
+
+
+@require_POST
+def datos_facturacion_pagador(request, pk):
+    """Guarda en el cliente los datos de facturación que pide la orden."""
+    _exigir_valores(request)
+    relacion = get_object_or_404(RelacionCobro.objects.select_related("pagador"), pk=pk)
+    formulario = FormularioDatosFacturacion(request.POST, instance=relacion.pagador)
+    if not formulario.is_valid():
+        return ver_relacion(request, pk, {"pagador": formulario})
+    formulario.save()
+    messages.success(request, f"Datos de facturación de {relacion.pagador.nombre} guardados.")
     return redirect("relacion_cobro", pk=pk)
 
 

@@ -40,6 +40,11 @@ class FormularioConfiguracion(forms.ModelForm):
             "nocturno_inicio",
             "nocturno_fin",
             "formato_exportacion",
+            "porcentaje_iva",
+            "empresa_nombre",
+            "empresa_nit",
+            "empresa_direccion",
+            "empresa_telefono",
         )
         labels: ClassVar[dict] = {
             "ven_valores_logistica": "Logística",
@@ -54,6 +59,7 @@ class FormularioConfiguracion(forms.ModelForm):
             **{nombre: forms.NumberInput(attrs={"min": 1}) for nombre in UMBRALES},
             "nocturno_inicio": HoraInput,
             "nocturno_fin": HoraInput,
+            "porcentaje_iva": forms.NumberInput(attrs={"min": 0, "max": 100, "step": "0.01"}),
         }
         error_messages: ClassVar[dict] = {
             "minimo_fotos": {
@@ -61,6 +67,10 @@ class FormularioConfiguracion(forms.ModelForm):
                 "max_value": f"El mínimo de fotos va de 0 a {MAXIMO_FOTOS}.",
             },
             **{nombre: {"min_value": "Escriba un número mayor que cero."} for nombre in UMBRALES},
+            "porcentaje_iva": {
+                "min_value": "El IVA va de 0 a 100.",
+                "max_value": "El IVA va de 0 a 100.",
+            },
         }
 
     def clean(self):

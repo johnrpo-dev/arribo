@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% block titulo %}Orden de facturación {{ relacion.pk }}{% endblock %}
+{% block cuerpo %}
+<main id="contenido" class="orden" tabindex="-1">
+  <div class="orden-barra no-imprimir">
+    <a href="{% url 'relacion_cobro' relacion.pk %}">← Relación de cobro N.º {{ relacion.pk }}</a>
+    <button type="button" class="boton boton--principal" onclick="window.print()">Imprimir o guardar en PDF</button>
+  </div>
+  {% include "parciales/mensajes.html" %}
+
+  <header class="orden-encabezado">
+    <div>
+      {% if empresa.empresa_nombre %}
+      <p class="orden-empresa">{{ empresa.empresa_nombre }}</p>
+      <p class="texto-secundario">{% if empresa.empresa_nit %}NIT {{ empresa.empresa_nit }}{% endif %}{% if empresa.empresa_direccion %} · {{ empresa.empresa_direccion }}{% endif %}{% if empresa.empresa_telefono %} · Tel. {{ empresa.empresa_telefono }}{% endif %}</p>
+      {% else %}
+      <p class="orden-empresa">Datos de la empresa sin configurar</p>
+      <p class="texto-secundario no-imprimir">Se escriben en Configuración → Facturación.</p>
+      {% endif %}
+    </div>
+    <div class="orden-numero">
+      <h1>Orden de facturación N.º {{ relacion.pk }}</h1>
+      <p class="texto-secundario">Emitida el {{ hoy|date:"d/m/Y" }} · servicios del {{ relacion.desde|date:"d/m/Y" }} al {{ relacion.hasta|date:"d/m/Y" }}</p>
+      <p class="texto-secundario">Estado: {{ relacion.estado_etiqueta }}{% if relacion.numero_factura %} · factura {{ relacion.numero_factura }}{% endif %}</p>
+    </div>
+  </header>
+
+  <p class="orden-nota">Documento interno para hacer la factura en el programa de facturación. <strong>No es una factura.</strong></p>
+
+  {% if faltan %}
+  <p class="aviso aviso--advertencia">Al pagador le falta: {{ faltan|join:", " }}. Complételo en la relación de cobro antes de facturar.</p>
+  {% endif %}
+
+  <section class="orden-bloque" aria-labelledby="t-facturar-a">
+    <h2 id="t-facturar-a">Facturar a</h2>
+    <table class="tabla orden-datos">
+      <tbody>
+        <tr><th scope="row">Nombre o razón social</th><td>{{ pagador.nombre_para_facturar }}</td></tr>
+        <tr><th scope="row">NIT o documento</th><td>{{ pagador.documento|default:"—" }}</td></tr>
+        <tr><th scope="row">Dirección</th><td>{{ pagador.direccion|default:"—" }}{% if pagador.ciudad %}, {{ pagador.ciudad }}{% endif %}</td></tr>
+        <tr><th scope="row">Correo de facturación</th><td>{{ pagador.correo_facturacion|default:"—" }}</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section class="orden-bloque" aria-labelledby="t-conceptos">
+    <h2 id="t-conceptos">Servicios</h2>
+    <table class="tabla">
+      <thead>
+        <tr>
+          <th scope="col">Servicio</th>
+          <th scope="col">Fecha</th>
+          <th scope="col">Descripción</th>
+          <th scope="col">Número de caso</th>
+          <th scope="col" class="orden-valor">Valor</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for fila, valor in filas %}
+        <tr>
+          <td>N.º {{ fila.servicio }}</td>
+          <td>{{ fila.fecha_servicio|date:"d/m/Y" }}</td>
+          <td>{{ fila.tipo_servicio }} · {% if fila.placa %}placa {{ fila.placa }}{% else %}VIN {{ fila.vin }}{% endif %}{% if fila.vehiculo %} ({{ fila.vehiculo }}){% endif %}<br><span class="texto-secundario">{{ fila.origen }} → {{ fila.destino }}</span></td>
+          <td>{{ fila.numero_caso|default:"—" }}</td>
+          <td class="orden-valor dinero">{{ valor }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+      <tfoot>
+        <tr><th scope="row" colspan="4">Subtotal</th><td class="orden-valor dinero">{{ cuenta.subtotal }}</td></tr>
+        <tr><th scope="row" colspan="4">IVA {{ cuenta.porcentaje }}</th><td class="orden-valor dinero">{{ cuenta.iva }}</td></tr>
+        <tr class="orden-total"><th scope="row" colspan="4">Total a facturar</th><td class="orden-valor dinero">{{ cuenta.total }}</td></tr>
+      </tfoot>
+    </table>
+  </section>
+
+  <p class="texto-secundario">Al registrar la factura en Arribo se pide su número y su total: si el total no es {{ cuenta.total }}, no se registra.</p>
+</main>
+{% endblock %}

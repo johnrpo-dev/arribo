@@ -1613,6 +1613,34 @@ tiene botón de actualizar información".
   (sin aprobar). Las cuatro preguntas que faltan (IVA, datos de facturación del cliente, quién
   factura y qué programa usan) están en `QUESTIONS.md`. No se construyó nada.
 
+### 1a-19b (21/11/2026) · Orden de facturación (borrador)
+
+- **Qué se hizo.** Respuestas del dueño: IVA del 19 % sumado al facturar; los datos de facturación
+  los guarda el cliente; por ahora un borrador; sin información del programa de facturación.
+  - `nucleo/facturacion.py`: subtotal, IVA redondeado al peso y total; verificación del total
+    digitado y del número repetido. Configuración → Facturación: IVA y datos de la empresa.
+  - La relación de cobro armada es la orden: muestra subtotal, IVA y total, avisa qué datos le
+    faltan al pagador y permite completarlos (se guardan en el cliente). "Ver orden de facturación"
+    abre una página para imprimir o guardar en PDF, con "No es una factura".
+  - Al registrar la factura (relación o línea suelta) se pide número **y total**: un total distinto
+    o un número ya usado no se registran y el mensaje dice la diferencia o dónde está el número.
+  - El IVA queda fijo en la relación al armarla. El Excel/CSV trae subtotal, IVA y total.
+  - Pruebas nuevas en `tests/nucleo/test_facturacion.py` y `tests/cobros/test_orden_de_facturacion.py`;
+    las de facturar en pantalla ahora mandan el total.
+- **Recorrido** en la base de recorrido: relación de tres servicios (525.000 + IVA 99.750 =
+  624.750); con 642.750 no se facturó; con 624.750 quedaron las tres líneas en FE-2001; una línea
+  suelta con "fe-2001" fue rechazada y con FE-2002 se facturó. El servidor aplicó solo las tres
+  migraciones nuevas al arrancar.
+- **Cómo probar (5 minutos).** Cerrar y volver a arrancar el panel (aplica las migraciones).
+  1. Configuración → Facturación: escribir el nombre y NIT de la empresa; el IVA ya está en 19.
+  2. Cobros → Relaciones de cobro: armar una de un cliente con servicios por facturar. Ver subtotal,
+     IVA y total; completar los datos del pagador.
+  3. "Ver orden de facturación" e "Imprimir o guardar en PDF".
+  4. Registrar la factura con un total equivocado: no deja y dice la diferencia. Con el total
+     correcto: todas las líneas quedan facturadas.
+- **Pendiente.** Quién factura, datos de la empresa y programa de facturación (`QUESTIONS.md`).
+  No hay pantalla de Clientes en el panel: los datos de facturación se editan desde la relación.
+
 ## Escalamientos
 
 Ninguno todavía.

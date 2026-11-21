@@ -1,7 +1,10 @@
 """Formularios de la sección Cobros. Solo validan lo que se digita; las reglas del cobro las
 aplican `cobros/operaciones.py` y `nucleo/cobro.py`."""
+from typing import ClassVar
+
 from django import forms
 
+from clientes.models import Cliente
 from nucleo.cobro import CobroInvalido, leer_pesos
 
 
@@ -22,12 +25,38 @@ class FormularioValor(forms.Form):
 
 
 class FormularioFactura(forms.Form):
+    """Número y total de la factura que se hizo en el programa de facturación (1a-19b): el total
+    se compara con el de la orden para atrapar errores de digitación."""
+
     numero_factura = forms.CharField(
         label="Número de factura",
         max_length=60,
         error_messages={"required": "Escriba el número de factura."},
         widget=forms.TextInput(attrs={"autocomplete": "off"}),
     )
+    total_factura = forms.CharField(
+        label="Total de la factura (con IVA)",
+        max_length=30,
+        error_messages={"required": "Escriba el total de la factura."},
+        widget=forms.TextInput(attrs={"inputmode": "decimal", "autocomplete": "off"}),
+        help_text="Tal como sale en la factura, por ejemplo 1.190.000",
+    )
+
+    def clean_total_factura(self):
+        try:
+            return leer_pesos(self.cleaned_data["total_factura"])
+        except CobroInvalido as error:
+            raise forms.ValidationError(str(error)) from error
+
+
+class FormularioDatosFacturacion(forms.ModelForm):
+    """Datos de facturación del pagador (1a-19b). Se guardan en el cliente: la próxima orden ya los
+    trae."""
+
+    class Meta:
+        model = Cliente
+        fields = ("razon_social", "documento", "direccion", "ciudad", "correo_facturacion")
+        labels: ClassVar[dict] = {"documento": "NIT o documento"}
 
 
 class FormularioAnulacion(forms.Form):

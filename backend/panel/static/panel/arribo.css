@@ -1196,3 +1196,47 @@ a.tarjeta-titulo:hover {
 .opcion:has(input:disabled) {
   color: var(--texto-secundario);
 }
+
+/* Orden de facturación (1a-19b): página propia, sin barra lateral, pensada para imprimirse o
+   guardarse en PDF desde el navegador y entregarse al facturador. */
+.orden {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: var(--e8) 24px;
+  background: var(--superficie);
+  min-height: 100vh;
+}
+.orden:focus { outline: none; }
+.orden-barra {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 24px;
+}
+.orden-encabezado {
+  display: flex;
+  justify-content: space-between;
+  gap: 24px;
+  flex-wrap: wrap;
+  border-bottom: 2px solid var(--texto);
+  padding-bottom: 16px;
+}
+.orden-empresa { font-size: 1.25rem; font-weight: 700; margin: 0; }
+.orden-numero { text-align: right; }
+.orden-numero h1 { font-size: 1.35rem; margin: 0 0 4px; }
+.orden-numero p { margin: 0; }
+.orden-nota { margin: 16px 0; }
+.orden-bloque { margin: 24px 0; }
+.orden-bloque h2 { font-size: 1rem; margin: 0 0 8px; }
+.orden-datos th { width: 34%; }
+.tabla .orden-valor { text-align: right; }
+.orden-total th, .orden-total td { font-weight: 700; font-size: 1.05rem; }
+
+@media print {
+  body, .orden { background: #ffffff; }
+  .orden { padding: 0; max-width: none; }
+  .no-imprimir, .saltar { display: none !important; }
+  .tabla { box-shadow: none; }
+}
