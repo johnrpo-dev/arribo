@@ -49,30 +49,27 @@ Ver `docs/despliegue.md`, sección 4.
 
 La pantalla de ingreso muestra abajo, en letra pequeña, a qué servidor apunta.
 
-En desarrollo, el celular llega al backend del PC por el cable USB. `adb` no está en el PATH; está en
-el SDK de Android:
+En desarrollo, el celular llega al backend del PC por el cable USB con un túnel de adb
+(`adb reverse tcp:8000 tcp:8000`): `127.0.0.1:8000` en el celular es el `runserver` del PC.
 
-```
-& "$env:LOCALAPPDATA\Android\sdk\platform-tools\adb.exe" reverse tcp:8000 tcp:8000
-```
+**No hay que crear el túnel a mano.** Desde que `runserver` arranca (como sea: `uv run python
+manage.py runserver`, `arrancar.ps1` o el preview), revisa cada 3 segundos si hay un celular
+conectado y, si le falta el túnel, lo crea (`backend/panel/tunel_usb.py`). Así se recupera solo
+cuando el cable se desconecta, el celular se reinicia o adb se reinicia, que eran las causas de
+"No hay conexión con el servidor". La consola del servidor dice en qué estado está:
+"Celular conectado...", "Esperando el celular..." o "Modo sin señal...".
 
-Esto hace que `127.0.0.1:8000` en el celular sea el `runserver` del PC. El túnel se pierde cada vez
-que el celular se desconecta, se bloquea o adb se reinicia, y entonces la app dice "No hay conexión
-con el servidor". Para no repetirlo a mano, use desde la raíz del repositorio:
-
-```
-powershell -ExecutionPolicy Bypass -File .\arrancar.ps1
-```
-
-Arranca el panel (o usa el que ya esté corriendo) y revisa el túnel cada 3 segundos, recreándolo
-solo. Para quitarlo a mano: `... adb.exe reverse --remove-all`.
+Si aun así la app no conecta: que el servidor esté corriendo, que el celular aparezca como
+`device` en `adb devices` (acepte la depuración USB si la pide) y que la app instalada sea la de
+desarrollo (abajo en la pantalla de ingreso dice `http://127.0.0.1:8000`).
 
 HTTP en claro solo se permite en el APK de depuración y solo hacia `127.0.0.1` y `localhost`
 (`android/app/src/debug/res/xml/network_security_config.xml`). El APK de release solo habla HTTPS.
 
-**Probar sin señal:** el túnel de `adb reverse` va por el cable y sigue funcionando en modo avión.
-Para simular de verdad que no hay señal, además del modo avión hay que quitar el túnel
-(`adb.exe reverse --remove-all`) o desconectar el cable.
+**Probar sin señal:** el túnel va por el cable y sigue funcionando en modo avión, y el servidor lo
+recrea si se quita a mano. Para simular de verdad que no hay señal, además del modo avión, desde
+`backend/`: `uv run python manage.py sin_senal` (quita el túnel y lo deja apagado). Para volver:
+`uv run python manage.py con_senal`. Desconectar el cable también sirve.
 
 ## Cómo está armada
 

@@ -43,11 +43,13 @@ uv run python manage.py runserver        # panel en http://127.0.0.1:8000
 uv run python manage.py evaluar_alertas  # alertas por umbral (en producción, cada minuto)
 ```
 
-Para probar con el celular por USB, desde la raíz del repositorio (deja el panel corriendo y
-recrea solo el túnel `adb reverse` cada vez que el celular se reconecta; Ctrl+C para terminar):
+Celular por USB: `runserver` (en desarrollo) mantiene solo el túnel `adb reverse` del celular y lo
+recrea si se pierde (`backend/panel/tunel_usb.py`); no hay que crearlo a mano ni usar otro script.
+`arrancar.ps1` en la raíz solo arranca el panel. Para la prueba sin señal, desde `backend/`:
 
 ```
-powershell -ExecutionPolicy Bypass -File .\arrancar.ps1
+uv run python manage.py sin_senal                # quita el túnel y lo deja apagado
+uv run python manage.py con_senal                # lo devuelve
 ```
 
 Desde `conductor/` (cuando exista el proyecto Flutter, tarea 1a-01):
