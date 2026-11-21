@@ -1606,6 +1606,13 @@ tiene botón de actualizar información".
 - **Cómo probar (1 minuto).** Cerrar el panel (Ctrl+C) y volver a arrancarlo. La consola dice
   "Aplicando 3 migración(es) pendiente(s)" y "Migraciones aplicadas". Entrar a Cobros: abre.
 
+### Propuesta (21/11/2026) · Orden de facturación
+
+- El dueño pidió una forma de pasarle al facturador los datos exactos para evitar errores al
+  facturar. Se escribió la propuesta en `docs/propuesta-orden-facturacion.md` y la tarea 1a-19b
+  (sin aprobar). Las cuatro preguntas que faltan (IVA, datos de facturación del cliente, quién
+  factura y qué programa usan) están en `QUESTIONS.md`. No se construyó nada.
+
 ## Escalamientos
 
 Ninguno todavía.
