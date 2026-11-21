@@ -22,6 +22,7 @@ db.sqlite3
 # Archivos subidos en desarrollo, estáticos juntados y respaldos
 backend/media/
 backend/estaticos/
+backend/.sin_senal
 despliegue/respaldos/
 
 # Flutter

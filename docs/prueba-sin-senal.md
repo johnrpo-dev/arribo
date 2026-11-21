@@ -5,9 +5,10 @@ Repetir completa antes de la demo y después de cualquier cambio en la cola o en
 
 Preparación: cargar los datos ficticios, iniciar sesión como un conductor con grúa de capacidad 1 y
 asignarle tres servicios desde el panel. "Sin señal" es modo avión, con Wi-Fi apagado. Si la app
-habla con el computador por el cable USB (`adb reverse`, en desarrollo), el modo avión no basta:
-además hay que quitar el túnel (`adb.exe reverse --remove-all`) o desconectar el cable; para
-"volver a tener señal", repetir `adb.exe reverse tcp:8000 tcp:8000` (ver `conductor/README.md`).
+habla con el computador por el cable USB (en desarrollo), el modo avión no basta: además, desde
+`backend/`, correr `uv run python manage.py sin_senal` (quita el túnel USB y lo deja apagado; el
+servidor ya no lo recrea) o desconectar el cable. Para "volver a tener señal":
+`uv run python manage.py con_senal` (ver `conductor/README.md`).
 
 Anotar en cada punto: fecha, versión del APK y resultado.
 

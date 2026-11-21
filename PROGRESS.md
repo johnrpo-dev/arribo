@@ -1561,6 +1561,32 @@ tiene botón de actualizar información".
   2. Abrir `https://DOMINIO/salud/`.
   3. Compilar el APK con `compilar-apk.ps1`, instalarlo e ingresar con un conductor.
 
+### Corrección (21/11/2026) · "No hay conexión con el servidor" en el celular, de raíz
+
+- **Causa.** En desarrollo el celular llega al PC por el túnel USB `adb reverse`. Solo lo creaba y
+  mantenía `arrancar.ps1`: si el panel se arrancaba con `manage.py runserver` a secas, o si el túnel
+  se perdía (cable, reinicio del celular o de adb) sin ese script abierto, la app quedaba sin
+  servidor aunque el panel estuviera corriendo. Eso fue lo que pasó esta vez.
+- **Solución.** El propio `runserver` (solo en desarrollo) vigila el túnel cada 3 segundos y lo crea
+  o recrea si falta (`backend/panel/tunel_usb.py`, arrancado desde `PanelConfig.ready`). Ya no
+  importa cómo se arranque el panel. `arrancar.ps1` queda solo para arrancarlo.
+- **Prueba sin señal.** Como el túnel vuelve solo, quitarlo a mano ya no simula la falta de señal.
+  Para eso están `manage.py sin_senal` (lo quita y lo deja apagado) y `manage.py con_senal`. Se
+  actualizaron `docs/prueba-sin-senal.md` y `conductor/README.md`.
+- **Verificado con el Motorola conectado.**
+  - El túnel apareció solo cuando el servidor del dueño recargó con el cambio.
+  - Se quitó a mano y volvió a los 2 segundos.
+  - Se reinició adb (`kill-server`) y volvió solo.
+  - En cada caso, desde el celular `http://127.0.0.1:8000/salud/` respondió `ok`.
+  - Con `sin_senal` el celular no llega al servidor y el túnel no vuelve; con `con_senal` llega de
+    nuevo.
+  - 17 pruebas nuevas en `tests/panel/test_tunel_usb.py`, con un adb falso.
+- **En producción** no hay túnel: la app apunta al dominio con HTTPS (`docs/despliegue.md`).
+- **Cómo probar (2 minutos).**
+  1. Arrancar el panel como sea y conectar el celular: la consola dice "Celular conectado".
+  2. Desconectar y volver a conectar el cable: la consola dice "se volvió a crear el túnel USB" y la
+     app entra sin hacer nada más.
+
 ## Escalamientos
 
 Ninguno todavía.
