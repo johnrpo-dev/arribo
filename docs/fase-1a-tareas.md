@@ -182,6 +182,17 @@ Toda tarea termina con `uv run pytest -q` y `uv run ruff check .` en verde, más
   Servicios del día por estado, no concretadas por motivo, cobros pendientes por pagador, documentos por vencer.
   Verificar: pruebas de los totales con datos conocidos.
 
+- [ ] **1a-19b Orden de facturación** (5 h, parte A). Depende de: 17. Pedida por el dueño.
+  **Propuesta sin aprobar**: no se empieza hasta que el dueño la apruebe y responda las preguntas
+  de "Orden de facturación" en `QUESTIONS.md` (IVA, datos de facturación del cliente, quién
+  factura, qué programa usan). Detalle en `docs/propuesta-orden-facturacion.md`.
+  Parte A: Arribo arma una orden interna (no es factura) desde una relación o una línea, con los
+  datos y el total exactos; queda congelada; el facturador la ve y la imprime; al registrar la
+  factura escribe número y total, y Arribo rechaza un total distinto o un número ya usado.
+  Parte B (después): archivo en el formato de importación del programa de facturación.
+  Verificar: un total mal digitado y un número repetido no se registran; uno correcto factura
+  todas las líneas de la orden.
+
 ## Cierre
 
 - [x] **1a-20 Datos ficticios** (3 h). Depende de: 19.

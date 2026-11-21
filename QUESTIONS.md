@@ -7,6 +7,24 @@ Formato: fecha, tarea, pregunta, qué se asumió mientras tanto (si se asumió a
 
 ## Abiertas
 
+### Orden de facturación (propuesta 1a-19b, `docs/propuesta-orden-facturacion.md`)
+
+Sin estas respuestas la tarea no empieza; no se asume nada.
+
+- **2026-11-21, 1a-19b. ¿Cómo va el IVA?** Hoy el valor de un cobro es uno solo, sin impuestos.
+  ¿Las tarifas ya incluyen IVA o se suma al facturar? ¿Qué porcentaje? ¿Hay clientes o tipos de
+  servicio exentos? Cambia cómo se calcula el total de la orden y qué se compara al registrar la
+  factura.
+- **2026-11-21, 1a-19b. ¿Qué datos de facturación necesita el facturador de cada cliente?** Hoy el
+  cliente tiene nombre y documento o NIT. ¿Hace falta razón social distinta del nombre, dirección,
+  ciudad, correo de facturación o responsabilidad fiscal? Los que hagan falta se agregan al cliente.
+- **2026-11-21, 1a-19b. ¿Quién factura?** ¿Un empleado que entra a Arribo con el rol de facturación,
+  o alguien de afuera (contador) a quien se le entrega la orden impresa? Cambia si basta la pantalla
+  o si la orden impresa es lo principal.
+- **2026-11-21, 1a-19b. ¿Qué programa de facturación usan?** (Siigo, Alegra, World Office u otro.)
+  Si permite importar renglones desde Excel, un archivo de ejemplo de su plantilla de importación
+  permite hacer la parte B.
+
 - **2026-11-18, 1a-21. ¿Dónde quedan los respaldos y cuántos?** Asumido: uno diario de la base, en
   el mismo VPS (`/opt/arribo/respaldos`), y se guardan 14. Si el VPS se pierde, se pierden con él:
   la copia fuera del servidor y la restauración probada son de la fase 3. Mientras tanto, el dueño
