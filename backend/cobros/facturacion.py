@@ -1,7 +1,7 @@
 """Orden de facturación (1a-19b): el total con IVA y la verificación al registrar la factura.
 
 La orden de facturación es la relación de cobro armada (o una línea suelta): Arribo calcula el
-subtotal, el IVA de la configuración y el total. Al registrar la factura, el facturador digita el
+subtotal, el IVA de la configuración (si lo lleva: se pregunta) y el total. Al registrar la factura, el facturador digita el
 número y el total que le dio su programa de facturación; aquí se comprueba, con las reglas de
 `nucleo/facturacion.py`, que el total sea el de la orden y que el número no esté ya registrado, y
 solo entonces se factura con las operaciones de siempre (que dejan el historial).
@@ -57,14 +57,20 @@ def _bloquear_numero(numero: str) -> None:
         )
 
 
-def facturar_linea(linea, numero, total_factura, *, actor, mostrar_valores=True):
-    """Factura una línea suelta si el total digitado es su valor más IVA y el número está libre."""
+def porcentaje_para(lleva_iva: bool) -> Decimal:
+    """El IVA que se suma según la respuesta a "¿Lleva IVA?"."""
+    return reglas.porcentaje_a_aplicar(lleva_iva, porcentaje_iva())
+
+
+def facturar_linea(linea, numero, total_factura, *, actor, lleva_iva=True, mostrar_valores=True):
+    """Factura una línea suelta si el total digitado es su valor (más IVA, si lo lleva) y el número
+    está libre."""
     with transaction.atomic():
         _bloquear_numero(numero)
         bloqueada = LineaCobro.objects.select_for_update().get(pk=linea.pk)
         if bloqueada.estado != EstadoCobro.POR_FACTURAR:
             raise CobroInvalido("Solo se factura una línea por facturar")
-        cuenta = liquidar_lineas([bloqueada])
+        cuenta = liquidar_lineas([bloqueada], porcentaje_para(lleva_iva))
         reglas.verificar_total(cuenta.total, total_factura, mostrar_valores=mostrar_valores)
         reglas.verificar_numero_libre(numero, donde_esta_la_factura(numero, excepto=[bloqueada.pk]))
         return operaciones.facturar(bloqueada, numero, actor=actor)

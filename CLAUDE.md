@@ -134,8 +134,10 @@ no reimplementan la regla. Si una regla cambia, se cambia en `nucleo/` con su pr
 - Todo cambio de valor queda en el historial: quién, cuándo y valor anterior.
 - El conductor nunca recibe valores: los serializadores de la API no los incluyen.
 - Dinero siempre en `Decimal`, nunca `float`.
-- El valor es sin IVA. Al facturar se registra número y total de la factura: el total debe ser el
-  de la orden (subtotal más IVA) y el número no puede estar ya registrado (`nucleo/facturacion.py`).
+- El valor es sin IVA. Si lleva IVA se pregunta en Cobros, sin respuesta por defecto: al armar la
+  relación (queda guardado en ella) y al facturar una línea suelta. Al facturar se registra número y
+  total de la factura: el total debe ser el de la orden (subtotal, más IVA si lo lleva) y el número
+  no puede estar ya registrado (`nucleo/facturacion.py`).
 
 **Eventos idempotentes** (`nucleo/sincronizacion.py`). Cada toque del conductor es un evento.
 - El id (UUID) se genera en el celular. Un evento repetido no se aplica dos veces.

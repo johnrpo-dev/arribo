@@ -87,7 +87,7 @@ Implementadas en `backend/nucleo/` con sus pruebas. Resumen en `CLAUDE.md`.
 | Umbrales de alertas | Sin asignar 10 min; programado sin asignar 2 h antes; sin "En camino" 15 min; Recogido sin Entregado 4 h; sin facturar 5 días; sin pagar 30 días | Global |
 | Horario nocturno | 7 p. m. a 6 a. m.; las alertas van también al administrador | Global |
 | Exportación de factura | Excel/CSV genérico | Adaptadores después |
-| IVA | 19 %, se suma al subtotal al facturar (los valores son sin IVA) | Global; fijo en cada relación al armarla |
+| IVA | 19 %, se suma al subtotal al facturar (los valores son sin IVA) si se responde que lo lleva: se pregunta al armar la relación y al facturar una línea suelta | Global; fijo en cada relación al armarla (cero si no lleva) |
 | Datos de la empresa en la orden de facturación | Vacíos: nombre, NIT, dirección y teléfono | Global |
 
 En la fase 1a, firma y horario nocturno se pueden editar pero aún no tienen efecto.

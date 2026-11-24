@@ -81,7 +81,7 @@ def test_el_csv_trae_encabezado_una_fila_por_linea_y_el_total():
     assert filas[2][-1] == "95000,50"
     assert filas[3][0] == "Subtotal"
     assert filas[3][-1] == "275000,50"
-    assert filas[4][0] == "IVA 0 %"
+    assert filas[4][0] == "Sin IVA"
     assert filas[4][-1] == "0"
     assert filas[5][0] == "Total"
     assert filas[5][-1] == "275000,50"

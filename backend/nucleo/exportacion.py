@@ -10,7 +10,7 @@ El CSV genérico:
 - Separado por punto y coma y con coma decimal, como lo espera Excel configurado en español.
 - Valores sin signo ni separador de miles, para que Excel los tome como números y pueda sumarlos.
 - Una fila por línea de cobro y al final tres filas: subtotal (los valores son sin IVA), IVA con su
-  porcentaje y total a facturar (1a-19b).
+  porcentaje ("Sin IVA" si la relación no lleva) y total a facturar (1a-19b).
 - Un texto que empiece con =, +, -, @ (o tabulador/retorno) va precedido de un apóstrofo: así Excel
   no lo ejecuta como fórmula (una dirección o un nombre digitado no debe poder correr nada).
 """
@@ -21,7 +21,7 @@ from datetime import date
 from decimal import Decimal
 from typing import Protocol
 
-from nucleo.facturacion import Liquidacion, formato_porcentaje, liquidar
+from nucleo.facturacion import Liquidacion, etiqueta_iva, liquidar
 
 BOM = "﻿"
 
@@ -142,7 +142,8 @@ class CsvGenerico:
         vacias = [""] * (len(COLUMNAS) - 2)
         cuenta = datos.liquidacion
         escritor.writerow(["Subtotal", *vacias, numero_para_excel(cuenta.subtotal)])
-        iva = f"IVA {formato_porcentaje(cuenta.porcentaje_iva)}"
-        escritor.writerow([iva, *vacias, numero_para_excel(cuenta.iva)])
+        escritor.writerow(
+            [etiqueta_iva(cuenta.porcentaje_iva), *vacias, numero_para_excel(cuenta.iva)]
+        )
         escritor.writerow(["Total", *vacias, numero_para_excel(cuenta.total)])
         return (BOM + salida.getvalue()).encode("utf-8")

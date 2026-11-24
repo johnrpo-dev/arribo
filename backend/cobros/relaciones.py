@@ -18,6 +18,7 @@ from django.db.models.functions import Coalesce, TruncDate
 from django.utils import timezone
 
 from configuracion.models import configuracion_vigente
+from nucleo import facturacion as reglas_facturacion
 from nucleo import relacion as reglas
 from nucleo.cobro import CobroInvalido, EstadoCobro
 from nucleo.estados import Estado
@@ -70,7 +71,9 @@ class RelacionOcupada(CobroInvalido):
     """Otra persona armó una relación con alguna de estas líneas al mismo tiempo."""
 
 
-def armar(pagador, desde, hasta, *, actor) -> RelacionCobro:
+def armar(pagador, desde, hasta, *, actor, lleva_iva=True) -> RelacionCobro:
+    """Arma la relación con las líneas candidatas. Guarda el IVA que lleva (el de la configuración,
+    o cero si se respondió que no lleva): la orden no cambia si después cambia la configuración."""
     reglas.validar_rango(desde, hasta)
     with transaction.atomic():
         lineas = list(candidatas(pagador, desde, hasta).select_for_update(of=("self",)))
@@ -81,7 +84,9 @@ def armar(pagador, desde, hasta, *, actor) -> RelacionCobro:
             hasta=hasta,
             estado=nueva.estado.value,
             creada_por=actor,
-            porcentaje_iva=configuracion_vigente().porcentaje_iva,
+            porcentaje_iva=reglas_facturacion.porcentaje_a_aplicar(
+                lleva_iva, configuracion_vigente().porcentaje_iva
+            ),
         )
         try:
             with transaction.atomic():

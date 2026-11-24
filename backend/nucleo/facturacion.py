@@ -4,6 +4,8 @@ factura que hizo el facturador en su programa de facturación.
 Reglas:
 - El valor de cada línea es sin IVA. Al facturar se suma el IVA (porcentaje de la configuración,
   19 % por defecto) sobre el subtotal de lo que se factura junto.
+- Si lleva IVA o no se pregunta en Cobros cada vez: al armar la relación y al facturar una línea
+  suelta. Si no lleva, el IVA es cero y el total es el subtotal.
 - El IVA se redondea al peso, la mitad hacia arriba.
 - Al registrar la factura se digita su número y su total. Si el total no es exactamente el de la
   orden, no se registra: casi siempre es un error de digitación.
@@ -34,6 +36,10 @@ class Liquidacion:
     iva: Decimal
     total: Decimal
 
+    @property
+    def lleva_iva(self) -> bool:
+        return self.porcentaje_iva > 0
+
 
 def validar_porcentaje_iva(porcentaje: Decimal) -> None:
     if not Decimal(0) <= porcentaje <= Decimal(100):
@@ -46,6 +52,17 @@ def liquidar(valores: Iterable[Decimal], porcentaje_iva: Decimal) -> Liquidacion
     subtotal = sum(valores, Decimal(0))
     iva = (subtotal * porcentaje_iva / 100).quantize(UN_PESO, rounding=ROUND_HALF_UP)
     return Liquidacion(subtotal, porcentaje_iva, iva, subtotal + iva)
+
+
+def porcentaje_a_aplicar(lleva_iva: bool, porcentaje_configurado: Decimal) -> Decimal:
+    """El IVA de lo que se factura: el de la configuración si lleva IVA; cero si no lleva."""
+    validar_porcentaje_iva(porcentaje_configurado)
+    return porcentaje_configurado if lleva_iva else Decimal(0)
+
+
+def etiqueta_iva(porcentaje: Decimal) -> str:
+    """Cómo se nombra el renglón del IVA: "IVA 19 %" o "Sin IVA"."""
+    return f"IVA {formato_porcentaje(porcentaje)}" if porcentaje > 0 else "Sin IVA"
 
 
 def formato_porcentaje(porcentaje: Decimal) -> str:

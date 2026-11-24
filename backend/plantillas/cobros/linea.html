@@ -12,11 +12,7 @@
     <table class="tabla">
       <tbody>
         <tr><th scope="row">Pagador</th><td><strong>{{ linea.pagador.nombre }}</strong></td></tr>
-        {% if ve_valores %}<tr><th scope="row">Valor{% if cuenta %} (sin IVA){% endif %}</th><td class="cobro-valor">{{ valor }}</td></tr>{% endif %}
-        {% if cuenta %}
-        <tr><th scope="row">IVA {{ cuenta.porcentaje }}</th><td class="dinero">{{ cuenta.iva }}</td></tr>
-        <tr><th scope="row">Total a facturar</th><td class="cobro-valor dinero">{{ cuenta.total }}</td></tr>
-        {% endif %}
+        {% if ve_valores %}<tr><th scope="row">Valor{% if linea.valor is not None %} (sin IVA){% endif %}</th><td class="cobro-valor">{{ valor }}</td></tr>{% endif %}
         <tr><th scope="row">Factura</th><td>{{ linea.numero_factura|default:"—" }}</td></tr>
         <tr><th scope="row">Servicio</th><td>{{ solicitud.get_tipo_display }} · solicitud {{ solicitud.pk }} · {% if es_regreso %}<span class="etiqueta etiqueta--regreso">Regreso del N.º {{ servicio.regreso_de_id }}</span>{% else %}<span class="etiqueta etiqueta--ida">Ida</span>{% endif %}</td></tr>
         <tr><th scope="row">Pidió</th><td>{{ solicitud.solicitante.nombre }}</td></tr>
@@ -51,7 +47,14 @@
     <form method="post" action="{% url 'facturar_cobro' linea.pk %}" class="tarjeta">
       {% csrf_token %}
       <h3 class="tarjeta-titulo">Facturar</h3>
-      <p class="ayuda">Haga la factura en su programa de facturación{% if cuenta %} por <strong>{{ cuenta.total }}</strong>{% endif %} y escriba aquí su número y su total. Si el total no coincide, no se registra.</p>
+      <p class="ayuda">Elija si lleva IVA, haga la factura en su programa de facturación por ese total y escriba aquí su número y su total. Si el total no coincide, no se registra.</p>
+      <fieldset class="grupo-opciones{% if formulario_factura.lleva_iva.errors %} campo--error{% endif %}">
+        <legend>¿Lleva IVA?</legend>
+        {% for opcion in formulario_factura.lleva_iva %}
+        <label class="opcion">{{ opcion.tag }} {{ opcion.choice_label }}</label>
+        {% endfor %}
+        {% for error in formulario_factura.lleva_iva.errors %}<p class="campo-error">{{ error }}</p>{% endfor %}
+      </fieldset>
       {% include "parciales/campo.html" with campo=formulario_factura.numero_factura %}
       {% include "parciales/campo.html" with campo=formulario_factura.total_factura %}
       <button type="submit" class="boton boton--principal">Marcar facturada</button>

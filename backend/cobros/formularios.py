@@ -7,6 +7,31 @@ from django import forms
 from clientes.models import Cliente
 from nucleo.cobro import CobroInvalido, leer_pesos
 
+SI, NO = "si", "no"
+
+
+def _campo_lleva_iva():
+    """La pregunta "¿Lleva IVA?" de Cobros. Sin respuesta por defecto: hay que elegir."""
+    return forms.TypedChoiceField(
+        label="¿Lleva IVA?",
+        choices=[(SI, "Sí"), (NO, "No")],
+        coerce=lambda valor: valor == SI,
+        widget=forms.RadioSelect,
+        error_messages={
+            "required": "Responda si lleva IVA.",
+            "invalid_choice": "Responda si lleva IVA.",
+        },
+    )
+
+
+class ConPreguntaIva:
+    """Las opciones de "¿Lleva IVA?" pueden decir el total que queda en cada caso."""
+
+    def poner_opciones_iva(self, opciones):
+        if opciones:
+            si, no = opciones
+            self.fields["lleva_iva"].choices = [(SI, si), (NO, no)]
+
 
 class FormularioValor(forms.Form):
     valor = forms.CharField(
@@ -35,11 +60,11 @@ class FormularioFactura(forms.Form):
         widget=forms.TextInput(attrs={"autocomplete": "off"}),
     )
     total_factura = forms.CharField(
-        label="Total de la factura (con IVA)",
+        label="Total de la factura",
         max_length=30,
         error_messages={"required": "Escriba el total de la factura."},
         widget=forms.TextInput(attrs={"inputmode": "decimal", "autocomplete": "off"}),
-        help_text="Tal como sale en la factura, por ejemplo 1.190.000",
+        help_text="Tal como sale en la factura (con el IVA, si lo lleva), por ejemplo 1.190.000",
     )
 
     def clean_total_factura(self):
@@ -47,6 +72,16 @@ class FormularioFactura(forms.Form):
             return leer_pesos(self.cleaned_data["total_factura"])
         except CobroInvalido as error:
             raise forms.ValidationError(str(error)) from error
+
+
+class FormularioFacturaLinea(ConPreguntaIva, FormularioFactura):
+    """Facturar una línea suelta: además del número y el total, si lleva IVA."""
+
+    lleva_iva = _campo_lleva_iva()
+
+    def __init__(self, *args, opciones_iva=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.poner_opciones_iva(opciones_iva)
 
 
 class FormularioDatosFacturacion(forms.ModelForm):
@@ -99,6 +134,16 @@ class FormularioRelacion(forms.Form):
         if desde and hasta and desde > hasta:
             self.add_error("hasta", "La fecha final va después de la inicial.")
         return datos
+
+
+class FormularioArmarRelacion(ConPreguntaIva, FormularioRelacion):
+    """Armar la relación ya vista: pagador y fechas (ocultos) y si lleva IVA."""
+
+    lleva_iva = _campo_lleva_iva()
+
+    def __init__(self, *args, opciones_iva=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.poner_opciones_iva(opciones_iva)
 
 
 class FormularioDescarte(forms.Form):

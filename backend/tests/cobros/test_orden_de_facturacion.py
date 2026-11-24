@@ -118,19 +118,20 @@ def test_un_total_mal_digitado_no_factura_la_linea(client, por_facturar, factura
     linea = por_facturar()
     respuesta = client.post(
         f"/cobros/{linea.pk}/facturar/",
-        {"numero_factura": "FE-3", "total_factura": "180.000"},
+        {"numero_factura": "FE-3", "total_factura": "180.000", "lleva_iva": "si"},
         follow=True,
     )
-    assert "no coincide" in respuesta.content.decode()
+    assert "no coincide con el de la orden" in respuesta.content.decode()
     assert estado(linea) == C.POR_FACTURAR
 
 
 def test_la_linea_muestra_lo_que_hay_que_facturar(client, por_facturar, facturador):
     linea = por_facturar()
     html = client.get(f"/cobros/{linea.pk}/").content.decode()
-    assert "Total a facturar" in html
-    assert "$ 214.200" in html
-    assert "Total de la factura (con IVA)" in html
+    assert "¿Lleva IVA?" in html
+    assert "Sí, lleva IVA del 19 %: total $ 214.200" in html
+    assert "No lleva IVA: total $ 180.000" in html
+    assert "Total de la factura" in html
 
 
 def test_quien_no_ve_valores_factura_sin_que_el_aviso_muestre_cifras(
@@ -140,11 +141,11 @@ def test_quien_no_ve_valores_factura_sin_que_el_aviso_muestre_cifras(
     configurar(ven_valores_facturacion=False)
     respuesta = client.post(
         f"/cobros/{linea.pk}/facturar/",
-        {"numero_factura": "FE-4", "total_factura": "100.000"},
+        {"numero_factura": "FE-4", "total_factura": "100.000", "lleva_iva": "si"},
         follow=True,
     )
     html = respuesta.content.decode()
-    assert "no coincide" in html
+    assert "no coincide con el de la orden" in html
     assert "214.200" not in html
     assert "180.000" not in html
 
