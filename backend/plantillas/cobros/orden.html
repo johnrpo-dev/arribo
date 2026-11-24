@@ -68,7 +68,7 @@
       </tbody>
       <tfoot>
         <tr><th scope="row" colspan="4">Subtotal</th><td class="orden-valor dinero">{{ cuenta.subtotal }}</td></tr>
-        <tr><th scope="row" colspan="4">IVA {{ cuenta.porcentaje }}</th><td class="orden-valor dinero">{{ cuenta.iva }}</td></tr>
+        <tr><th scope="row" colspan="4">{{ cuenta.etiqueta_iva }}</th><td class="orden-valor dinero">{{ cuenta.iva }}</td></tr>
         <tr class="orden-total"><th scope="row" colspan="4">Total a facturar</th><td class="orden-valor dinero">{{ cuenta.total }}</td></tr>
       </tfoot>
     </table>

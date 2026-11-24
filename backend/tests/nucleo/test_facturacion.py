@@ -6,9 +6,11 @@ from nucleo.cobro import CobroInvalido
 from nucleo.facturacion import (
     FacturaNoCuadra,
     FacturaRepetida,
+    etiqueta_iva,
     formato_porcentaje,
     liquidar,
     normalizar_numero,
+    porcentaje_a_aplicar,
     verificar_numero_libre,
     verificar_total,
 )
@@ -79,3 +81,25 @@ def test_el_numero_se_compara_sin_mayusculas_ni_espacios_de_los_extremos():
 def test_el_porcentaje_se_muestra_sin_ceros_de_sobra():
     assert formato_porcentaje(D("19.00")) == "19 %"
     assert formato_porcentaje(D("10.50")) == "10,5 %"
+
+
+def test_si_lleva_iva_se_aplica_el_de_la_configuracion():
+    assert porcentaje_a_aplicar(True, IVA) == IVA
+
+
+def test_si_no_lleva_iva_el_total_es_el_subtotal():
+    porcentaje = porcentaje_a_aplicar(False, IVA)
+    liquidacion = liquidar([D("180000")], porcentaje)
+    assert (liquidacion.iva, liquidacion.total) == (D("0"), D("180000"))
+    assert not liquidacion.lleva_iva
+    assert liquidar([D("180000")], IVA).lleva_iva
+
+
+def test_la_configuracion_sigue_validandose_aunque_no_lleve_iva():
+    with pytest.raises(CobroInvalido):
+        porcentaje_a_aplicar(False, D("101"))
+
+
+def test_el_renglon_del_iva_dice_sin_iva_cuando_no_lleva():
+    assert etiqueta_iva(D("19")) == "IVA 19 %"
+    assert etiqueta_iva(D("0")) == "Sin IVA"

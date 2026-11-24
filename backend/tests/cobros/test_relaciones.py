@@ -119,7 +119,8 @@ def test_una_linea_reservada_no_se_factura_suelta(client, por_facturar, cliente,
     assert f"/cobros/relaciones/{relacion.pk}/" in html
     assert "Marcar facturada" not in html
     client.post(
-        f"/cobros/{linea.pk}/facturar/", {"numero_factura": "FE-1", "total_factura": "214.200"}
+        f"/cobros/{linea.pk}/facturar/",
+        {"numero_factura": "FE-1", "total_factura": "214.200", "lleva_iva": "si"},
     )
     assert estado(linea) == C.POR_FACTURAR
 
@@ -301,7 +302,7 @@ def test_armar_facturar_y_pagar_desde_el_panel(client, por_facturar, cliente, fa
     linea = por_facturar()
     respuesta = client.post(
         "/cobros/relaciones/armar/",
-        {"pagador": cliente.pk, "desde": "2026-11-01", "hasta": "2026-11-15"},
+        {"pagador": cliente.pk, "desde": "2026-11-01", "hasta": "2026-11-15", "lleva_iva": "si"},
     )
     relacion = RelacionCobro.objects.get()
     assert respuesta.status_code == 302

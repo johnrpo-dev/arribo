@@ -7,6 +7,19 @@ Formato: fecha, tarea, pregunta, qué se asumió mientras tanto (si se asumió a
 
 ## Abiertas
 
+### ¿Lleva IVA? (24/11/2026)
+
+- **2026-11-24. ¿Dónde se pregunta?** Asumido: en los dos lugares donde se fija el total a
+  facturar: al armar la relación (vale para todas sus líneas y queda guardado en ella) y al facturar
+  una línea suelta. No hay respuesta por defecto: si no se elige, no se arma ni se factura. Si cada
+  cliente siempre lleva o siempre no lleva, se podría guardar en el cliente y traerlo marcado.
+- **2026-11-24. Cambiar la respuesta de una relación ya armada.** Asumido: no se cambia; se descarta
+  la relación (con motivo) y se vuelve a armar. Las relaciones armadas antes de este cambio siguen
+  con el IVA que tenían.
+- **2026-11-24. La línea suelta no guarda la respuesta.** La línea facturada guarda el número de
+  factura, no si llevó IVA ni el total. Si hace falta saberlo después (por ejemplo, para conciliar
+  el pago), hay que guardarlo en la línea.
+
 ### Número de bodega (24/11/2026)
 
 - **2026-11-24. ¿El número de bodega es único?** Asumido: no. Dos concesionarios (o dos bodegas)

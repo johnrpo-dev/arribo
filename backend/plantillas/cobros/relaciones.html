@@ -49,7 +49,7 @@
         {% endfor %}
       </tbody>
       <tfoot>
-        <tr><th scope="row" colspan="5">Total ({{ vista_previa.lineas|length }} línea{{ vista_previa.lineas|length|pluralize }})</th><td class="dinero"><strong>{{ vista_previa.total }}</strong></td></tr>
+        <tr><th scope="row" colspan="5">Subtotal sin IVA ({{ vista_previa.lineas|length }} línea{{ vista_previa.lineas|length|pluralize }})</th><td class="dinero"><strong>{{ vista_previa.total }}</strong></td></tr>
       </tfoot>
     </table>
   </div>
@@ -58,6 +58,13 @@
     <input type="hidden" name="pagador" value="{{ vista_previa.datos.pagador.pk }}">
     <input type="hidden" name="desde" value="{{ vista_previa.datos.desde|date:'Y-m-d' }}">
     <input type="hidden" name="hasta" value="{{ vista_previa.datos.hasta|date:'Y-m-d' }}">
+    <fieldset class="grupo-opciones{% if vista_previa.formulario_armar.lleva_iva.errors %} campo--error{% endif %}">
+      <legend>¿Lleva IVA?</legend>
+      {% for opcion in vista_previa.formulario_armar.lleva_iva %}
+      <label class="opcion">{{ opcion.tag }} {{ opcion.choice_label }}</label>
+      {% endfor %}
+      {% for error in vista_previa.formulario_armar.lleva_iva.errors %}<p class="campo-error">{{ error }}</p>{% endfor %}
+    </fieldset>
     <button type="submit" class="boton boton--principal">Armar la relación</button>
   </form>
   {% else %}

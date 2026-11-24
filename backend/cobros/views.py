@@ -25,7 +25,7 @@ from configuracion.models import configuracion_vigente
 from configuracion.operaciones import puede_ver_valores
 from nucleo.cobro import CobroInvalido, EstadoCobro, formato_pesos
 from nucleo.estados import Estado
-from nucleo.facturacion import formato_porcentaje
+from nucleo.facturacion import etiqueta_iva, formato_porcentaje, liquidar
 from nucleo.relacion import EstadoRelacion
 from nucleo.trayecto import puntos_del_servicio
 from solicitudes.models import EventoEstado, Servicio
@@ -35,9 +35,11 @@ from . import relaciones as relaciones_op
 from .exportacion import exportador_configurado
 from .formularios import (
     FormularioAnulacion,
+    FormularioArmarRelacion,
     FormularioDatosFacturacion,
     FormularioDescarte,
     FormularioFactura,
+    FormularioFacturaLinea,
     FormularioRelacion,
     FormularioValor,
 )
@@ -104,9 +106,10 @@ def detalle(request, pk, formularios=None):
 
     historial = list(linea.historial.select_related("usuario"))
     reserva = linea.inclusiones.filter(reservada=True).first()
-    cuenta = None
-    if ve_valores and estado == EstadoCobro.POR_FACTURAR:
-        cuenta = _cuenta_para_mostrar(facturacion.liquidar_lineas([linea]))
+    formulario_factura = formularios.get("factura") or FormularioFacturaLinea()
+    formulario_factura.poner_opciones_iva(
+        _opciones_iva(linea.valor if ve_valores else None)
+    )
     return render(
         request,
         "cobros/linea.html",
@@ -121,14 +124,13 @@ def detalle(request, pk, formularios=None):
             "ve_valores": ve_valores,
             "valor": formato_pesos(linea.valor) if ve_valores else None,
             "tarifa": formato_pesos(tarifa) if tarifa else None,
-            "cuenta": cuenta,
             "puede_fijar_valor": ve_valores
             and estado in (EstadoCobro.SIN_VALOR, EstadoCobro.POR_FACTURAR),
             "puede_facturar": estado == EstadoCobro.POR_FACTURAR and reserva is None,
             "puede_pagar": estado == EstadoCobro.FACTURADO,
             "en_relacion": reserva.relacion_id if reserva else None,
             "formulario_valor": formularios.get("valor") or FormularioValor(initial=inicial),
-            "formulario_factura": formularios.get("factura") or FormularioFactura(),
+            "formulario_factura": formulario_factura,
             "formulario_anulacion": formularios.get("anulacion") or FormularioAnulacion(),
             "historial": [
                 (
@@ -163,10 +165,11 @@ def fijar_valor(request, pk):
 @require_POST
 def facturar(request, pk):
     linea = get_object_or_404(LineaCobro, pk=pk)
-    formulario = FormularioFactura(request.POST)
+    formulario = FormularioFacturaLinea(request.POST)
     if not formulario.is_valid():
         return detalle(request, pk, {"factura": formulario})
     numero = formulario.cleaned_data["numero_factura"]
+    lleva_iva = formulario.cleaned_data["lleva_iva"]
     return _aplicar(
         request,
         linea,
@@ -175,9 +178,10 @@ def facturar(request, pk):
             numero,
             formulario.cleaned_data["total_factura"],
             actor=request.user,
+            lleva_iva=lleva_iva,
             mostrar_valores=puede_ver_valores(request.user),
         ),
-        f"Facturada con el número {numero.strip()}.",
+        f"Facturada con el número {numero.strip()} ({'con' if lleva_iva else 'sin'} IVA).",
     )
 
 
@@ -234,10 +238,23 @@ def _aplicar(request, linea, operacion, exito):
 def _cuenta_para_mostrar(cuenta):
     return {
         "subtotal": formato_pesos(cuenta.subtotal),
+        "etiqueta_iva": etiqueta_iva(cuenta.porcentaje_iva),
         "porcentaje": formato_porcentaje(cuenta.porcentaje_iva),
         "iva": formato_pesos(cuenta.iva),
         "total": formato_pesos(cuenta.total),
     }
+
+
+def _opciones_iva(subtotal):
+    """Las respuestas a "¿Lleva IVA?" con el total que queda en cada caso (sin cifras si quien
+    factura no ve valores)."""
+    porcentaje = facturacion.porcentaje_iva()
+    si = f"Sí, lleva IVA del {formato_porcentaje(porcentaje)}"
+    no = "No lleva IVA"
+    if subtotal is None:
+        return si, no
+    con_iva = liquidar([subtotal], porcentaje)
+    return f"{si}: total {formato_pesos(con_iva.total)}", f"{no}: total {formato_pesos(subtotal)}"
 
 
 def _entregado_en(servicio):
@@ -269,7 +286,7 @@ def _pagadores_con_pendientes():
     return Cliente.objects.filter(pk__in=libres.values("pagador")).order_by("nombre")
 
 
-def relaciones(request, formulario=None):
+def relaciones(request, formulario=None, formulario_armar=None):
     """Relaciones armadas y facturadas, y el formulario para armar una nueva. Con pagador y fechas
     elegidos (GET), muestra qué líneas entrarían antes de armarla."""
     _exigir_valores(request)
@@ -286,9 +303,13 @@ def relaciones(request, formulario=None):
     if formulario.is_bound and formulario.is_valid():
         d = formulario.cleaned_data
         lineas = list(relaciones_op.candidatas(d["pagador"], d["desde"], d["hasta"]))
+        subtotal = sum((linea.valor for linea in lineas), Decimal(0))
+        formulario_armar = formulario_armar or FormularioArmarRelacion(pagadores=pagadores)
+        formulario_armar.poner_opciones_iva(_opciones_iva(subtotal))
         vista_previa = {
             "lineas": [(linea, formato_pesos(linea.valor)) for linea in lineas],
-            "total": formato_pesos(sum((linea.valor for linea in lineas), Decimal(0))),
+            "total": formato_pesos(subtotal),
+            "formulario_armar": formulario_armar,
             "sin_valor": list(relaciones_op.sin_valor(d["pagador"], d["desde"], d["hasta"])),
             "datos": d,
         }
@@ -310,12 +331,16 @@ def relaciones(request, formulario=None):
 @require_POST
 def armar_relacion(request):
     _exigir_valores(request)
-    formulario = FormularioRelacion(request.POST, pagadores=_pagadores_con_pendientes())
+    pagadores = _pagadores_con_pendientes()
+    formulario = FormularioArmarRelacion(request.POST, pagadores=pagadores)
     if not formulario.is_valid():
-        return relaciones(request, formulario)
+        # Vuelve a mostrar las líneas que entrarían, con el error junto a la pregunta.
+        return relaciones(request, FormularioRelacion(request.POST, pagadores=pagadores), formulario)
     d = formulario.cleaned_data
     try:
-        relacion = relaciones_op.armar(d["pagador"], d["desde"], d["hasta"], actor=request.user)
+        relacion = relaciones_op.armar(
+            d["pagador"], d["desde"], d["hasta"], actor=request.user, lleva_iva=d["lleva_iva"]
+        )
     except CobroInvalido as error:
         messages.error(request, f"No se armó: {error}.")
         return redirect("relaciones_cobro")

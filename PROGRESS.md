@@ -1672,6 +1672,37 @@ tiene botón de actualizar información".
   bodega en la app (el APK actual lo ignora y, sin placa ni VIN, pide digitarlos al recoger).
 - **Pruebas:** servidor 2356 (`uv run pytest -q`), ruff sin errores; app 464 (`flutter test`).
 
+### Cambio de regla (24/11/2026) · Cobros pregunta si lleva IVA
+
+- **Qué se hizo.** El dueño pidió que en Cobros se pregunte si lleva IVA o no. Antes se sumaba
+  siempre el IVA de la configuración.
+  - Armar una relación: debajo de las líneas que entrarían está "¿Lleva IVA?" con dos respuestas que
+    dicen el total de cada caso ("Sí, lleva IVA del 19 %: total $ 214.200" / "No lleva IVA: total
+    $ 180.000"). No hay respuesta marcada: sin elegir, no se arma. La relación guarda el IVA (cero si
+    no lleva); la relación, la orden de facturación y el Excel/CSV dicen "Sin IVA".
+  - Facturar una línea suelta: la misma pregunta en el formulario de facturar. El total digitado se
+    compara con el valor (si no lleva) o con el valor más IVA (si lleva). Quien no ve valores ve la
+    pregunta sin cifras.
+  - La regla está en `nucleo/facturacion.py` (`porcentaje_a_aplicar`, `etiqueta_iva`).
+  - Pruebas nuevas: `tests/cobros/test_pregunta_iva.py` (11) y 4 en `tests/nucleo/test_facturacion.py`.
+    Las pruebas de pantalla que ya facturaban ahora responden la pregunta; dos que pasaban por el
+    texto de ayuda ("no coincide") ahora comprueban el mensaje de error completo.
+- **Decidido** (supuestos en `QUESTIONS.md`): se pregunta al armar y al facturar la línea suelta,
+  sin respuesta por defecto; una relación armada no cambia de respuesta (se descarta y se vuelve a
+  armar); la línea suelta no guarda si llevó IVA.
+- **Recorrido** en la base de recorrido, con el rol de facturación: la vista previa mostró las dos
+  respuestas con su total ($ 416.500 / $ 350.000); sin responder no se armó ("Responda si lleva
+  IVA."); con "No" quedó la relación con subtotal $ 350.000, "Sin IVA" $ 0 y total $ 350.000, igual
+  en la orden y en el archivo. Línea suelta de $ 180.000: sin responder no se facturó; con "No" y
+  $ 214.200 dijo "tiene $ 34.200 de más"; con "No" y $ 180.000 quedó facturada.
+- **Cómo probar (menos de 5 minutos).** Reiniciar el panel (no hay migración).
+  1. Cobros → Relaciones: elegir pagador y fechas, "Ver qué líneas entran". Aparece "¿Lleva IVA?"
+     con el total de cada respuesta.
+  2. "Armar la relación" sin elegir: avisa "Responda si lleva IVA." y no la arma.
+  3. Elegir "No" y armar: la relación y la orden dicen "Sin IVA" y el total es el subtotal.
+  4. En una línea por facturar suelta, el formulario "Facturar" trae la misma pregunta.
+- **Pruebas:** servidor 2371 (`uv run pytest -q`), ruff sin errores. La app no cambió.
+
 ## Escalamientos
 
 Ninguno todavía.

@@ -13,7 +13,7 @@
       <tr><th scope="row">Pagador</th><td><strong>{{ relacion.pagador.nombre }}</strong>{% if relacion.pagador.documento %} · {{ relacion.pagador.documento }}{% endif %}</td></tr>
       <tr><th scope="row">Fechas del servicio</th><td>{{ relacion.desde|date:"d/m/Y" }} – {{ relacion.hasta|date:"d/m/Y" }}</td></tr>
       <tr><th scope="row">Subtotal (sin IVA)</th><td class="dinero">{{ cuenta.subtotal }}</td></tr>
-      <tr><th scope="row">IVA {{ cuenta.porcentaje }}</th><td class="dinero">{{ cuenta.iva }}</td></tr>
+      <tr><th scope="row">{{ cuenta.etiqueta_iva }}</th><td class="dinero">{{ cuenta.iva }}</td></tr>
       <tr><th scope="row">Total a facturar</th><td class="cobro-valor dinero">{{ cuenta.total }}</td></tr>
       <tr><th scope="row">Factura</th><td>{{ relacion.numero_factura|default:"—" }}</td></tr>
       {% if relacion.motivo_descarte %}<tr><th scope="row">Motivo del descarte</th><td>{{ relacion.motivo_descarte }}</td></tr>{% endif %}
