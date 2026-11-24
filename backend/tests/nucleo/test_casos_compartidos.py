@@ -146,11 +146,12 @@ def test_vin_normalizado_y_valido_como_dice_el_archivo(caso):
 
 @pytest.mark.parametrize("caso", IDENTIFICACION["vehiculo"], ids=_nombre)
 def test_identificacion_del_vehiculo_completa_o_no_como_dice_el_archivo(caso):
+    argumentos = (caso["placa"], caso["vin"], caso["tipo"], caso.get("numero_bodega"))
     if caso["completa"]:
-        validar_identificacion(caso["placa"], caso["vin"], caso["tipo"])
+        validar_identificacion(*argumentos)
     else:
         with pytest.raises(IdentificacionIncompleta):
-            validar_identificacion(caso["placa"], caso["vin"], caso["tipo"])
+            validar_identificacion(*argumentos)
 
 
 @pytest.mark.parametrize("caso", IDENTIFICACION["exigida"], ids=_nombre)
@@ -179,6 +180,7 @@ def test_identificacion_al_recoger_con_lo_digitado_como_dice_el_archivo(caso):
         caso["digitada"]["placa"],
         caso["digitada"]["vin"],
         caso["tipo"],
+        caso["vehiculo"].get("numero_bodega"),
     )
     if caso["completa"]:
         validar_identificacion_al_recoger(*argumentos)

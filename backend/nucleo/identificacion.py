@@ -5,6 +5,11 @@ antes de buscar, para que "abc-123" encuentre "ABC123" y "+57 300 123 4567" encu
 Python puro: lo usan los modelos y la app del conductor (su copia en Dart cumple los casos de
 docs/casos-reglas.json).
 
+Número de bodega (pedido del dueño, 24/11/2026): un vehículo también se identifica por el número
+que tiene en la bodega (de un concesionario, por ejemplo). Cuenta igual que la placa o el VIN para
+tenerlo identificado; un desvare sigue exigiendo la placa. No es único: cada bodega numera a su
+manera. Lo escribe la oficina; en la app el conductor lo ve, pero al recoger solo digita placa o VIN.
+
 Placa o VIN digitados al recoger (1a-13b): si el vehículo llega sin identificación, el conductor
 la digita en la app y viaja en el evento de Recogido. `validar_identificacion_al_recoger` cuenta
 lo digitado; `completar_identificacion` dice qué se guarda en el vehículo y qué revisa logística.
@@ -34,6 +39,12 @@ _SEPARADORES_VIN = re.compile(r"[\s-]")
 _VIN_VALIDO = re.compile(rf"[{CARACTERES_VIN}]{{{LARGO_VIN}}}")
 _PLACA_VALIDA = re.compile(rf"[A-Z0-9]{{1,{LARGO_MAXIMO_PLACA}}}")
 
+LARGO_MAXIMO_NUMERO_BODEGA = 20
+# Para la restricción de la base: mayúsculas, dígitos y guiones, sin espacios.
+PATRON_NUMERO_BODEGA = rf"^[A-Z0-9-]{{1,{LARGO_MAXIMO_NUMERO_BODEGA}}}$"
+_NUMERO_BODEGA_VALIDO = re.compile(rf"[A-Z0-9-]{{1,{LARGO_MAXIMO_NUMERO_BODEGA}}}")
+_ESPACIOS = re.compile(r"\s")
+
 
 class TelefonoInvalido(ValueError):
     """El texto no se puede leer como un teléfono."""
@@ -47,8 +58,12 @@ class VinInvalido(ValueError):
     """El VIN no tiene 17 caracteres válidos."""
 
 
+class NumeroBodegaInvalido(ValueError):
+    """El número de bodega no tiene de 1 a 20 letras, dígitos o guiones."""
+
+
 class IdentificacionIncompleta(ValueError):
-    """Al vehículo le falta la placa o el VIN que el servicio exige."""
+    """Al vehículo le falta la placa, el VIN o el número de bodega que el servicio exige."""
 
 
 def normalizar_placa(texto: str | None) -> str:
@@ -102,18 +117,38 @@ def validar_placa(placa: str) -> None:
         )
 
 
-def validar_identificacion(
-    placa: str | None, vin: str | None, tipo_servicio: TipoServicio | str
-) -> None:
-    """El vehículo tiene placa o VIN (al menos uno); un desvare exige la placa.
+def normalizar_numero_bodega(texto: str | None) -> str:
+    """Mayúsculas y sin espacios: " b-12 " da "B-12". Otros símbolos se dejan: los rechaza
+    validar_numero_bodega."""
+    return _ESPACIOS.sub("", (texto or "").upper())
 
-    Solo revisa que estén; el formato del VIN lo revisa validar_vin.
+
+def validar_numero_bodega(numero: str) -> None:
+    """Un número de bodega ya normalizado: de 1 a 20 letras, dígitos o guiones."""
+    if not _NUMERO_BODEGA_VALIDO.fullmatch(numero or ""):
+        raise NumeroBodegaInvalido(
+            f"El número de bodega debe tener de 1 a {LARGO_MAXIMO_NUMERO_BODEGA} letras, dígitos "
+            f"o guiones; se leyó {numero!r}."
+        )
+
+
+def validar_identificacion(
+    placa: str | None,
+    vin: str | None,
+    tipo_servicio: TipoServicio | str,
+    numero_bodega: str | None = None,
+) -> None:
+    """El vehículo tiene placa, VIN o número de bodega (al menos uno); un desvare exige la placa.
+
+    Solo revisa que estén; el formato lo revisan validar_vin y validar_numero_bodega.
     """
     tiene_placa = bool(normalizar_placa(placa))
     if TipoServicio(tipo_servicio) == TipoServicio.DESVARE and not tiene_placa:
         raise IdentificacionIncompleta("Un desvare exige la placa del vehículo.")
-    if not tiene_placa and not normalizar_vin(vin):
-        raise IdentificacionIncompleta("El vehículo necesita placa o VIN (al menos uno).")
+    if not tiene_placa and not normalizar_vin(vin) and not normalizar_numero_bodega(numero_bodega):
+        raise IdentificacionIncompleta(
+            "El vehículo necesita placa, VIN o número de bodega (al menos uno)."
+        )
 
 
 # --- Placa o VIN digitados al recoger ------------------------------------------------------------
@@ -125,9 +160,10 @@ def validar_identificacion_al_recoger(
     placa_digitada: str | None,
     vin_digitado: str | None,
     tipo_servicio: TipoServicio | str,
+    numero_bodega: str | None = None,
 ) -> None:
-    """Un Recogido que llega de la app: `validar_identificacion` con lo que el vehículo tiene y,
-    donde le falte, lo que el conductor digitó al recogerlo.
+    """Un Recogido que llega de la app: `validar_identificacion` con lo que el vehículo tiene
+    (placa, VIN y número de bodega) y, donde le falte, la placa o el VIN que el conductor digitó.
 
     Lo digitado cuenta aunque no se pueda guardar en el vehículo (mal formado, o de otro vehículo):
     el conductor lo leyó del vehículo que montó, queda en el evento y logística lo revisa. Solo
@@ -137,6 +173,7 @@ def validar_identificacion_al_recoger(
         normalizar_placa(placa_guardada) or normalizar_placa(placa_digitada),
         normalizar_vin(vin_guardado) or normalizar_vin(vin_digitado),
         tipo_servicio,
+        numero_bodega,
     )
 
 

@@ -1,3 +1,4 @@
+import 'package:arribo_conductor/asignaciones/componentes.dart';
 // El modelo local del servicio: lo que se guarda y lo que nunca se guarda (valores de cobro).
 
 import 'package:arribo_conductor/asignaciones/servicio.dart';
@@ -76,6 +77,28 @@ void main() {
     expect(leido.programadaPara!.isUtc, isTrue);
     expect(leido.vehiculo.descripcion, 'Mazda CX-30 Rojo');
     expect(leido.grua?.placa, 'GRU001');
+  });
+
+  test('el número de bodega llega de la API y se guarda en la base local', () async {
+    final prueba = await BaseDePrueba.crear();
+    addTearDown(prueba.cerrar);
+    final json = servicioJson();
+    final vehiculo = {...json['vehiculo']! as Map<String, Object?>, 'placa': null, 'vin': null};
+    final original = Servicio.desdeJson({
+      ...json,
+      'vehiculo': {...vehiculo, 'numero_bodega': 'B-120'},
+    });
+
+    await prueba.base.db.insert('servicios', original.aFila(0));
+    final leido = Servicio.desdeFila((await prueba.base.db.query('servicios')).single);
+
+    expect(original.vehiculo.numeroBodega, 'B-120');
+    expect(leido.vehiculo.numeroBodega, 'B-120');
+    expect(identificacionDe(leido.vehiculo), 'Bodega B-120');
+  });
+
+  test('sin número de bodega en la respuesta (servidor anterior a 1.4) queda sin dato', () {
+    expect(Servicio.desdeJson(servicioJson()).vehiculo.numeroBodega, isNull);
   });
 
   test('un desvare sin destino y sin contacto se lee con el destino vacío', () {

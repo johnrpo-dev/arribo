@@ -41,7 +41,7 @@ def test_las_opciones_de_la_configuracion_son_los_momentos_del_nucleo():
 
 def test_al_asignar_sin_placa_ni_vin_no_se_asigna(al_asignar, crear_servicio, nuevo_vehiculo, ana, usuario):
     servicio = crear_servicio(vehiculo=nuevo_vehiculo(placa="", vin=""))
-    with pytest.raises(IdentificacionIncompleta, match="placa o VIN"):
+    with pytest.raises(IdentificacionIncompleta, match="placa, VIN o número de bodega"):
         operaciones.asignar(servicio, ana, actor=usuario)
     servicio.refresh_from_db()
     assert (servicio.estado, servicio.conductor_id) == (E.PENDIENTE_ASIGNAR, None)

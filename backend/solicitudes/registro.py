@@ -57,6 +57,7 @@ class DatosContacto:
 class DatosVehiculo:
     placa: str  # ya normalizada
     vin: str  # ya normalizado y válido
+    numero_bodega: str = ""  # ya normalizado y válido; no identifica un vehículo guardado
     marca: str = ""
     linea: str = ""
     color: str = ""
@@ -68,7 +69,7 @@ class DatosVehiculo:
     def tiene_datos(self) -> bool:
         return any(
             (getattr(self, campo) or "").strip()
-            for campo in ("placa", "vin", "marca", "linea", "color")
+            for campo in ("placa", "vin", "numero_bodega", "marca", "linea", "color")
         )
 
 
@@ -409,12 +410,13 @@ def _vehiculo(datos: DatosVehiculo) -> Vehiculo:
         return Vehiculo.objects.create(
             placa=datos.placa,
             vin=datos.vin,
+            numero_bodega=datos.numero_bodega,
             marca=datos.marca.strip(),
             linea=datos.linea.strip(),
             color=datos.color.strip(),
         )
     cambios = []
-    for campo in ("placa", "vin", "marca", "linea", "color"):
+    for campo in ("placa", "vin", "numero_bodega", "marca", "linea", "color"):
         nuevo = getattr(datos, campo).strip()
         if nuevo and not getattr(vehiculo, campo):
             setattr(vehiculo, campo, nuevo)
@@ -428,18 +430,20 @@ def _vehiculo_del_servicio(servicio: Servicio, datos: DatosVehiculo) -> Vehiculo
     """El vehículo de una fila que edita un servicio del borrador.
 
     Con placa o VIN, el vehículo de esa placa o VIN (guardado o nuevo). Sin ninguno de los dos,
-    si el vehículo actual tampoco los tiene, se corrigen ahí marca, línea y color: un vehículo sin
-    placa ni VIN solo se alcanza por este servicio, y así no se crea otro en cada edición.
+    si el vehículo actual tampoco los tiene, se corrigen ahí número de bodega, marca, línea y
+    color: un vehículo sin placa ni VIN solo se alcanza por este servicio (el número de bodega no
+    es único), y así no se crea otro en cada edición.
     """
     actual = servicio.vehiculo
     if datos.placa or datos.vin or actual.placa or actual.vin:
         return _vehiculo(datos)
-    actual.marca, actual.linea, actual.color = (
+    actual.numero_bodega, actual.marca, actual.linea, actual.color = (
+        datos.numero_bodega,
         datos.marca.strip(),
         datos.linea.strip(),
         datos.color.strip(),
     )
-    actual.save(update_fields=["marca", "linea", "color"])
+    actual.save(update_fields=["numero_bodega", "marca", "linea", "color"])
     return actual
 
 

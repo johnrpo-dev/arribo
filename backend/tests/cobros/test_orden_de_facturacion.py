@@ -296,3 +296,22 @@ def test_el_iva_es_19_por_defecto_y_cambiarlo_deja_historial(client, crear_usuar
     cambio = HistorialConfiguracion.objects.get(campo="porcentaje_iva")
     assert (cambio.valor_anterior, cambio.valor_nuevo) == ("19.00", "16")
     assert HistorialConfiguracion.objects.filter(campo="empresa_nombre").exists()
+
+
+def test_el_numero_de_bodega_sale_en_la_orden_el_archivo_y_la_busqueda(
+    client, por_facturar, cliente, facturador
+):
+    from nucleo.exportacion import COLUMNAS
+
+    from .test_relaciones import leer_csv
+
+    linea = por_facturar()
+    vehiculo = linea.servicio.vehiculo
+    vehiculo.placa, vehiculo.numero_bodega = "", "B-512"
+    vehiculo.save()
+    relacion = armar(cliente, facturador)
+
+    assert "bodega B-512" in client.get(relacion_url(relacion, "orden")).content.decode()
+    filas = leer_csv(client.get(relacion_url(relacion, "descargar")).content)
+    assert filas[1][COLUMNAS.index("Número de bodega")] == "B-512"
+    assert "bodega B-512" in client.get("/cobros/", {"q": "b-512"}).content.decode()

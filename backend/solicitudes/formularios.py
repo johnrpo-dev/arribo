@@ -17,11 +17,14 @@ from django.utils import timezone
 
 from clientes.models import Cliente, TipoCliente, buscar_cliente_por_telefono
 from nucleo.identificacion import (
+    NumeroBodegaInvalido,
     TelefonoInvalido,
     VinInvalido,
+    normalizar_numero_bodega,
     normalizar_placa,
     normalizar_telefono,
     normalizar_vin,
+    validar_numero_bodega,
     validar_vin,
 )
 from nucleo.tipos import TipoServicio
@@ -317,6 +320,11 @@ class FormularioVehiculo(forms.Form):
     servicio = forms.IntegerField(required=False, widget=forms.HiddenInput)
     placa = _texto("Placa", 20)
     vin = _texto("VIN", 25)
+    numero_bodega = _texto(
+        "Número de bodega",
+        30,
+        help_text="Si no tiene placa ni VIN a mano: el número con que lo tienen en la bodega.",
+    )
     marca = _texto("Marca", 60)
     linea = _texto("Línea", 60)
     color = _texto("Color", 40)
@@ -344,6 +352,15 @@ class FormularioVehiculo(forms.Form):
                 raise forms.ValidationError(str(error)) from error
         return vin
 
+    def clean_numero_bodega(self):
+        numero = normalizar_numero_bodega(self.cleaned_data["numero_bodega"])
+        if numero:
+            try:
+                validar_numero_bodega(numero)
+            except NumeroBodegaInvalido as error:
+                raise forms.ValidationError(str(error)) from error
+        return numero
+
     def clean(self):
         datos = super().clean()
         if self.errors:
@@ -352,7 +369,9 @@ class FormularioVehiculo(forms.Form):
         if fila.servicio_id is not None and not fila.quitar and not fila.tiene_datos:
             self.add_error("placa", "Escriba los datos del vehículo o marque Quitar.")
         elif fila.servicio_id is None and not fila.tiene_datos and fila.referencia_externa:
-            self.add_error("placa", "Escriba la placa, el VIN u otro dato del vehículo.")
+            self.add_error(
+                "placa", "Escriba la placa, el VIN, el número de bodega u otro dato del vehículo."
+            )
         if fila.quitar:
             return datos
         try:
@@ -366,6 +385,7 @@ class FormularioVehiculo(forms.Form):
         return DatosVehiculo(
             placa=d.get("placa", ""),
             vin=d.get("vin", ""),
+            numero_bodega=d.get("numero_bodega", ""),
             marca=d.get("marca", ""),
             linea=d.get("linea", ""),
             color=d.get("color", ""),
@@ -419,6 +439,7 @@ def inicial_vehiculos(servicios) -> list[dict]:
             "servicio": s.pk,
             "placa": s.vehiculo.placa,
             "vin": s.vehiculo.vin,
+            "numero_bodega": s.vehiculo.numero_bodega,
             "marca": s.vehiculo.marca,
             "linea": s.vehiculo.linea,
             "color": s.vehiculo.color,

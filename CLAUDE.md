@@ -148,7 +148,8 @@ no reimplementan la regla. Si una regla cambia, se cambia en `nucleo/` con su pr
 
 **Otras reglas fijas**
 - Nada se borra: se cancela con motivo. Historial de cambios por registro.
-- Placa o VIN, al menos uno; desvare exige placa. VIN: 17 caracteres alfanuméricos sin I, O, Q; sin dígito verificador.
+- Placa, VIN o número de bodega, al menos uno; desvare exige placa. VIN: 17 caracteres alfanuméricos sin
+  I, O, Q; sin dígito verificador. El número de bodega no es único y lo escribe la oficina.
 - Documento vencido: bloquea asignaciones nuevas; no interrumpe un servicio en curso.
 - Cada servicio guarda el conductor y la grúa con que se hizo; cambiar al conductor de grúa no altera el historial.
 - Zona horaria America/Bogota; en base de datos todo en UTC con `USE_TZ`.

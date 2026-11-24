@@ -39,6 +39,7 @@ class FilaRelacion:
     origen: str
     destino: str
     valor: Decimal
+    numero_bodega: str = ""  # si el vehículo se identifica así (sin placa ni VIN, o además)
 
 
 @dataclass(frozen=True)
@@ -100,6 +101,7 @@ COLUMNAS = (
     "Tipo de servicio",
     "Placa",
     "VIN",
+    "Número de bodega",
     "Vehículo",
     "Origen",
     "Destino",
@@ -130,6 +132,7 @@ class CsvGenerico:
                     texto_para_excel(fila.tipo_servicio),
                     texto_para_excel(fila.placa),
                     texto_para_excel(fila.vin),
+                    texto_para_excel(fila.numero_bodega),
                     texto_para_excel(fila.vehiculo),
                     texto_para_excel(fila.origen),
                     texto_para_excel(fila.destino),

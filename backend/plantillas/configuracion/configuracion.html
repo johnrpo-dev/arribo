@@ -13,7 +13,7 @@
   <section class="bloque" aria-labelledby="t-registro">
     <h2 class="titulo-seccion" id="t-registro">Registro de vehículos</h2>
     <fieldset class="grupo-opciones{% if formulario.momento_placa_vin.errors %} campo--error{% endif %}">
-      <legend>Momento en que se exige placa o VIN</legend>
+      <legend>Momento en que se exige placa, VIN o número de bodega</legend>
       {% for opcion in formulario.momento_placa_vin %}
       <label class="opcion">{{ opcion.tag }} {{ opcion.choice_label }}</label>
       {% endfor %}

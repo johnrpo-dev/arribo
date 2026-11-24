@@ -641,14 +641,22 @@ def _exigir_solicitud_asignable(servicio):
 
 def _exigir_identificacion(servicio):
     vehiculo = servicio.vehiculo
-    validar_identificacion(vehiculo.placa, vehiculo.vin, servicio.solicitud.tipo)
+    validar_identificacion(
+        vehiculo.placa, vehiculo.vin, servicio.solicitud.tipo, vehiculo.numero_bodega
+    )
 
 
 def _exigir_identificacion_al_recoger(servicio, evento: EventoDelConductor):
-    """Recogido de la app: cuenta también la placa o el VIN que el conductor digitó."""
+    """Recogido de la app: cuenta también la placa o el VIN que el conductor digitó. El número de
+    bodega lo escribe la oficina; el conductor no lo digita."""
     vehiculo = servicio.vehiculo
     validar_identificacion_al_recoger(
-        vehiculo.placa, vehiculo.vin, evento.placa, evento.vin, servicio.solicitud.tipo
+        vehiculo.placa,
+        vehiculo.vin,
+        evento.placa,
+        evento.vin,
+        servicio.solicitud.tipo,
+        vehiculo.numero_bodega,
     )
 
 

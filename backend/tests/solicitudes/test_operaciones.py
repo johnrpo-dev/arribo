@@ -308,7 +308,7 @@ def test_novedad_con_vehiculo_montado_no_se_reasigna(crear_servicio, usuario):
 def test_no_se_marca_recogido_un_vehiculo_sin_placa_ni_vin(crear_servicio, nuevo_vehiculo, usuario):
     servicio = crear_servicio(E.EN_CAMINO, vehiculo=nuevo_vehiculo(placa="", vin=""))
     antes = foto(servicio)
-    with pytest.raises(IdentificacionIncompleta, match="placa o VIN"):
+    with pytest.raises(IdentificacionIncompleta, match="placa, VIN o número de bodega"):
         operaciones.cambiar_estado(servicio, E.RECOGIDO, actor=usuario)
     assert foto(servicio) == antes
     assert not EventoEstado.objects.exists()

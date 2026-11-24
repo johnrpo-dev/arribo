@@ -10,17 +10,20 @@ from nucleo.identificacion import (
     DatoPorRevisar,
     IdentificacionIncompleta,
     MomentoIdentificacion,
+    NumeroBodegaInvalido,
     PlacaInvalida,
     Revision,
     TelefonoInvalido,
     VinInvalido,
     completar_identificacion,
     identificacion_exigida,
+    normalizar_numero_bodega,
     normalizar_placa,
     normalizar_telefono,
     normalizar_vin,
     validar_identificacion,
     validar_identificacion_al_recoger,
+    validar_numero_bodega,
     validar_placa,
     validar_vin,
 )
@@ -171,7 +174,7 @@ def test_sin_placa_ni_vin_falta_identificacion(tipo, placa, vin):
 
 
 def test_sin_placa_ni_vin_el_mensaje_lo_explica():
-    with pytest.raises(IdentificacionIncompleta, match="placa o VIN"):
+    with pytest.raises(IdentificacionIncompleta, match="placa, VIN o número de bodega"):
         validar_identificacion("", "", TipoServicio.TRASLADO)
 
 
@@ -254,7 +257,7 @@ def test_al_recoger_un_desvare_con_vin_guardado_se_completa_con_la_placa_digitad
 
 @pytest.mark.parametrize("digitada", [None, "", " - "])
 def test_al_recoger_sin_nada_digitado_ni_guardado_falta_identificacion(digitada):
-    with pytest.raises(IdentificacionIncompleta, match="placa o VIN"):
+    with pytest.raises(IdentificacionIncompleta, match="placa, VIN o número de bodega"):
         validar_identificacion_al_recoger("", "", digitada, digitada, TipoServicio.TRASLADO)
 
 
@@ -331,3 +334,37 @@ def test_completar_un_vin_invalido_no_impide_guardar_la_placa():
 def test_completar_sin_nada_digitado_deja_el_vehiculo_como_estaba():
     complemento = completar_identificacion("ABC123", "", None, " - ")
     assert complemento == Complemento("ABC123", "", (), ())
+
+
+# --- Número de bodega ----------------------------------------------------------------------------
+
+
+def test_el_numero_de_bodega_identifica_al_vehiculo_como_la_placa_o_el_vin():
+    validar_identificacion(None, None, "traslado", "B-120")
+    validar_identificacion("", "", "evento", "120")
+
+
+def test_sin_placa_vin_ni_numero_de_bodega_el_vehiculo_no_esta_identificado():
+    with pytest.raises(IdentificacionIncompleta, match="placa, VIN o número de bodega"):
+        validar_identificacion(None, None, "traslado", "  ")
+
+
+def test_un_desvare_sigue_exigiendo_la_placa_aunque_tenga_numero_de_bodega():
+    with pytest.raises(IdentificacionIncompleta, match="desvare exige la placa"):
+        validar_identificacion(None, None, "desvare", "B-120")
+
+
+def test_el_numero_de_bodega_se_guarda_en_mayusculas_y_sin_espacios():
+    assert normalizar_numero_bodega(" b-12 0 ") == "B-120"
+    assert normalizar_numero_bodega(None) == ""
+
+
+@pytest.mark.parametrize("numero", ["B-120", "120", "A" * 20])
+def test_numero_de_bodega_valido(numero):
+    validar_numero_bodega(numero)
+
+
+@pytest.mark.parametrize("numero", ["", "A" * 21, "B.120", "B/120"])
+def test_numero_de_bodega_invalido(numero):
+    with pytest.raises(NumeroBodegaInvalido):
+        validar_numero_bodega(numero)

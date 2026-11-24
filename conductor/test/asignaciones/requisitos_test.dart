@@ -14,6 +14,7 @@ Servicio servicio(
   String? estadoPrevio,
   String? placa = 'ABC123',
   String? vin,
+  String? numeroBodega,
   String tipo = 'traslado',
   int capacidad = 1,
   int grua = 2,
@@ -23,7 +24,7 @@ Servicio servicio(
   estado: estado,
   estadoPrevio: estadoPrevio,
   tipo: tipo,
-  vehiculo: Vehiculo(placa: placa, vin: vin),
+  vehiculo: Vehiculo(placa: placa, vin: vin, numeroBodega: numeroBodega),
   grua: Grua(id: grua, placa: 'GRU00$grua', capacidad: capacidad),
 );
 
@@ -145,6 +146,21 @@ void main() {
       expect(identificacionPorDigitar(s, configuracion: configuracion), (placa: true, vin: false));
     });
 
+    test('con solo número de bodega se puede recoger un traslado sin digitar nada', () {
+      final s = servicio(41, placa: null, numeroBodega: 'B-120');
+
+      expect(bloqueoDeRecogida(s, [s], configuracion: configuracion), isNull);
+      expect(bloqueoDeRecogida(s, [s], configuracion: alAsignar), isNull);
+      expect(identificacionPorDigitar(s, configuracion: configuracion), isNull);
+      expect(faltantesDeIdentificacion(s, placaDigitada: '', vinDigitado: ''), isEmpty);
+    });
+
+    test('un desvare con solo número de bodega sigue pidiendo la placa', () {
+      final s = servicio(41, placa: null, numeroBodega: 'B-120', tipo: 'desvare');
+
+      expect(identificacionPorDigitar(s, configuracion: configuracion), (placa: true, vin: false));
+    });
+
     test('sin configuración guardada vale la de fábrica: pide digitarla', () {
       final s = servicio(41, placa: null);
 
@@ -159,7 +175,10 @@ void main() {
 
       expect(identificacionPorDigitar(s, configuracion: alAsignar), isNull);
       expect(bloqueo.titulo, 'Falta identificar el vehículo');
-      expect(bloqueo.mensaje, contains('El vehículo necesita placa o VIN (al menos uno).'));
+      expect(
+        bloqueo.mensaje,
+        contains('El vehículo necesita placa, VIN o número de bodega (al menos uno).'),
+      );
       expect(bloqueo.mensaje, contains('Llame a logística'));
       expect(bloqueo.faltanPorEntregar, isEmpty);
     });
@@ -182,7 +201,9 @@ void main() {
         faltantesDeIdentificacion(s, placaDigitada: placa, vinDigitado: vin);
 
     test('sin digitar nada dice qué falta', () {
-      expect(faltan(sinIdentificar), ['El vehículo necesita placa o VIN (al menos uno).']);
+      expect(faltan(sinIdentificar), [
+        'El vehículo necesita placa, VIN o número de bodega (al menos uno).',
+      ]);
       expect(faltan(desvare), ['Un desvare exige la placa del vehículo.']);
     });
 

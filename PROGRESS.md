@@ -1641,6 +1641,37 @@ tiene botón de actualizar información".
 - **Pendiente.** Quién factura, datos de la empresa y programa de facturación (`QUESTIONS.md`).
   No hay pantalla de Clientes en el panel: los datos de facturación se editan desde la relación.
 
+### Cambio de regla (24/11/2026) · Número de bodega como tercera identificación
+
+- **Qué se hizo.** El dueño indicó que un vehículo también se identifica por el número que tiene en
+  la bodega. Ahora es obligatorio al menos uno de tres: placa, VIN o número de bodega. El desvare
+  sigue exigiendo la placa.
+  - `nucleo/identificacion.py` (y su copia en la app): la regla y la normalización del número
+    (mayúsculas, sin espacios; letras, dígitos o guiones, hasta 20). Casos nuevos en
+    `docs/casos-reglas.json`, que recorren el servidor y la app.
+  - Vehículo: campo `numero_bodega` (no único) con restricción en la base. El formulario de la
+    solicitud tiene el campo "Número de bodega"; la lista, el detalle, el tablero y Cobros muestran
+    "bodega B-7731" cuando no hay placa ni VIN, y la búsqueda de Solicitudes y Cobros lo encuentra.
+  - La orden de facturación y el Excel/CSV de la relación lo traen (columna nueva después de VIN).
+  - API revisión 1.4: el vehículo trae `numero_bodega`. La app lo guarda (base local versión 6), lo
+    muestra y no pide digitar placa ni VIN al recoger si el vehículo ya tiene número de bodega.
+  - Pruebas nuevas: `tests/solicitudes/test_numero_de_bodega.py`, más casos en núcleo, exportación,
+    orden y API; en la app, `requisitos_test.dart` y `servicio_test.dart`.
+- **Decidido** (supuestos en `QUESTIONS.md`): no es único; lo escribe la oficina; a un vehículo ya
+  guardado se le completa si no tenía, sin cambiar uno que ya tenga.
+- **Recorrido** en la base de recorrido: solicitud registrada con solo "b-77 31" → guardado
+  "B-7731"; la búsqueda "b-7731" la encuentra; con "al asignar" se asignó; sin ningún dato no se
+  asignó ("El vehículo necesita placa, VIN o número de bodega (al menos uno)."); un desvare con solo
+  número de bodega tampoco; "12/4" lo rechazó el formulario.
+- **Cómo probar (menos de 5 minutos).** Cerrar y volver a arrancar el panel (aplica la migración).
+  1. Solicitudes → Nueva: dejar placa y VIN vacíos y escribir un número de bodega. Guardar.
+  2. En la lista, buscar ese número: aparece como "bodega …".
+  3. Asignarla a un conductor: se deja (con cualquiera de los dos momentos configurados).
+  4. En el celular (APK nuevo): el servicio muestra "Bodega …" y al recogerlo no pide placa ni VIN.
+- **Pendiente.** El APK del celular hay que volver a compilarlo e instalarlo para ver el número de
+  bodega en la app (el APK actual lo ignora y, sin placa ni VIN, pide digitarlos al recoger).
+- **Pruebas:** servidor 2356 (`uv run pytest -q`), ruff sin errores; app 464 (`flutter test`).
+
 ## Escalamientos
 
 Ninguno todavía.

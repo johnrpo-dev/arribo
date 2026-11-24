@@ -7,6 +7,24 @@ Formato: fecha, tarea, pregunta, qué se asumió mientras tanto (si se asumió a
 
 ## Abiertas
 
+### Número de bodega (24/11/2026)
+
+- **2026-11-24. ¿El número de bodega es único?** Asumido: no. Dos concesionarios (o dos bodegas)
+  pueden usar el mismo número, así que no sirve para reconocer un vehículo ya guardado: eso lo
+  siguen haciendo la placa y el VIN. Si en la práctica es único por cliente, se puede agregar.
+- **2026-11-24. ¿Cómo se escribe?** Asumido: de 1 a 20 letras, dígitos o guiones; se guarda en
+  mayúsculas y sin espacios ("b 77-31" queda "B77-31"). Cambia si traen otros símbolos.
+- **2026-11-24. ¿Un desvare puede ir solo con número de bodega?** Asumido: no; el desvare sigue
+  exigiendo la placa (regla ya escrita en `CLAUDE.md`).
+- **2026-11-24. ¿Quién lo escribe?** Asumido: la oficina, al registrar la solicitud. El conductor
+  lo ve en la app, pero al recoger solo puede digitar la placa o el VIN.
+- **2026-11-24. Un vehículo ya guardado que vuelve con otro número de bodega.** Asumido: si el
+  vehículo (reconocido por placa o VIN) no tenía número de bodega, se le guarda; si ya tenía otro,
+  no se cambia (igual que marca, línea y color). Si cambia de bodega en cada visita, habría que
+  guardarlo en el servicio y no en el vehículo.
+- **2026-11-24. Columna nueva en el Excel/CSV de la relación.** "Número de bodega" va después de
+  "VIN": si alguien tiene una plantilla de Excel que lee las columnas por posición, se corren una.
+
 ### Orden de facturación (1a-19b, borrador hecho; `docs/propuesta-orden-facturacion.md`)
 
 - **2026-11-21, 1a-19b. ¿Quién factura?** El dueño lo confirma después ("por ahora hagamos un

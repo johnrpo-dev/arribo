@@ -129,12 +129,13 @@ void main() {
       }
     });
 
-    test('placa o VIN, al menos uno; el desvare exige placa', () {
+    test('placa, VIN o número de bodega, al menos uno; el desvare exige placa', () {
       for (final caso in lista(identificacion['vehiculo'])) {
         final falta = identificacionFaltante(
           placa: caso['placa'] as String?,
           vin: caso['vin'] as String?,
           tipo: caso['tipo']! as String,
+          numeroBodega: caso['numero_bodega'] as String?,
         );
         expect(falta == null, caso['completa'], reason: '$caso');
       }
@@ -157,6 +158,7 @@ void main() {
           placaDigitada: digitada['placa'] as String?,
           vinDigitado: digitada['vin'] as String?,
           tipo: caso['tipo']! as String,
+          numeroBodega: vehiculo['numero_bodega'] as String?,
         );
         expect(falta == null, caso['completa'], reason: '${caso['nombre']}');
       }
