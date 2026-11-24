@@ -11,7 +11,7 @@ from django.db.models import Count, Exists, OuterRef, Q
 
 from nucleo.cobro import EstadoCobro, formato_pesos
 from nucleo.estados import Estado
-from nucleo.identificacion import normalizar_placa
+from nucleo.identificacion import normalizar_numero_bodega, normalizar_placa
 from solicitudes.models import EventoEstado, Servicio
 
 from .models import LineaCobro
@@ -53,7 +53,7 @@ def lineas(filtro: str = FILTRO_POR_DEFECTO, texto: str = ""):
 
 
 def buscar(consulta, texto: str):
-    """Por pagador, placa o VIN, número de servicio o de solicitud y número de factura."""
+    """Por pagador, placa, VIN o número de bodega, número de servicio o de solicitud y número de factura."""
     texto = (texto or "").strip()
     if not texto:
         return consulta
@@ -65,6 +65,7 @@ def buscar(consulta, texto: str):
     if len(alfanumerico) >= MINIMO_PARCIAL:
         condicion |= Q(servicio__vehiculo__placa__contains=alfanumerico)
         condicion |= Q(servicio__vehiculo__vin__contains=alfanumerico)
+        condicion |= Q(servicio__vehiculo__numero_bodega__contains=normalizar_numero_bodega(texto))
     return consulta.filter(condicion)
 
 

@@ -20,7 +20,12 @@ from django.utils import timezone
 
 from clientes.models import TelefonoCliente
 from nucleo.estados import TERMINALES, Estado
-from nucleo.identificacion import TelefonoInvalido, normalizar_placa, normalizar_telefono
+from nucleo.identificacion import (
+    TelefonoInvalido,
+    normalizar_numero_bodega,
+    normalizar_placa,
+    normalizar_telefono,
+)
 from nucleo.registro import describir_faltantes
 
 from .models import VALORES_EN_RONDA, EstadoRegistro, Servicio, Solicitud
@@ -147,9 +152,11 @@ def buscar(solicitudes, texto: str):
     if len(alfanumerico) >= MINIMO_PARCIAL:
         de_servicios |= Q(vehiculo__placa__contains=alfanumerico)
         de_servicios |= Q(vehiculo__vin__contains=alfanumerico)
+        de_servicios |= Q(vehiculo__numero_bodega__contains=normalizar_numero_bodega(texto))
         de_servicios |= Q(grua__placa__contains=alfanumerico)
     elif alfanumerico:
         de_servicios |= Q(vehiculo__placa=alfanumerico) | Q(grua__placa=alfanumerico)
+        de_servicios |= Q(vehiculo__numero_bodega=normalizar_numero_bodega(texto))
     condicion |= Q(pk__in=Servicio.objects.filter(de_servicios).values("solicitud_id"))
     return solicitudes.filter(condicion)
 
@@ -177,7 +184,7 @@ class Fila:
 
 
 def filas(solicitudes) -> list[Fila]:
-    """Vehículos (placa o VIN, sin repetir los de regreso) y conductores de cada solicitud, desde
+    """Vehículos (placa, VIN o número de bodega, sin repetir los de regreso) y conductores de cada solicitud, desde
     los servicios precargados."""
     resultado = []
     for solicitud in solicitudes:
@@ -186,7 +193,7 @@ def filas(solicitudes) -> list[Fila]:
             if servicio.estado == Estado.CANCELADO and servicio.regreso_de_id is None:
                 continue  # un vehículo quitado del borrador
             vehiculo = servicio.vehiculo
-            vehiculos.setdefault(vehiculo.pk, vehiculo.placa or vehiculo.vin or "Sin placa ni VIN")
+            vehiculos.setdefault(vehiculo.pk, vehiculo.identificacion)
             if servicio.conductor_id:
                 conductores.setdefault(servicio.conductor_id, servicio.conductor.nombre)
         resultado.append(Fila(solicitud, list(vehiculos.values()), list(conductores.values())))

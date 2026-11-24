@@ -1,7 +1,10 @@
 // Placa y VIN del vehículo: normalización y la regla de identificación al recoger.
 //
+// El vehículo se identifica con placa, VIN o número de bodega (al menos uno). El número de bodega
+// lo escribe la oficina; el conductor solo digita placa o VIN.
+//
 // Copia de backend/nucleo/identificacion.py. El servidor decide: un Recogido de un vehículo sin
-// placa ni VIN (o un desvare sin placa), sin que el evento los traiga digitados, queda como
+// placa, VIN ni número de bodega (o un desvare sin placa), sin que el evento los traiga digitados, queda como
 // conflicto `identificacion_incompleta`. La app pide digitarlos antes (1a-13b) y le dice al
 // conductor qué falta. Las dos copias cumplen los mismos casos de docs/casos-reglas.json
 // (test/casos_compartidos_test.dart).
@@ -37,20 +40,27 @@ String normalizarVin(String? texto) => (texto ?? '').toUpperCase().replaceAll(_s
 /// Un VIN ya normalizado: exactamente 17 letras o dígitos, sin I, O ni Q.
 bool vinValido(String vin) => _vinValido.hasMatch(vin);
 
+final _espacios = RegExp(r'\s');
+
+/// Mayúsculas y sin espacios (`normalizar_numero_bodega`): " b 1024 " da "B1024".
+String normalizarNumeroBodega(String? texto) =>
+    (texto ?? '').toUpperCase().replaceAll(_espacios, '');
+
 /// Una placa ya normalizada: de 1 a 10 letras o dígitos (`validar_placa`).
 bool placaValida(String placa) => _placaValida.hasMatch(placa);
 
 /// Lo que le falta al vehículo para recogerlo (`validar_identificacion`), o null si está completo:
-/// placa o VIN, al menos uno; un desvare exige la placa. Solo revisa que estén.
+/// placa, VIN o número de bodega, al menos uno; un desvare exige la placa. Solo revisa que estén.
 String? identificacionFaltante({
   required String? placa,
   required String? vin,
   required String tipo,
+  required String? numeroBodega,
 }) {
   final tienePlaca = normalizarPlaca(placa).isNotEmpty;
   if (tipo == 'desvare' && !tienePlaca) return 'Un desvare exige la placa del vehículo.';
-  if (!tienePlaca && normalizarVin(vin).isEmpty) {
-    return 'El vehículo necesita placa o VIN (al menos uno).';
+  if (!tienePlaca && normalizarVin(vin).isEmpty && normalizarNumeroBodega(numeroBodega).isEmpty) {
+    return 'El vehículo necesita placa, VIN o número de bodega (al menos uno).';
   }
   return null;
 }
@@ -73,10 +83,12 @@ String? identificacionFaltanteAlRecoger({
   required String? placaDigitada,
   required String? vinDigitado,
   required String tipo,
+  required String? numeroBodega,
 }) => identificacionFaltante(
   placa: _primero(normalizarPlaca(placaGuardada), normalizarPlaca(placaDigitada)),
   vin: _primero(normalizarVin(vinGuardado), normalizarVin(vinDigitado)),
   tipo: tipo,
+  numeroBodega: numeroBodega,
 );
 
 String _primero(String guardado, String digitado) => guardado.isNotEmpty ? guardado : digitado;

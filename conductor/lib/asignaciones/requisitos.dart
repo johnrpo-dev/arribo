@@ -42,6 +42,7 @@ BloqueoDeRecogida? bloqueoDeRecogida(
       placa: servicio.vehiculo.placa,
       vin: servicio.vehiculo.vin,
       tipo: servicio.tipo,
+      numeroBodega: servicio.vehiculo.numeroBodega,
     );
     if (falta != null) {
       return BloqueoDeRecogida(
@@ -78,7 +79,8 @@ bool seDigitaAlRecoger(ConfiguracionApp? configuracion) =>
     MomentoIdentificacion.alAsignar;
 
 /// Qué datos le pide digitar la pantalla del Recogido, o null si no le pide ninguno (el vehículo
-/// ya está identificado o la configuración es "al asignar"). Un desvare pide solo la placa, que
+/// ya está identificado, también si solo tiene número de bodega, o la configuración es "al
+/// asignar"). Un desvare pide solo la placa, que
 /// es la que exige; un traslado o un evento sin placa ni VIN piden los dos (basta uno).
 ({bool placa, bool vin})? identificacionPorDigitar(
   Servicio servicio, {
@@ -90,6 +92,7 @@ bool seDigitaAlRecoger(ConfiguracionApp? configuracion) =>
     placa: vehiculo.placa,
     vin: vehiculo.vin,
     tipo: servicio.tipo,
+    numeroBodega: vehiculo.numeroBodega,
   );
   if (falta == null) return null;
   return (placa: true, vin: servicio.tipo != 'desvare');
@@ -111,6 +114,7 @@ List<String> faltantesDeIdentificacion(
     placaDigitada: placa,
     vinDigitado: vin,
     tipo: servicio.tipo,
+    numeroBodega: servicio.vehiculo.numeroBodega,
   );
   return [
     ?falta,
@@ -122,7 +126,10 @@ List<String> faltantesDeIdentificacion(
 }
 
 String _nombreDe(Servicio servicio) =>
-    servicio.vehiculo.placa ?? servicio.vehiculo.vin ?? 'servicio N.º ${servicio.id}';
+    servicio.vehiculo.placa ??
+    servicio.vehiculo.vin ??
+    (servicio.vehiculo.numeroBodega == null ? null : 'bodega ${servicio.vehiculo.numeroBodega}') ??
+    'servicio N.º ${servicio.id}';
 
 /// "Nombre de quien entrega el vehículo" (Recogido) o "…de quien recibe…" (Entregado).
 String etiquetaDeQuien(String destino) => destino == Estado.recogido

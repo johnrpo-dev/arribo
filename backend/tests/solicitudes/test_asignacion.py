@@ -386,7 +386,7 @@ def test_el_error_de_placa_al_asignar_se_ve_en_la_pantalla(
         url_asignar(servicio), {f"s{servicio.pk}-conductor": ana.pk}, follow=True
     )
     html = respuesta.content.decode()
-    assert "El vehículo necesita placa o VIN" in html
+    assert "El vehículo necesita placa, VIN o número de bodega" in html
     assert "La configuración exige placa o VIN al asignar." in html
     servicio.refresh_from_db()
     assert servicio.estado == E.PENDIENTE_ASIGNAR

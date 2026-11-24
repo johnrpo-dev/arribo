@@ -9,10 +9,14 @@
 // escribe en la base una lista a medias.
 
 class Vehiculo {
-  const Vehiculo({this.placa, this.vin, this.marca, this.linea, this.color});
+  const Vehiculo({this.placa, this.vin, this.numeroBodega, this.marca, this.linea, this.color});
 
   final String? placa;
   final String? vin;
+
+  /// El número con que lo tienen en la bodega (lo escribe la oficina; el conductor no lo digita).
+  /// Revisión 1.4 de la API: cuenta como identificación al recoger, igual que la placa o el VIN.
+  final String? numeroBodega;
   final String? marca;
   final String? linea;
   final String? color;
@@ -147,6 +151,7 @@ class Servicio {
       vehiculo: Vehiculo(
         placa: _textoOpcional(vehiculo, 'placa'),
         vin: _textoOpcional(vehiculo, 'vin'),
+        numeroBodega: _textoOpcional(vehiculo, 'numero_bodega'),
         marca: _textoOpcional(vehiculo, 'marca'),
         linea: _textoOpcional(vehiculo, 'linea'),
         color: _textoOpcional(vehiculo, 'color'),
@@ -191,6 +196,7 @@ class Servicio {
     vehiculo: Vehiculo(
       placa: vehiculo.placa ?? (placa.isEmpty ? null : placa),
       vin: vehiculo.vin ?? (vin.isEmpty ? null : vin),
+      numeroBodega: vehiculo.numeroBodega,
       marca: vehiculo.marca,
       linea: vehiculo.linea,
       color: vehiculo.color,
@@ -236,6 +242,7 @@ class Servicio {
     'orden_ronda': ordenRonda,
     'vehiculo_placa': vehiculo.placa,
     'vehiculo_vin': vehiculo.vin,
+    'vehiculo_numero_bodega': vehiculo.numeroBodega,
     'vehiculo_marca': vehiculo.marca,
     'vehiculo_linea': vehiculo.linea,
     'vehiculo_color': vehiculo.color,
@@ -271,6 +278,7 @@ class Servicio {
       vehiculo: Vehiculo(
         placa: fila['vehiculo_placa'] as String?,
         vin: fila['vehiculo_vin'] as String?,
+        numeroBodega: fila['vehiculo_numero_bodega'] as String?,
         marca: fila['vehiculo_marca'] as String?,
         linea: fila['vehiculo_linea'] as String?,
         color: fila['vehiculo_color'] as String?,

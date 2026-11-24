@@ -169,6 +169,7 @@ def datos_para_exportar(relacion) -> DatosRelacion:
                 tipo_servicio=solicitud.get_tipo_display(),
                 placa=vehiculo.placa,
                 vin=vehiculo.vin,
+                numero_bodega=vehiculo.numero_bodega,
                 vehiculo=" ".join(p for p in (vehiculo.marca, vehiculo.linea) if p),
                 origen=recoger,
                 destino=entregar,

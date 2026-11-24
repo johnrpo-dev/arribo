@@ -1,5 +1,5 @@
 {
-  "descripcion": "Casos compartidos de las reglas que la app del conductor copia del servidor. La regla vive en backend/nucleo/; la app la repite en conductor/lib/asignaciones/ (estados.dart, capacidad.dart, identificacion.dart) y conductor/lib/fotos/foto.dart. Los recorren backend/tests/nucleo/test_casos_compartidos.py y conductor/test/casos_compartidos_test.dart. Las secciones identificacion.al_recoger e identificacion.completar tratan la placa o el VIN que el conductor digita al recoger (1a-13b). Si una regla cambia en nucleo/, su prueba falla hasta que este archivo cambie, y entonces falla la de la app hasta que cambie su copia.",
+  "descripcion": "Casos compartidos de las reglas que la app del conductor copia del servidor. La regla vive en backend/nucleo/; la app la repite en conductor/lib/asignaciones/ (estados.dart, capacidad.dart, identificacion.dart) y conductor/lib/fotos/foto.dart. Los recorren backend/tests/nucleo/test_casos_compartidos.py y conductor/test/casos_compartidos_test.dart. Las secciones identificacion.al_recoger e identificacion.completar tratan la placa o el VIN que el conductor digita al recoger (1a-13b). Si una regla cambia en nucleo/, su prueba falla hasta que este archivo cambie, y entonces falla la de la app hasta que cambie su copia. El vehículo también se identifica por su número de bodega (campo numero_bodega; si falta, no tiene): cuenta como la placa o el VIN, salvo en un desvare, que exige la placa.",
   "estados": {
     "todos": [
       "pendiente_asignar",
@@ -667,6 +667,38 @@
         "vin": null,
         "tipo": "desvare",
         "completa": false
+      },
+      {
+        "nombre": "solo número de bodega: completa un traslado",
+        "placa": null,
+        "vin": null,
+        "numero_bodega": "B-120",
+        "tipo": "traslado",
+        "completa": true
+      },
+      {
+        "nombre": "solo número de bodega: completa un evento",
+        "placa": null,
+        "vin": null,
+        "numero_bodega": "B-120",
+        "tipo": "evento",
+        "completa": true
+      },
+      {
+        "nombre": "desvare con solo número de bodega: incompleta (exige placa)",
+        "placa": null,
+        "vin": null,
+        "numero_bodega": "B-120",
+        "tipo": "desvare",
+        "completa": false
+      },
+      {
+        "nombre": "número de bodega en blanco no cuenta",
+        "placa": null,
+        "vin": null,
+        "numero_bodega": "   ",
+        "tipo": "traslado",
+        "completa": false
       }
     ],
     "exigida": [
@@ -835,6 +867,34 @@
         },
         "tipo": "traslado",
         "completa": true
+      },
+      {
+        "nombre": "con número de bodega guardado y nada digitado: completa",
+        "vehiculo": {
+          "placa": null,
+          "vin": null,
+          "numero_bodega": "B-120"
+        },
+        "digitada": {
+          "placa": null,
+          "vin": null
+        },
+        "tipo": "traslado",
+        "completa": true
+      },
+      {
+        "nombre": "desvare con número de bodega y sin placa: incompleta",
+        "vehiculo": {
+          "placa": null,
+          "vin": null,
+          "numero_bodega": "B-120"
+        },
+        "digitada": {
+          "placa": null,
+          "vin": null
+        },
+        "tipo": "desvare",
+        "completa": false
       }
     ],
     "completar": [

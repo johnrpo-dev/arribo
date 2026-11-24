@@ -360,7 +360,7 @@ def test_referencia_sin_datos_del_vehiculo_se_rechaza(client, logistica, con_tel
     respuesta = client.post(
         RUTA, con_vehiculos(vehiculo("ABC123"), vehiculo("", referencia_externa="CASO-1"))
     )
-    assert "Escriba la placa, el VIN u otro dato del vehículo." in respuesta.content.decode()
+    assert "Escriba la placa, el VIN, el número de bodega u otro dato del vehículo." in respuesta.content.decode()
 
 
 def test_agregar_vehiculo_devuelve_la_fila_siguiente_y_actualiza_el_total(client, logistica):
@@ -464,7 +464,7 @@ def test_el_formulario_dice_cuando_se_exigira_la_placa_o_el_vin(client, logistic
     configuracion.momento_placa_vin = momento
     configuracion.save()
     html = client.get(RUTA).content.decode()
-    assert f"La placa o el VIN se exigirán {texto}" in html
+    assert f"La placa, el VIN o el número de bodega (al menos uno) se exigirán {texto}" in html
 
 
 def test_al_asignar_configurado_el_panel_registra_sin_placa_pero_no_asigna(

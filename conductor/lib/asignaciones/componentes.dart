@@ -12,7 +12,11 @@ import 'enlaces.dart';
 import 'servicio.dart';
 
 /// La placa, o el VIN, o un aviso si no hay ninguno.
-String identificacionDe(Vehiculo vehiculo) => vehiculo.placa ?? vehiculo.vin ?? 'Sin placa ni VIN';
+String identificacionDe(Vehiculo vehiculo) =>
+    vehiculo.placa ??
+    vehiculo.vin ??
+    (vehiculo.numeroBodega == null ? null : 'Bodega ${vehiculo.numeroBodega}') ??
+    'Sin placa, VIN ni número de bodega';
 
 /// "Traslado", "Evento (regreso)", "Desvare".
 String tipoDe(Servicio servicio) =>

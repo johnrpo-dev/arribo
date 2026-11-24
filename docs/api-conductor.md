@@ -1,4 +1,4 @@
-# API de la app del conductor (contrato versión 1, revisión 1.3)
+# API de la app del conductor (contrato versión 1, revisión 1.4)
 
 Contrato entre el servidor (`backend/api/`) y la app Flutter (`conductor/`). Lo usan la sincronización
 (1a-10), las pantallas de la app (1a-11 a 1a-13) y el push (1a-14). Si el código y este documento no
@@ -16,6 +16,7 @@ Revisiones (cambios compatibles: no cambian `"version": 1` ni la ruta `/api/v1/`
 | 1.1 | 1a-13b | El evento `recogido` acepta `placa` y `vin` digitados por el conductor (ver "Placa o VIN digitados al recoger") |
 | 1.2 | 1a-14 | `PUT /api/v1/push/` registra el token de push del celular; `POST /salir/` lo borra; la lista y el detalle dejan los servicios "vistos por el conductor" (ver "Avisos push") |
 | 1.3 | 1a-08h | Cada servicio trae `regreso_de` y `espera_ida`: un regreso no avanza hasta que su ida esté entregada; si llega igual, es conflicto `ida_sin_entregar` (ver "El regreso espera a su ida") |
+| 1.4 | Número de bodega | `vehiculo` trae `numero_bodega`. El vehículo queda identificado con placa, VIN o número de bodega (al menos uno); un desvare sigue exigiendo la placa. El conductor no lo digita: solo lo ve |
 
 ## Reglas generales
 
@@ -186,8 +187,8 @@ Respuesta 200:
       "regreso_de": null,
       "espera_ida": false,
       "orden_ronda": 1,
-      "vehiculo": {"placa": "ABC123", "vin": "1HGCM82633A004352", "marca": "Mazda",
-                   "linea": "CX-30", "color": "Rojo"},
+      "vehiculo": {"placa": "ABC123", "vin": "1HGCM82633A004352", "numero_bodega": null,
+                   "marca": "Mazda", "linea": "CX-30", "color": "Rojo"},
       "origen": {
         "direccion": "Calle 10 # 43-20, El Poblado",
         "ubicacion": "https://maps.app.goo.gl/abc123",
@@ -227,7 +228,7 @@ Cada servicio:
 | `regreso_de` | entero o null | Desde 1.3. En un regreso, el `id` del servicio de ida; null en una ida |
 | `espera_ida` | booleano | Desde 1.3. Regreso cuya ida todavía no está entregada: la app no deja marcar En camino, Recogido ni Entregado (Novedad sí). Ver "El regreso espera a su ida" |
 | `orden_ronda` | entero o null | Puesto en la ronda (1 primero). Puede tener huecos; la lista ya viene ordenada |
-| `vehiculo` | objeto | `placa`, `vin`, `marca`, `linea`, `color`; cada uno texto o null |
+| `vehiculo` | objeto | `placa`, `vin`, `numero_bodega` (desde 1.4), `marca`, `linea`, `color`; cada uno texto o null |
 | `origen` | objeto | Dónde se recoge el vehículo: `direccion` (texto), `ubicacion` (enlace o coordenadas, sin geocodificar) y `contacto` (`nombre`, `telefono` solo dígitos, o null) |
 | `destino` | objeto | Dónde se entrega; misma forma. En un desvare suele venir todo en null |
 | `referencia_externa` | texto o null | Número de caso de la aseguradora o del concesionario |
@@ -351,7 +352,8 @@ es lo mismo que `null`. La app manda solo los datos que el vehículo no tiene.
 `identificacion.placa_valida`, `al_recoger` y `completar`):**
 - Placa: de 1 a 10 letras o dígitos (lo que cabe en el vehículo).
 - VIN: exactamente 17 letras o dígitos, sin I, O ni Q. No se valida el dígito verificador.
-- Placa o VIN, al menos uno entre lo que tiene el vehículo y lo digitado; un desvare exige la placa.
+- Placa, VIN o número de bodega, al menos uno entre lo que tiene el vehículo y lo digitado (el número
+  de bodega no se digita: solo cuenta el que ya tiene el vehículo, desde 1.4); un desvare exige la placa.
 
 **Qué hace el servidor** (`nucleo.identificacion`, en la misma transacción del evento):
 - Para decidir si el Recogido encaja, cuenta lo que tiene el vehículo y, donde le falte, lo
@@ -461,7 +463,7 @@ Motivos (`motivo`; `detalle` es su texto en español):
 | `conflicto` | `novedad_sin_motivo` | `novedad` sin `motivo` |
 | `conflicto` | `destino_no_permitido` | Un estado que no se marca desde la app (por ejemplo `cancelado`) |
 | `conflicto` | `ida_sin_entregar` | Desde 1.3. `en_camino`, `recogido` o `entregado` de un regreso cuya ida todavía no está entregada |
-| `conflicto` | `identificacion_incompleta` | `recogido` de un vehículo sin placa ni VIN (o un desvare sin placa), sin que el evento los traiga digitados |
+| `conflicto` | `identificacion_incompleta` | `recogido` de un vehículo sin placa, VIN ni número de bodega (o un desvare sin placa), sin que el evento traiga placa o VIN digitados |
 | `rechazado` | `id_reutilizado` | El `id` ya está guardado con otro servicio, destino, secuencia o conductor. No se aplica, no reemplaza al guardado ni se guarda como conflicto nuevo |
 | `rechazado` | `servicio_desconocido` | `servicio_id` no existe (un evento no se puede guardar sin servicio) |
 | `rechazado` | `datos_invalidos` | Falta o no se puede leer `id`, `servicio_id`, `destino` o `secuencia`, o el elemento no es un objeto |

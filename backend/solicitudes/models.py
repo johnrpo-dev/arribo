@@ -18,11 +18,16 @@ from nucleo.estados import NOVEDAD_DESDE, Estado, estado_solicitud
 from nucleo.estados import Servicio as ServicioNucleo
 from nucleo.evidencia import Foto
 from nucleo.identificacion import (
+    LARGO_MAXIMO_NUMERO_BODEGA,
     LARGO_MAXIMO_PLACA,
+    PATRON_NUMERO_BODEGA,
     PATRON_VIN,
+    NumeroBodegaInvalido,
     VinInvalido,
+    normalizar_numero_bodega,
     normalizar_placa,
     normalizar_vin,
+    validar_numero_bodega,
     validar_vin,
 )
 from nucleo.sincronizacion import MOTIVOS_DE_CONFLICTO, Resultado
@@ -69,7 +74,8 @@ VALORES_MOTIVO_CONFLICTO = sorted(motivo.value for motivo in MOTIVOS_DE_CONFLICT
 
 
 class Vehiculo(models.Model):
-    """Un vehículo que la empresa mueve. Puede existir sin placa ni VIN: se exigen al recogerlo."""
+    """Un vehículo que la empresa mueve. Puede existir sin placa, VIN ni número de bodega: se
+    exige al menos uno al recogerlo (`nucleo.identificacion.validar_identificacion`)."""
 
     placa = models.CharField(
         "placa",
@@ -83,6 +89,14 @@ class Vehiculo(models.Model):
         blank=True,
         help_text="17 letras o dígitos, sin I, O ni Q. Se guarda en mayúsculas, sin espacios "
         "ni guiones.",
+    )
+    numero_bodega = models.CharField(
+        "número de bodega",
+        max_length=LARGO_MAXIMO_NUMERO_BODEGA,
+        blank=True,
+        db_index=True,
+        help_text="El número con que lo tienen en la bodega (de un concesionario, por ejemplo). "
+        "No es único. Se guarda en mayúsculas, sin espacios.",
     )
     marca = models.CharField("marca", max_length=60, blank=True)
     linea = models.CharField("línea", max_length=60, blank=True)
@@ -122,22 +136,47 @@ class Vehiculo(models.Model):
                 name="vehiculo_vin_valido",
                 violation_error_message="El VIN tiene 17 letras o dígitos, sin I, O ni Q.",
             ),
+            models.CheckConstraint(
+                condition=Q(numero_bodega="") | Q(numero_bodega__regex=PATRON_NUMERO_BODEGA),
+                name="vehiculo_numero_bodega_normalizado",
+                violation_error_message="El número de bodega va en mayúsculas, con letras, "
+                "dígitos o guiones.",
+            ),
         )
 
+    @property
+    def identificacion(self) -> str:
+        """Placa, si no VIN, si no el número de bodega: con lo que se reconoce el vehículo."""
+        if self.placa or self.vin:
+            return self.placa or self.vin
+        if self.numero_bodega:
+            return f"bodega {self.numero_bodega}"
+        return "Sin placa, VIN ni número de bodega"
+
     def __str__(self):
-        identificacion = self.placa or self.vin or f"sin placa ni VIN (#{self.pk})"
+        identificacion = (
+            self.identificacion
+            if (self.placa or self.vin or self.numero_bodega)
+            else f"sin identificación (#{self.pk})"
+        )
         descripcion = " ".join(parte for parte in (self.marca, self.linea) if parte)
         return f"{identificacion} · {descripcion}" if descripcion else identificacion
 
     def clean(self):
         self.placa = normalizar_placa(self.placa)
         self.vin = normalizar_vin(self.vin)
+        self.numero_bodega = normalizar_numero_bodega(self.numero_bodega)
         errores = {}
         if self.vin:
             try:
                 validar_vin(self.vin)
             except VinInvalido as error:
                 errores["vin"] = str(error)
+        if self.numero_bodega:
+            try:
+                validar_numero_bodega(self.numero_bodega)
+            except NumeroBodegaInvalido as error:
+                errores["numero_bodega"] = str(error)
         otros = Vehiculo.objects.exclude(pk=self.pk)
         if self.placa and otros.filter(placa=self.placa).exists():
             errores["placa"] = f"Ya hay un vehículo con la placa {self.placa}."
@@ -150,6 +189,7 @@ class Vehiculo(models.Model):
         # Solo normaliza: un VIN inválido lo rechaza la base (vehiculo_vin_valido).
         self.placa = normalizar_placa(self.placa)
         self.vin = normalizar_vin(self.vin)
+        self.numero_bodega = normalizar_numero_bodega(self.numero_bodega)
         super().save(*args, **kwargs)
 
 

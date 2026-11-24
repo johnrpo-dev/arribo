@@ -60,7 +60,7 @@
         <tr>
           <td>N.º {{ fila.servicio }}</td>
           <td>{{ fila.fecha_servicio|date:"d/m/Y" }}</td>
-          <td>{{ fila.tipo_servicio }} · {% if fila.placa %}placa {{ fila.placa }}{% else %}VIN {{ fila.vin }}{% endif %}{% if fila.vehiculo %} ({{ fila.vehiculo }}){% endif %}<br><span class="texto-secundario">{{ fila.origen }} → {{ fila.destino }}</span></td>
+          <td>{{ fila.tipo_servicio }} · {% if fila.placa %}placa {{ fila.placa }}{% elif fila.vin %}VIN {{ fila.vin }}{% endif %}{% if fila.numero_bodega %}{% if fila.placa or fila.vin %} · {% endif %}bodega {{ fila.numero_bodega }}{% endif %}{% if fila.vehiculo %} ({{ fila.vehiculo }}){% endif %}<br><span class="texto-secundario">{{ fila.origen }} → {{ fila.destino }}</span></td>
           <td>{{ fila.numero_caso|default:"—" }}</td>
           <td class="orden-valor dinero">{{ valor }}</td>
         </tr>

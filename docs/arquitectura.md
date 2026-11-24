@@ -48,7 +48,7 @@ manda sobre lo que hizo físicamente. Un evento que ya no encaja se guarda y abr
 | Tarifa | Cliente o convenio, tipo de servicio, valor propuesto |
 | Contacto | Nombre y teléfono; en origen o destino de un servicio |
 | Solicitud | Solicitante, tipo, origen y destino en texto con pin opcional, fecha, respuesta de regreso, motivo de no concretada |
-| Vehículo | Placa o VIN (cada uno único si existe), marca, línea, color |
+| Vehículo | Placa o VIN (cada uno único si existe), número de bodega (no único), marca, línea, color. Se exige al menos uno de los tres |
 | Servicio (vehículo-en-solicitud) | Vehículo, estado, estado previo, conductor y grúa guardados, orden de ronda, referencia externa, enlace a la ida si es regreso |
 | Evento de estado | Id del celular (único), secuencia, quién, hora del dispositivo, hora de sincronización, ubicación, resultado |
 | Evidencia | Foto, tipo (recogida, entrega, soporte), evento |

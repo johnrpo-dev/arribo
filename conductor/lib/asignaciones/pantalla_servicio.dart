@@ -300,6 +300,7 @@ class _Detalle extends StatelessWidget {
         seccion('Vehículo', [
           FilaDato('Placa', vehiculo.placa ?? 'Sin placa'),
           FilaDato('VIN', vehiculo.vin ?? 'Sin VIN'),
+          if (vehiculo.numeroBodega != null) FilaDato('N.º de bodega', vehiculo.numeroBodega!),
           if (vehiculo.marca != null) FilaDato('Marca', vehiculo.marca!),
           if (vehiculo.linea != null) FilaDato('Línea', vehiculo.linea!),
           if (vehiculo.color != null) FilaDato('Color', vehiculo.color!),

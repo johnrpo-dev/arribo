@@ -37,7 +37,7 @@ def datos(**cambios):
     return formulario({k: v for k, v in base.items() if v is not None})
 
 
-CAMPOS_VEHICULO = ("servicio", "placa", "vin", "marca", "linea", "color", "referencia_externa", "quitar")
+CAMPOS_VEHICULO = ("servicio", "placa", "vin", "numero_bodega", "marca", "linea", "color", "referencia_externa", "quitar")
 
 
 def formulario(campos, vehiculos=None):

@@ -152,6 +152,7 @@ def test_cada_servicio_trae_lo_que_la_app_necesita_para_trabajar_sin_senal(
             "vehiculo": {
                 "placa": "ABC123",
                 "vin": VIN,
+                "numero_bodega": None,
                 "marca": "Mazda",
                 "linea": "CX-30",
                 "color": "Rojo",
@@ -188,7 +189,12 @@ def test_los_datos_que_faltan_van_como_null_y_sin_hora_es_inmediato(
     assert servicio["programada_para"] is None
     assert servicio["referencia_externa"] is None
     assert servicio["vehiculo"] == {
-        "placa": "XYZ789", "vin": None, "marca": None, "linea": None, "color": None
+        "placa": "XYZ789",
+        "vin": None,
+        "numero_bodega": None,
+        "marca": None,
+        "linea": None,
+        "color": None,
     }
 
 

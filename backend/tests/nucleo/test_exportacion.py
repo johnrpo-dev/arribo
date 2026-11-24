@@ -71,6 +71,7 @@ def test_el_csv_trae_encabezado_una_fila_por_linea_y_el_total():
         "Traslado",
         "ABC123",
         "",
+        "",
         "Mazda 3",
         "Cra 43A # 1-50, Medellín",
         "Taller Envigado",
@@ -98,6 +99,12 @@ def test_el_csv_suma_el_iva_al_subtotal():
     assert filas[-1][-1] == "428400"
 
 
+def test_el_numero_de_bodega_va_en_su_columna_despues_del_vin():
+    filas = leer(CsvGenerico().exportar(datos(fila(placa="", numero_bodega="B-77"))))
+    assert COLUMNAS.index("Número de bodega") == COLUMNAS.index("VIN") + 1
+    assert filas[1][COLUMNAS.index("Número de bodega")] == "B-77"
+
+
 def test_usa_punto_y_coma_y_fin_de_linea_de_windows():
     contenido = CsvGenerico().exportar(datos(fila()))
     primera = contenido.decode("utf-8").removeprefix(BOM).split("\r\n")[0]
@@ -106,13 +113,15 @@ def test_usa_punto_y_coma_y_fin_de_linea_de_windows():
 
 def test_un_texto_con_punto_y_coma_o_comillas_queda_en_su_celda():
     contenido = CsvGenerico().exportar(datos(fila(origen='Bodega "Norte"; muelle 2')))
-    assert leer(contenido)[1][12] == 'Bodega "Norte"; muelle 2'
+    assert leer(contenido)[1][COLUMNAS.index("Origen")] == 'Bodega "Norte"; muelle 2'
 
 
 @pytest.mark.parametrize("peligroso", ["=1+1", "+57 300", "-SUMA(A1)", "@cmd", "\tx"])
 def test_un_texto_que_parece_formula_no_se_ejecuta_en_excel(peligroso):
     assert texto_para_excel(peligroso) == "'" + peligroso
-    assert leer(CsvGenerico().exportar(datos(fila(destino=peligroso))))[1][13] == "'" + peligroso
+    assert leer(CsvGenerico().exportar(datos(fila(destino=peligroso))))[1][COLUMNAS.index("Destino")] == (
+        "'" + peligroso
+    )
 
 
 def test_el_texto_normal_no_se_toca():

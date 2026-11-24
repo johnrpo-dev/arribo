@@ -172,6 +172,12 @@ const List<List<String>> migraciones = [
         'CHECK (espera_ida IN (0, 1))',
     "DELETE FROM estado_local WHERE clave = 'etag'",
   ],
+  // Versión 6: el número de bodega del vehículo (contrato 1.4). Sin ETag la siguiente lista llega
+  // completa, con el número de bodega de cada vehículo.
+  [
+    'ALTER TABLE servicios ADD COLUMN vehiculo_numero_bodega TEXT',
+    "DELETE FROM estado_local WHERE clave = 'etag'",
+  ],
 ];
 
 /// Nombre del archivo de la base en la carpeta de bases de datos de la app.

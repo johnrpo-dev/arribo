@@ -127,6 +127,8 @@ class ServicioDelConductorSerializer(serializers.BaseSerializer):
             "vehiculo": {
                 "placa": _texto(vehiculo.placa),
                 "vin": _texto(vehiculo.vin),
+                # Revisión 1.4: el número con que lo tienen en la bodega (lo escribe la oficina).
+                "numero_bodega": _texto(vehiculo.numero_bodega),
                 "marca": _texto(vehiculo.marca),
                 "linea": _texto(vehiculo.linea),
                 "color": _texto(vehiculo.color),

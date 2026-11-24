@@ -45,7 +45,7 @@
 
   <section aria-labelledby="t-vehiculo">
     <h2 class="titulo-seccion" id="t-vehiculo">Vehículos</h2>
-    <p class="ayuda">Cada vehículo es un servicio. La placa o el VIN se exigirán {{ momento_placa_vin }} (así está en la configuración); un desvare exige la placa.</p>
+    <p class="ayuda">Cada vehículo es un servicio. La placa, el VIN o el número de bodega (al menos uno) se exigirán {{ momento_placa_vin }} (así está en la configuración); un desvare exige la placa.</p>
     {{ vehiculos.management_form }}
     <div class="formulario" id="vehiculos">
       {% for fila in vehiculos %}
