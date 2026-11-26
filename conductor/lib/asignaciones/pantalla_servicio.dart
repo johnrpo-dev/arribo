@@ -156,8 +156,8 @@ class _AccionesState extends State<_Acciones> {
           destino: siguiente,
         );
     return Material(
-      color: Colores.superficie,
-      shape: const Border(top: BorderSide(color: Colores.borde)),
+      color: context.colores.superficie,
+      shape: Border(top: BorderSide(color: context.colores.borde)),
       child: SafeArea(
         child: Padding(
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
@@ -170,19 +170,19 @@ class _AccionesState extends State<_Acciones> {
                   key: const Key('aviso-espera-ida'),
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: Colores.regresoFondo,
-                    border: Border.all(color: Colores.regreso),
+                    color: context.colores.regresoFondo,
+                    border: Border.all(color: context.colores.regreso),
                     borderRadius: const BorderRadius.all(Radius.circular(8)),
                   ),
                   child: Row(
                     children: [
-                      const Icon(Icons.lock_outline, color: Colores.regreso),
+                      Icon(Icons.lock_outline, color: context.colores.regreso),
                       const SizedBox(width: 10),
                       Expanded(
                         child: Text(
                           textoEsperaIda,
                           style: Theme.of(context).textTheme.bodyLarge
-                              ?.copyWith(color: Colores.regreso),
+                              ?.copyWith(color: context.colores.regreso),
                         ),
                       ),
                     ],
@@ -194,7 +194,7 @@ class _AccionesState extends State<_Acciones> {
                   onPressed: _ocupado ? null : () => _marcar(siguiente),
                   child: Text('Marcar ${nombreEstado(siguiente)}', textAlign: TextAlign.center),
                 ),
-              if (siguiente != null && conNovedad) const SizedBox(height: 8),
+              if (siguiente != null && conNovedad) const SizedBox(height: 16),
               if (conNovedad)
                 OutlinedButton(
                   key: const Key('marcar-novedad'),
@@ -270,11 +270,15 @@ class _Detalle extends StatelessWidget {
             Text(tipoDe(servicio), style: textos.bodyLarge),
           ],
         ),
+        if (servicio.estado != Estado.cancelado) ...[
+          const SizedBox(height: 16),
+          BarraDeAvance(servicio.estado, estadoPrevio: estadoPrevio),
+        ],
         if (servicio.estado == Estado.novedad && estadoPrevio != null) ...[
           const SizedBox(height: 8),
           Text(
             'Estado antes de la novedad: ${nombreEstado(estadoPrevio)}',
-            style: textos.bodyLarge?.copyWith(color: Colores.textoSecundario),
+            style: textos.bodyLarge?.copyWith(color: context.colores.textoSecundario),
           ),
         ],
         if (servicio.estado == Estado.novedad) ...[
@@ -290,7 +294,7 @@ class _Detalle extends StatelessWidget {
           AvisoDeEvento(evento: evento, alEntender: () => alEntender(evento)),
         ],
         const SizedBox(height: 12),
-        Text(identificacionDe(vehiculo), style: textos.headlineSmall),
+        Text(identificacionDe(vehiculo), style: estiloPlaca),
         const SizedBox(height: 4),
         Text(
           'Hora: ${textoProgramada(servicio.programadaPara, ahora: ahora)}',

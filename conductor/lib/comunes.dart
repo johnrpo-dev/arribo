@@ -16,10 +16,11 @@ class Recuadro extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colores = context.colores;
     final (color, fondo, iconoPorDefecto) = switch (tipo) {
-      TipoRecuadro.error => (Colores.peligro, Colores.peligroFondo, Icons.error_outline),
-      TipoRecuadro.aviso => (Colores.aviso, Colores.avisoFondo, Icons.cloud_off_outlined),
-      TipoRecuadro.info => (Colores.acento, Colores.acentoFondo, Icons.info_outline),
+      TipoRecuadro.error => (colores.peligro, colores.peligroFondo, Icons.error_outline),
+      TipoRecuadro.aviso => (colores.aviso, colores.avisoFondo, Icons.cloud_off_outlined),
+      TipoRecuadro.info => (colores.acento, colores.acentoFondo, Icons.info_outline),
     };
     return Semantics(
       liveRegion: true,
@@ -38,7 +39,7 @@ class Recuadro extends StatelessWidget {
             Expanded(
               child: Text(
                 texto,
-                style: Theme.of(context).textTheme.bodyLarge?.copyWith(color: Colores.texto),
+                style: Theme.of(context).textTheme.bodyLarge?.copyWith(color: colores.texto),
               ),
             ),
           ],

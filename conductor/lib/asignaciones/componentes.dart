@@ -9,6 +9,7 @@ import '../formato.dart';
 import '../fotos/foto.dart';
 import '../tema.dart';
 import 'enlaces.dart';
+import 'estados.dart';
 import 'servicio.dart';
 
 /// La placa, o el VIN, o un aviso si no hay ninguno.
@@ -22,6 +23,58 @@ String identificacionDe(Vehiculo vehiculo) =>
 String tipoDe(Servicio servicio) =>
     servicio.esRegreso ? '${nombreTipo(servicio.tipo)} (regreso)' : nombreTipo(servicio.tipo);
 
+/// El icono que acompaña el nombre de cada estado: la etiqueta no depende solo del color.
+IconData iconoDeEstado(String estado) => switch (estado) {
+  'pendiente_asignar' => Icons.schedule,
+  'asignado' => Icons.assignment_ind_outlined,
+  'en_camino' => Icons.local_shipping_outlined,
+  'recogido' => Icons.directions_car_filled_outlined,
+  'entregado' => Icons.check_circle_outline,
+  'novedad' => Icons.report_problem_outlined,
+  'cancelado' => Icons.cancel_outlined,
+  _ => Icons.help_outline,
+};
+
+/// La forma común de las etiquetas: pastilla con borde, icono y texto del mismo color.
+class _Pastilla extends StatelessWidget {
+  const _Pastilla({
+    super.key,
+    required this.icono,
+    required this.texto,
+    required this.color,
+    required this.fondo,
+  });
+
+  final IconData icono;
+  final String texto;
+  final Color color;
+  final Color fondo;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: ShapeDecoration(
+        color: fondo,
+        shape: StadiumBorder(side: BorderSide(color: color, width: 1.5)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          ExcludeSemantics(child: Icon(icono, size: 18, color: color)),
+          const SizedBox(width: 6),
+          Flexible(
+            child: Text(
+              texto,
+              style: Theme.of(context).textTheme.labelMedium?.copyWith(color: color),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class EtiquetaEstado extends StatelessWidget {
   const EtiquetaEstado(this.estado, {super.key});
 
@@ -29,17 +82,17 @@ class EtiquetaEstado extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colores = coloresDeEstado(estado);
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration: BoxDecoration(
-        color: colores.fondo,
-        border: Border.all(color: colores.texto),
-        borderRadius: const BorderRadius.all(Radius.circular(6)),
-      ),
-      child: Text(
-        nombreEstado(estado),
-        style: Theme.of(context).textTheme.labelMedium?.copyWith(color: colores.texto),
+    final colores = context.colores.deEstado(estado);
+    final nombre = nombreEstado(estado);
+    // TalkBack la lee una sola vez, como "Estado: En camino".
+    return Semantics(
+      label: 'Estado: $nombre',
+      excludeSemantics: true,
+      child: _Pastilla(
+        icono: iconoDeEstado(estado),
+        texto: nombre,
+        color: colores.texto,
+        fondo: colores.fondo,
       ),
     );
   }
@@ -51,26 +104,11 @@ class EtiquetaPendiente extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration: BoxDecoration(
-        color: Colores.avisoFondo,
-        border: Border.all(color: Colores.aviso),
-        borderRadius: const BorderRadius.all(Radius.circular(6)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Icon(Icons.cloud_upload_outlined, size: 18, color: Colores.aviso),
-          const SizedBox(width: 6),
-          Flexible(
-            child: Text(
-              'Pendiente por enviar',
-              style: Theme.of(context).textTheme.labelMedium?.copyWith(color: Colores.aviso),
-            ),
-          ),
-        ],
-      ),
+    return _Pastilla(
+      icono: Icons.cloud_upload_outlined,
+      texto: 'Pendiente por enviar',
+      color: context.colores.aviso,
+      fondo: context.colores.avisoFondo,
     );
   }
 }
@@ -81,27 +119,12 @@ class EtiquetaEsperaIda extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    return _Pastilla(
       key: const Key('espera-ida'),
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration: BoxDecoration(
-        color: Colores.regresoFondo,
-        border: Border.all(color: Colores.regreso),
-        borderRadius: const BorderRadius.all(Radius.circular(6)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Icon(Icons.lock_outline, size: 18, color: Colores.regreso),
-          const SizedBox(width: 6),
-          Flexible(
-            child: Text(
-              'Espera la ida',
-              style: Theme.of(context).textTheme.labelMedium?.copyWith(color: Colores.regreso),
-            ),
-          ),
-        ],
-      ),
+      icono: Icons.lock_outline,
+      texto: 'Espera la ida',
+      color: context.colores.regreso,
+      fondo: context.colores.regresoFondo,
     );
   }
 }
@@ -114,24 +137,91 @@ class EtiquetaFotosPendientes extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration: BoxDecoration(
-        color: Colores.avisoFondo,
-        border: Border.all(color: Colores.aviso),
-        borderRadius: const BorderRadius.all(Radius.circular(6)),
-      ),
+    return _Pastilla(
+      icono: Icons.photo_camera_outlined,
+      texto: cantidad == 1 ? '1 foto por subir' : '$cantidad fotos por subir',
+      color: context.colores.aviso,
+      fondo: context.colores.avisoFondo,
+    );
+  }
+}
+
+/// Los tres pasos que marca el conductor, en orden.
+const pasosDeAvance = [Estado.enCamino, Estado.recogido, Estado.entregado];
+
+/// Cuántos de los tres pasos están cumplidos. En una novedad, los que había antes de ella (0 si
+/// no se sabe).
+int pasosCumplidos(String estado, {String? estadoPrevio}) {
+  final base = estado == Estado.novedad ? estadoPrevio : estado;
+  return pasosDeAvance.indexOf(base ?? '') + 1;
+}
+
+/// El avance del servicio en tres tramos: En camino, Recogido, Entregado. En una novedad se
+/// pinta en rojo hasta donde iba; un servicio cancelado no la muestra.
+class BarraDeAvance extends StatelessWidget {
+  const BarraDeAvance(this.estado, {super.key, this.estadoPrevio});
+
+  final String estado;
+
+  /// Solo en una novedad: el estado que tenía antes.
+  final String? estadoPrevio;
+
+  @override
+  Widget build(BuildContext context) {
+    if (estado == Estado.cancelado) return const SizedBox.shrink();
+    final conNovedad = estado == Estado.novedad;
+    final cumplidos = pasosCumplidos(estado, estadoPrevio: estadoPrevio);
+    final colores = context.colores;
+    final lleno = conNovedad ? colores.peligro : colores.acento;
+    final estilo = Theme.of(context).textTheme.bodySmall;
+    // Con letra muy grande cada nombre se achica para caber en su tercio, en una sola línea:
+    // nunca se parte una palabra. TalkBack igual lee la etiqueta completa de la barra.
+    final escala = MediaQuery.textScalerOf(context).clamp(maxScaleFactor: 1.6);
+    final etiqueta = StringBuffer('Avance: paso $cumplidos de ${pasosDeAvance.length}');
+    if (cumplidos > 0) etiqueta.write(', ${nombreEstado(pasosDeAvance[cumplidos - 1])}');
+    if (conNovedad) etiqueta.write(', con novedad');
+
+    return Semantics(
+      label: etiqueta.toString(),
+      excludeSemantics: true,
       child: Row(
-        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Icon(Icons.photo_camera_outlined, size: 18, color: Colores.aviso),
-          const SizedBox(width: 6),
-          Flexible(
-            child: Text(
-              cantidad == 1 ? '1 foto por subir' : '$cantidad fotos por subir',
-              style: Theme.of(context).textTheme.labelMedium?.copyWith(color: Colores.aviso),
+          for (var i = 0; i < pasosDeAvance.length; i++) ...[
+            if (i > 0) const SizedBox(width: 6),
+            Expanded(
+              child: Column(
+                children: [
+                  Container(
+                    key: Key('avance-$i'),
+                    height: 8,
+                    decoration: BoxDecoration(
+                      color: i < cumplidos ? lleno : colores.pista,
+                      borderRadius: const BorderRadius.all(Radius.circular(4)),
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  // RichText y no Text: el nombre del paso no se confunde con la etiqueta del
+                  // estado cuando se busca el texto en pantalla, y TalkBack lee la barra entera.
+                  FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: RichText(
+                      textAlign: TextAlign.center,
+                      textScaler: escala,
+                      maxLines: 1,
+                      softWrap: false,
+                      text: TextSpan(
+                        text: nombreEstado(pasosDeAvance[i]),
+                        style: i == cumplidos - 1
+                            ? estilo?.copyWith(color: colores.texto, fontWeight: FontWeight.w700)
+                            : estilo?.copyWith(color: colores.textoSecundario),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
-          ),
+          ],
         ],
       ),
     );
@@ -268,7 +358,7 @@ class SeccionLugar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final textos = Theme.of(context).textTheme;
-    final secundario = textos.bodyLarge?.copyWith(color: Colores.textoSecundario);
+    final secundario = textos.bodyLarge?.copyWith(color: context.colores.textoSecundario);
     final llamar = enlaceLlamar(lugar.contactoTelefono);
     final maps = enlaceGoogleMaps(lugar);
     final waze = enlaceWaze(lugar);
@@ -280,7 +370,7 @@ class SeccionLugar extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(titulo, style: textos.labelMedium?.copyWith(color: Colores.textoSecundario)),
+        Text(titulo, style: textos.labelMedium?.copyWith(color: context.colores.textoSecundario)),
         const SizedBox(height: 4),
         if (lugar.vacio)
           Text(textoSinDatos, style: secundario)
@@ -384,7 +474,7 @@ class FilaDato extends StatelessWidget {
           children: [
             TextSpan(
               text: '$etiqueta: ',
-              style: textos.bodyLarge?.copyWith(color: Colores.textoSecundario),
+              style: textos.bodyLarge?.copyWith(color: context.colores.textoSecundario),
             ),
             TextSpan(text: valor, style: textos.bodyLarge),
           ],

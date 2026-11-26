@@ -35,6 +35,7 @@ void main() {
       'eventos_pendientes',
       'fotos_pendientes',
       'pasos_en_curso',
+      'preferencias',
     });
   });
 
@@ -311,5 +312,47 @@ void main() {
         expect((evento['secuencia'], evento['placa'], evento['vin']), (5, null, null));
       },
     );
+  });
+
+  group('versión 7 (preferencias)', () {
+    test('guarda y reemplaza una preferencia por clave', () async {
+      expect(await prueba.base.leerPreferencia(Preferencia.tema), isNull);
+      await prueba.base.escribirPreferencia(Preferencia.tema, 'oscuro');
+      await prueba.base.escribirPreferencia(Preferencia.tema, 'claro');
+      expect(await prueba.base.leerPreferencia(Preferencia.tema), 'claro');
+      expect(await prueba.base.db.query('preferencias'), hasLength(1));
+    });
+
+    test('un celular con la versión 6 sube a la 7 sin perder la lista ni la cola', () async {
+      await prueba.base.cerrar();
+      await File(prueba.ruta).delete();
+      final v6 = await BaseLocal.abrir(
+        fabricaDePrueba,
+        prueba.ruta,
+        migraciones: migraciones.take(6).toList(),
+      );
+      await v6.escribir(Clave.dispositivoId, 'el-mismo');
+      await v6.db.insert('eventos_pendientes', {
+        'id': 'a',
+        'conductor_id': 3,
+        'servicio_id': 41,
+        'destino': 'en_camino',
+        'secuencia': 5,
+        'hora_dispositivo': '2026-11-20T19:42:07Z',
+        'creado_en': '2026-11-20T19:42:07Z',
+      });
+      expect(await v6.db.getVersion(), 6);
+      expect(await tablas(v6), isNot(contains('preferencias')));
+      await v6.cerrar();
+
+      prueba.base = await BaseLocal.abrir(fabricaDePrueba, prueba.ruta);
+
+      expect(await prueba.base.db.getVersion(), 7);
+      expect(await tablas(prueba.base), contains('preferencias'));
+      expect(await prueba.base.leer(Clave.dispositivoId), 'el-mismo');
+      expect((await prueba.base.db.query('eventos_pendientes')).single['secuencia'], 5);
+      expect(await prueba.base.pendientesPorEnviar(), 1);
+      expect(await prueba.base.leerPreferencia(Preferencia.tema), isNull);
+    });
   });
 }

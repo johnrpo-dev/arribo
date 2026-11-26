@@ -3,12 +3,14 @@
 
 import 'package:arribo_conductor/app.dart';
 import 'package:arribo_conductor/asignaciones/almacen_asignaciones.dart';
+import 'package:arribo_conductor/asignaciones/componentes.dart';
 import 'package:arribo_conductor/asignaciones/lista_asignaciones.dart';
 import 'package:arribo_conductor/asignaciones/servicio.dart';
 import 'package:arribo_conductor/base_local.dart';
 import 'package:arribo_conductor/cola/cola_eventos.dart';
 import 'package:arribo_conductor/cola/sincronizador.dart';
 import 'package:arribo_conductor/ingreso/sesion.dart';
+import 'package:arribo_conductor/tema.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:material_ui/material_ui.dart';
@@ -614,6 +616,8 @@ void main() {
 
     await volver(tester);
     expect(tester.takeException(), isNull);
+    // La lista queda donde estaba; el aviso global está arriba del todo.
+    await tester.scrollUntilVisible(find.byKey(const Key('pendientes')), -300);
     expect(find.byKey(const Key('pendientes')), findsOneWidget);
   });
 
@@ -664,6 +668,38 @@ void main() {
 
       expect(find.byKey(const Key('aviso-espera-ida')), findsNothing);
       expect(find.text('Marcar En camino'), findsOneWidget);
+    });
+  });
+
+  group('cabecera del detalle', () {
+    testWidgets('muestra la placa en grande y la barra de avance del estado', (tester) async {
+      final semantica = tester.ensureSemantics();
+      await guardar({41: 'recogido'});
+      await abrirDetalle(tester);
+
+      expect(tester.widget<Text>(find.text('ABC123')).style, estiloPlaca);
+      expect(find.byType(BarraDeAvance), findsOneWidget);
+      expect(find.bySemanticsLabel('Avance: paso 2 de 3, Recogido'), findsOneWidget);
+      // La barra no repite el nombre del estado: la etiqueta sigue siendo la única.
+      expect(find.text('Recogido'), findsOneWidget);
+      semantica.dispose();
+    });
+
+    testWidgets('en una novedad la barra dice hasta dónde iba', (tester) async {
+      final semantica = tester.ensureSemantics();
+      await guardar({41: 'novedad'}, previo: 'en_camino');
+      await abrirDetalle(tester);
+
+      expect(find.bySemanticsLabel('Avance: paso 1 de 3, En camino, con novedad'), findsOneWidget);
+      semantica.dispose();
+    });
+
+    testWidgets('el paso que sigue y Reportar novedad quedan separados 16 dp', (tester) async {
+      await abrirDetalle(tester);
+
+      final marcar = tester.getRect(find.byKey(const Key('marcar-en_camino')));
+      final novedad = tester.getRect(find.byKey(const Key('marcar-novedad')));
+      expect(novedad.top - marcar.bottom, 16);
     });
   });
 }

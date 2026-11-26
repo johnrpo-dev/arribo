@@ -178,6 +178,16 @@ const List<List<String>> migraciones = [
     'ALTER TABLE servicios ADD COLUMN vehiculo_numero_bodega TEXT',
     "DELETE FROM estado_local WHERE clave = 'etag'",
   ],
+  // Versión 7: preferencias de quien usa este celular, por clave (por ahora, el tema claro u
+  // oscuro). Aparte de estado_local: no dependen de la sesión ni del servidor.
+  [
+    '''
+    CREATE TABLE preferencias (
+      clave TEXT PRIMARY KEY NOT NULL,
+      dato TEXT NOT NULL
+    )
+    ''',
+  ],
 ];
 
 /// Nombre del archivo de la base en la carpeta de bases de datos de la app.
@@ -194,6 +204,12 @@ abstract final class Clave {
   /// La secuencia del último evento que se encoló en este celular. Solo crece: no se toca al
   /// cerrar sesión ni al cambiar de conductor (ver `cola/cola_eventos.dart`).
   static const ultimaSecuencia = 'ultima_secuencia';
+}
+
+/// Claves de la tabla preferencias.
+abstract final class Preferencia {
+  /// `automatico`, `claro` u `oscuro` (ver `preferencia_tema.dart`).
+  static const tema = 'tema';
 }
 
 class BaseLocal {
@@ -260,6 +276,25 @@ class BaseLocal {
 
   Future<void> borrar(String clave, {DatabaseExecutor? en}) async {
     await (en ?? db).delete('estado_local', where: 'clave = ?', whereArgs: [clave]);
+  }
+
+  // ---------- preferencias ----------
+
+  Future<String?> leerPreferencia(String clave) async {
+    final filas = await db.query(
+      'preferencias',
+      columns: ['dato'],
+      where: 'clave = ?',
+      whereArgs: [clave],
+    );
+    return filas.isEmpty ? null : filas.first['dato'] as String;
+  }
+
+  Future<void> escribirPreferencia(String clave, String dato) async {
+    await db.insert('preferencias', {
+      'clave': clave,
+      'dato': dato,
+    }, conflictAlgorithm: ConflictAlgorithm.replace);
   }
 
   Future<Map<String, Object?>?> leerJson(String clave, {DatabaseExecutor? en}) async {

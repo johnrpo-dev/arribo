@@ -14,6 +14,7 @@ import 'comunes.dart';
 import 'fotos/camara.dart';
 import 'ingreso/pantalla_ingreso.dart';
 import 'ingreso/sesion.dart';
+import 'preferencia_tema.dart';
 import 'push.dart';
 import 'tema.dart';
 
@@ -27,6 +28,7 @@ class ArriboApp extends StatefulWidget {
     this.servidor = servidorConfigurado,
     this.reloj = DateTime.now,
     this.avisosTocados,
+    this.tema,
   });
 
   final Sesion sesion;
@@ -42,6 +44,10 @@ class ArriboApp extends StatefulWidget {
   /// refresca. null sin Firebase (y en las pruebas que no lo usan).
   final Stream<MensajePush>? avisosTocados;
 
+  /// El tema elegido (automático, claro u oscuro), ya leído de la base. Si no llega, se lee al
+  /// abrir y mientras tanto sigue al teléfono.
+  final PreferenciaTema? tema;
+
   @override
   State<ArriboApp> createState() => _ArriboAppState();
 }
@@ -51,10 +57,22 @@ class _ArriboAppState extends State<ArriboApp> {
   late EstadoSesion _estadoAnterior = widget.sesion.estado;
   late final Camara _camara = widget.camara ?? CamaraDelSistema();
   StreamSubscription<MensajePush>? _avisos;
+  late final PreferenciaTema _tema;
+
+  // Los dos temas se arman una vez: cambiar de modo solo elige cuál se usa.
+  final _temaClaro = temaArribo();
+  final _temaOscuro = temaArribo(Brightness.dark);
 
   @override
   void initState() {
     super.initState();
+    final dado = widget.tema;
+    if (dado != null) {
+      _tema = dado;
+    } else {
+      _tema = PreferenciaTema(widget.sesion.base);
+      unawaited(_tema.recargar());
+    }
     widget.sesion.addListener(_alCambiarLaSesion);
     _avisos = widget.avisosTocados?.listen(_alTocarUnAviso);
   }
@@ -63,6 +81,7 @@ class _ArriboAppState extends State<ArriboApp> {
   void dispose() {
     widget.sesion.removeListener(_alCambiarLaSesion);
     unawaited(_avisos?.cancel());
+    if (widget.tema == null) _tema.dispose();
     super.dispose();
   }
 
@@ -87,13 +106,21 @@ class _ArriboAppState extends State<ArriboApp> {
 
   @override
   Widget build(BuildContext context) {
+    return ValueListenableBuilder<ThemeMode>(
+      valueListenable: _tema,
+      builder: (context, modo, _) => _app(modo),
+    );
+  }
+
+  Widget _app(ThemeMode modo) {
     return MaterialApp(
       title: 'Arribo conductor',
       navigatorKey: _navegador,
       restorationScopeId: 'arribo',
       debugShowCheckedModeBanner: false,
-      theme: temaArribo(),
-      themeMode: ThemeMode.light,
+      theme: _temaClaro,
+      darkTheme: _temaOscuro,
+      themeMode: modo,
       locale: const Locale('es', 'CO'),
       supportedLocales: const [Locale('es', 'CO')],
       localizationsDelegates: GlobalMaterialLocalizations.delegates,
@@ -112,6 +139,7 @@ class _ArriboAppState extends State<ArriboApp> {
             sesion: widget.sesion,
             abrirEnlace: widget.abrirEnlace,
             reloj: widget.reloj,
+            tema: _tema,
           ),
         },
       ),
