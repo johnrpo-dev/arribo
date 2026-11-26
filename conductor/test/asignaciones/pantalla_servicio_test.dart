@@ -617,7 +617,11 @@ void main() {
     await volver(tester);
     expect(tester.takeException(), isNull);
     // La lista queda donde estaba; el aviso global está arriba del todo.
-    await tester.scrollUntilVisible(find.byKey(const Key('pendientes')), -300);
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('pendientes')),
+      -300,
+      scrollable: desplazableDelContenido,
+    );
     expect(find.byKey(const Key('pendientes')), findsOneWidget);
   });
 

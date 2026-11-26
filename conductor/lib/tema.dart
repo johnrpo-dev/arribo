@@ -217,6 +217,12 @@ const double radioTarjeta = 12;
 /// Esquinas de los botones y de los campos de texto.
 const double radioControl = 10;
 
+/// Cuánto dura una transición dentro de una pantalla (la franja sin señal, el recuadro de estado,
+/// el cambio de la tarjeta activa): 250 ms, o nada si en Android se quitaron las animaciones.
+/// Todas las animaciones de la app usan esta; las transiciones entre pantallas no se tocan.
+Duration duracionDeTransicion(BuildContext context) =>
+    MediaQuery.disableAnimationsOf(context) ? Duration.zero : const Duration(milliseconds: 250);
+
 /// La placa (o el VIN) en grande: la cifra de ancho fijo para leerla y compararla de un vistazo.
 /// Sin color: toma el del texto del tema.
 const estiloPlaca = TextStyle(

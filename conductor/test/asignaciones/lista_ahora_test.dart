@@ -381,9 +381,8 @@ void main() {
   });
 
   group('el recuadro de estado', () {
-    testWidgets('sin conexión y con cambios pendientes, un solo recuadro con las dos filas', (
-      tester,
-    ) async {
+    testWidgets('sin conexión y con cambios pendientes: los pendientes en el recuadro y sin '
+        'conexión en la franja fija de arriba, una sola vez', (tester) async {
       pantallaAlta(tester);
       await abrirApp(tester);
       await tocar(tester, find.byKey(const Key('tarjeta-marcar-en_camino')));
@@ -401,17 +400,22 @@ void main() {
         ),
         findsOneWidget,
       );
+      const sinConexion =
+          'Sin conexión. Se muestra lo guardado en el celular. Actualizado hoy, 9:30 a. m.';
+      expect(find.text(sinConexion), findsOneWidget);
       expect(
         find.descendant(
-          of: panel,
-          matching: find.text(
-            'Sin conexión. Se muestra lo guardado en el celular. Actualizado hoy, 9:30 a. m.',
-          ),
+          of: find.byKey(const Key('franja-sin-senal')),
+          matching: find.text(sinConexion),
         ),
         findsOneWidget,
       );
-      // Una línea entre las dos filas, nada más.
-      expect(find.descendant(of: panel, matching: find.byType(Divider)), findsOneWidget);
+      expect(
+        find.descendant(of: panel, matching: find.textContaining('Sin conexión')),
+        findsNothing,
+      );
+      // Una sola fila en el recuadro: sin líneas divisorias.
+      expect(find.descendant(of: panel, matching: find.byType(Divider)), findsNothing);
     });
 
     testWidgets('sin nada que contar, solo la línea de la última actualización', (tester) async {
@@ -430,7 +434,11 @@ void main() {
     await abrirApp(tester);
     expect(tester.takeException(), isNull);
 
-    await tester.scrollUntilVisible(find.byKey(const Key('tarjeta-marcar-en_camino')), 300);
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('tarjeta-marcar-en_camino')),
+      300,
+      scrollable: desplazableDelContenido,
+    );
     await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);
     await tocar(tester, find.byKey(const Key('tarjeta-marcar-en_camino')));
@@ -438,10 +446,15 @@ void main() {
     await tocar(tester, find.byKey(const Key('confirmar')));
     expect(tester.takeException(), isNull);
 
-    // Arriba: el recuadro con la fila de pendientes y la de sin conexión.
-    await tester.scrollUntilVisible(find.byKey(const Key('estado-de-la-lista')), -300);
+    // Arriba: el recuadro con la fila de pendientes; sin conexión lo dice la franja fija.
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('estado-de-la-lista')),
+      -300,
+      scrollable: desplazableDelContenido,
+    );
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('pendientes')), findsOneWidget);
+    expect(find.byKey(const Key('franja-sin-senal')), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
   group('vehículo identificado solo por número de bodega', () {

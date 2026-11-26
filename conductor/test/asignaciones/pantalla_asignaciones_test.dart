@@ -221,11 +221,15 @@ void main() {
     expect(tester.takeException(), isNull);
 
     // Recorre la lista completa: las dos tarjetas se construyen y se dibujan sin desbordarse.
-    await tester.scrollUntilVisible(find.text('Recoger en: Calle 10 # 43-20, El Poblado'), 300);
+    await tester.scrollUntilVisible(
+      find.text('Recoger en: Calle 10 # 43-20, El Poblado'),
+      300,
+      scrollable: desplazableDelContenido,
+    );
     await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);
 
-    await tester.scrollUntilVisible(find.text('ABC123'), -300);
+    await tester.scrollUntilVisible(find.text('ABC123'), -300, scrollable: desplazableDelContenido);
     await tester.ensureVisible(find.text('ABC123'));
     await tester.pumpAndSettle();
     await abrirDetalleDe(tester, 'ABC123');
@@ -235,7 +239,7 @@ void main() {
     await tester.scrollUntilVisible(
       find.textContaining('Montado en la grúa'),
       300,
-      scrollable: find.byType(Scrollable).first,
+      scrollable: desplazableDelContenido,
     );
     await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);

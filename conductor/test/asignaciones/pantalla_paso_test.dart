@@ -77,13 +77,33 @@ void main() {
   // Viernes 20 de noviembre, 10:00 a. m. en Colombia.
   final ahora = DateTime.utc(2026, 11, 20, 15);
 
+  /// La placa o el VIN ([campo]) que el servidor guardó de un Recogido digitado y aplicado, como
+  /// hace el real: desde entonces la lista ya los trae.
+  String? digitadoRecibido(int id, String campo) {
+    for (final lote in eventos.lotes.reversed) {
+      for (final evento in lote.reversed) {
+        final aplicado = eventos.guardados[evento['id']]?['resultado'] == 'aplicado';
+        if (evento['servicio_id'] == id && aplicado && evento[campo] != null) {
+          return evento[campo]! as String;
+        }
+      }
+    }
+    return null;
+  }
+
   Map<String, Object?> servicioDe(int id, String estado) => {
     ...servicioJson(id: id, estado: estado, placa: placas[id] ?? 'JKL456', tipo: tipo),
     'estado_previo': estado == 'novedad' ? eventos.previos[id] : null,
     'a_bordo': estado == 'recogido' || (estado == 'novedad' && eventos.previos[id] == 'recogido'),
     'grua': {'id': 2, 'placa': 'GRU001', 'capacidad': capacidad},
     if (sinIdentificar.contains(id))
-      'vehiculo': {'placa': null, 'vin': null, 'marca': 'Mazda', 'linea': 'CX-30', 'color': 'Rojo'},
+      'vehiculo': {
+        'placa': digitadoRecibido(id, 'placa'),
+        'vin': digitadoRecibido(id, 'vin'),
+        'marca': 'Mazda',
+        'linea': 'CX-30',
+        'color': 'Rojo',
+      },
   };
 
   Future<http.Response> responder(PeticionRecibida peticion) async {
@@ -742,7 +762,11 @@ void main() {
       await volver(tester);
 
       // El tercero: los dos puestos van ocupados.
-      await tester.scrollUntilVisible(find.text('JKL456'), 400);
+      await tester.scrollUntilVisible(
+        find.text('JKL456'),
+        400,
+        scrollable: desplazableDelContenido,
+      );
       await tester.ensureVisible(find.text('JKL456'));
       await tester.pumpAndSettle();
       await abrirDetalleDe(tester, 'JKL456');
@@ -870,6 +894,34 @@ void main() {
       expect(api.fotosSubidas, isEmpty);
     });
 
+    testWidgets('sin señal, el cambio y las fotos pendientes van en un solo recuadro, una fila '
+        'cada uno con una línea entre ellas; sin conexión va en la franja fija', (tester) async {
+      await marcarRecogidoConFotos(tester);
+
+      final panel = find.byKey(const Key('estado-de-la-lista'));
+      expect(panel, findsOneWidget);
+      expect(find.descendant(of: panel, matching: find.byKey(const Key('pendientes'))), findsOne);
+      expect(
+        find.descendant(of: panel, matching: find.byKey(const Key('fotos-pendientes'))),
+        findsOne,
+      );
+      // Una línea entre las dos filas, nada más.
+      expect(find.descendant(of: panel, matching: find.byType(Divider)), findsOneWidget);
+      expect(
+        find.descendant(of: panel, matching: find.textContaining('Sin conexión')),
+        findsNothing,
+      );
+      expect(
+        find.descendant(
+          of: find.byKey(const Key('franja-sin-senal')),
+          matching: find.text(
+            'Sin conexión. Se muestra lo guardado en el celular. Actualizado hoy, 9:30 a. m.',
+          ),
+        ),
+        findsOneWidget,
+      );
+    });
+
     testWidgets('al volver la señal suben solas, después del evento, y el indicador desaparece', (
       tester,
     ) async {
@@ -972,7 +1024,7 @@ void main() {
     celularConTextoGrande(tester);
     await abrirApp(tester);
 
-    await tester.scrollUntilVisible(find.text('XYZ789'), 400);
+    await tester.scrollUntilVisible(find.text('XYZ789'), 400, scrollable: desplazableDelContenido);
     await tester.pumpAndSettle();
     await abrirDetalleDe(tester, 'XYZ789');
     await tocar(tester, find.text('Marcar Recogido'));
@@ -982,7 +1034,7 @@ void main() {
     await tocar(tester, find.text('Entendido'));
     await volver(tester);
 
-    await tester.scrollUntilVisible(find.text('ABC123'), -400);
+    await tester.scrollUntilVisible(find.text('ABC123'), -400, scrollable: desplazableDelContenido);
     await tester.pumpAndSettle();
     await abrirDetalleDe(tester, 'ABC123');
     await tocar(tester, find.text('Marcar Entregado'));

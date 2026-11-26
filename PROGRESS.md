@@ -1822,4 +1822,34 @@ Ninguno todavía.
   4. Tocar Actualizar: no vibra.
 - **Pruebas:** app 581 (16 nuevas en `test/asignaciones/vibracion_test.dart`), `flutter analyze`
   sin problemas. El servidor no cambió. No se ha probado en un celular real.
-- **Pendiente.** Etapa 4 (transiciones; estados vacío, de carga y sin señal).
+- **Siguiente.** Etapa 4, hecha abajo.
+
+### Rediseño de la app, etapa 4 (26/11/2026) · Sin señal, lista vacía, carga y transiciones
+
+- **Qué se hizo** (`savvy-flow:savvy-careful`; diseño y revisión de la sesión principal):
+  - **Sin señal:** una franja fija arriba de la lista, del detalle y de la pantalla de fotos, fuera
+    de lo que se desplaza: sigue a la vista al bajar. En la lista dice "Sin conexión. Se muestra lo
+    guardado en el celular. Actualizado …" (ya no va en el recuadro de estado); en el detalle y en
+    fotos, "Sin conexión. Lo que marque se envía cuando vuelva la señal." Con letra muy grande no
+    pasa de la cuarta parte de la pantalla (el texto se desplaza dentro, con barra).
+  - **Lista vacía:** icono, título, explicación y botón "Actualizar". Distingue "Aún no hay
+    servicios en el celular" (nunca recibió la lista) de "No tiene servicios asignados."
+  - **Carga:** la rueda dice qué hace ("Cargando sus servicios…", "Cargando el servicio…",
+    "Preparando el paso…").
+  - **Transiciones:** la tarjeta activa cambia con un fundido al avanzar de paso; la franja y el
+    recuadro de estado aparecen y desaparecen sin saltos. Todo en 250 ms (`duracionDeTransicion` en
+    `tema.dart`), y nada si en Android se quitaron las animaciones. Las transiciones entre
+    pantallas no cambian.
+  - En las pruebas, el servidor falso de `pantalla_paso_test` ahora devuelve la placa o el VIN
+    digitados en un Recogido aplicado, como el real.
+- **Cómo probar (menos de 5 minutos).** Instalar la app nueva (`flutter run --release` desde
+  `conductor/`).
+  1. Con servicios asignados, quitar la señal (`uv run python manage.py sin_senal` desde
+     `backend/`, o modo avión) y tocar Actualizar: arriba aparece la franja amarilla; bajar por la
+     lista: la franja sigue ahí. Entrar a un servicio: dice que lo que marque se envía después.
+  2. Devolver la señal (`con_senal`) y actualizar: la franja se va sin salto.
+  3. Marcar En camino desde la tarjeta: la tarjeta cambia con un fundido.
+  4. Con un conductor sin servicios: se ve "No tiene servicios asignados." y el botón Actualizar.
+- **Pruebas:** app 603 (22 nuevas en `test/asignaciones/estados_pantalla_test.dart`),
+  `flutter analyze` sin problemas. El servidor no cambió. No se ha probado en un celular real.
+- **Rediseño completo** (etapas 1 a 4). Queda verlo en el celular.

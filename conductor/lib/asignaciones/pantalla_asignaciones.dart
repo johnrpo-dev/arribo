@@ -216,57 +216,170 @@ class _PantallaAsignacionesState extends State<PantallaAsignaciones> {
         listenable: widget.lista,
         builder: (context, _) {
           final lista = widget.lista;
-          if (!lista.cargada) return const Center(child: CircularProgressIndicator());
           final ahora = widget.reloj();
-          // El servicio que está atendiendo va arriba ("Ahora"), con el botón del paso que sigue;
-          // los demás quedan debajo ("Después"), en el orden de la ronda.
-          final activo = servicioActivo(lista.servicios);
-          final despues = [
-            for (final servicio in lista.servicios)
-              if (servicio.id != activo?.id) servicio,
-          ];
-          Widget tarjeta(Servicio servicio, {bool activa = false}) => TarjetaServicio(
-            key: ValueKey('tarjeta-${servicio.id}'),
-            servicio: servicio,
-            pendiente: lista.pendientesDe(servicio.id) > 0,
-            fotosPendientes: lista.fotos.pendientesDe(servicio.id),
-            ahora: ahora,
-            abrirEnlace: widget.abrirEnlace,
-            activa: activa,
-            lista: activa ? lista : null,
-            alTocar: () =>
-                Navigator.of(context).restorablePushNamed(rutaServicio, arguments: servicio.id),
-          );
-          return RefreshIndicator(
-            onRefresh: lista.actualizar,
-            child: ListView(
-              physics: const AlwaysScrollableScrollPhysics(),
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
-              children: [
-                _EstadoDeLaLista(lista: lista, ahora: ahora),
-                const SizedBox(height: 12),
-                if (lista.servicios.isEmpty)
-                  Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 32),
-                    child: Text(
-                      lista.ultimaActualizacion == null
-                          ? 'Cuando haya señal aparecerán aquí sus servicios.'
-                          : 'No tiene servicios asignados.',
-                      style: Theme.of(context).textTheme.bodyLarge,
-                      textAlign: TextAlign.center,
-                    ),
-                  ),
-                if (activo != null) ...[
-                  const _TituloDeSeccion('Ahora'),
-                  tarjeta(activo, activa: true),
-                  const SizedBox(height: 12),
-                  if (despues.isNotEmpty) const _TituloDeSeccion('Después'),
-                ],
-                for (final servicio in despues) ...[tarjeta(servicio), const SizedBox(height: 12)],
-              ],
-            ),
+          final actualizada = textoUltimaActualizacion(lista.ultimaActualizacion, ahora: ahora);
+          // Sin señal, el aviso queda fijo arriba, fuera de lo que se desplaza.
+          return ConFranjaSinSenal(
+            visible: lista.sinConexion,
+            texto: 'Sin conexión. Se muestra lo guardado en el celular. $actualizada',
+            child: lista.cargada
+                ? _contenido(context, lista, ahora)
+                : const Cargando('Cargando sus servicios…'),
           );
         },
+      ),
+    );
+  }
+
+  /// La lista ya leída de la base: el estado, el servicio activo y los demás.
+  Widget _contenido(BuildContext context, ListaAsignaciones lista, DateTime ahora) {
+    // El servicio que está atendiendo va arriba ("Ahora"), con el botón del paso que sigue;
+    // los demás quedan debajo ("Después"), en el orden de la ronda.
+    final activo = servicioActivo(lista.servicios);
+    final despues = [
+      for (final servicio in lista.servicios)
+        if (servicio.id != activo?.id) servicio,
+    ];
+    Widget tarjeta(Servicio servicio, {bool activa = false}) => TarjetaServicio(
+      key: ValueKey('tarjeta-${servicio.id}'),
+      servicio: servicio,
+      pendiente: lista.pendientesDe(servicio.id) > 0,
+      fotosPendientes: lista.fotos.pendientesDe(servicio.id),
+      ahora: ahora,
+      abrirEnlace: widget.abrirEnlace,
+      activa: activa,
+      lista: activa ? lista : null,
+      alTocar: () =>
+          Navigator.of(context).restorablePushNamed(rutaServicio, arguments: servicio.id),
+    );
+    return RefreshIndicator(
+      onRefresh: lista.actualizar,
+      child: ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
+        children: [
+          _EstadoDeLaLista(lista: lista, ahora: ahora),
+          const SizedBox(height: 12),
+          if (lista.servicios.isEmpty) _ListaVacia(lista: lista),
+          if (activo != null) ...[
+            const _TituloDeSeccion('Ahora'),
+            // Al avanzar de paso o cambiar el servicio activo, la tarjeta cambia con un fundido.
+            _CambioDeTarjeta(
+              child: KeyedSubtree(
+                key: ValueKey('activa-${activo.id}-${activo.estado}'),
+                child: tarjeta(activo, activa: true),
+              ),
+            ),
+            const SizedBox(height: 12),
+            if (despues.isNotEmpty) const _TituloDeSeccion('Después'),
+          ],
+          for (final servicio in despues) ...[tarjeta(servicio), const SizedBox(height: 12)],
+        ],
+      ),
+    );
+  }
+}
+
+/// Sin servicios en la lista: qué pasa y un botón para pedirla otra vez (deslizar hacia abajo
+/// también sirve). Distingue si el celular nunca ha recibido la lista o si la recibió vacía.
+class _ListaVacia extends StatelessWidget {
+  const _ListaVacia({required this.lista});
+
+  final ListaAsignaciones lista;
+
+  @override
+  Widget build(BuildContext context) {
+    final textos = Theme.of(context).textTheme;
+    final nuncaActualizada = lista.ultimaActualizacion == null;
+    final actualizando = lista.actualizando;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 32),
+      child: Column(
+        children: [
+          Icon(Icons.inbox_outlined, size: 64, color: context.colores.textoSecundario),
+          const SizedBox(height: 16),
+          Semantics(
+            header: true,
+            child: Text(
+              nuncaActualizada
+                  ? 'Aún no hay servicios en el celular'
+                  : 'No tiene servicios asignados.',
+              style: textos.titleMedium,
+              textAlign: TextAlign.center,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            nuncaActualizada
+                ? 'Cuando haya señal aparecerán aquí sus servicios.'
+                : 'Cuando le asignen uno, aparecerá aquí.',
+            style: textos.bodyLarge,
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 24),
+          OutlinedButton.icon(
+            key: const Key('vacia-actualizar'),
+            onPressed: actualizando ? null : lista.actualizar,
+            icon: const Icon(Icons.refresh),
+            label: Text(actualizando ? 'Actualizando…' : 'Actualizar'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// El cambio de la tarjeta activa: la anterior se desvanece mientras aparece la nueva y el alto
+/// pasa de uno al otro sin saltos ([duracionDeTransicion]). La que sale no recibe toques ni la lee
+/// TalkBack: solo vale la nueva.
+class _CambioDeTarjeta extends StatelessWidget {
+  const _CambioDeTarjeta({required this.child});
+
+  /// Con una clave propia por servicio y estado: al cambiar la clave, cambia la tarjeta.
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return TamanoAnimado(
+      child: AnimatedSwitcher(
+        duration: duracionDeTransicion(context),
+        transitionBuilder: (child, animacion) => FadeTransition(opacity: animacion, child: child),
+        // La que sale no ocupa alto: el alto lo da la nueva y lo anima TamanoAnimado.
+        layoutBuilder: (actual, anteriores) => Stack(
+          alignment: Alignment.topCenter,
+          clipBehavior: Clip.none,
+          children: [
+            for (final anterior in anteriores)
+              _Transicion(key: anterior.key, saliendo: true, child: anterior),
+            if (actual != null) _Transicion(key: actual.key, saliendo: false, child: actual),
+          ],
+        ),
+        child: child,
+      ),
+    );
+  }
+}
+
+/// Una tarjeta dentro de [_CambioDeTarjeta]. La misma forma para la que entra y la que sale, para
+/// no perder su estado al pasar de una a otra.
+class _Transicion extends StatelessWidget {
+  const _Transicion({super.key, required this.saliendo, required this.child});
+
+  final bool saliendo;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Align(
+      alignment: Alignment.topCenter,
+      heightFactor: saliendo ? 0 : 1,
+      // A todo el ancho, como las demás tarjetas de la lista.
+      child: SizedBox(
+        width: double.infinity,
+        child: IgnorePointer(
+          ignoring: saliendo,
+          child: ExcludeSemantics(excluding: saliendo, child: child),
+        ),
       ),
     );
   }
@@ -290,11 +403,12 @@ class _TituloDeSeccion extends StatelessWidget {
   }
 }
 
-/// Arriba de la lista. Lo informativo (sin conexión o un error, con la hora de la última
-/// actualización; cambios y fotos pendientes por enviar) va junto en un solo recuadro, una fila
-/// por cosa. Lo que pide algo al conductor (cambios o fotos de otro conductor, cambios que el
-/// servidor no aplicó, fotos que rechazó) sigue aparte, cada uno en su recuadro. Si no hay nada
-/// que contar, una línea discreta con la hora de la última actualización.
+/// Arriba de la lista. Lo informativo (un error, con la hora de la última actualización; cambios y
+/// fotos pendientes por enviar) va junto en un solo recuadro, una fila por cosa. Sin conexión lo
+/// dice la franja fija de arriba de la pantalla, no este recuadro. Lo que pide algo al conductor
+/// (cambios o fotos de otro conductor, cambios que el servidor no aplicó, fotos que rechazó) sigue
+/// aparte, cada uno en su recuadro. Si no hay nada que contar, una línea discreta con la hora de la
+/// última actualización.
 class _EstadoDeLaLista extends StatelessWidget {
   const _EstadoDeLaLista({required this.lista, required this.ahora});
 
@@ -322,12 +436,8 @@ class _EstadoDeLaLista extends StatelessWidget {
           key: const Key('fotos-pendientes'),
           icono: Icons.photo_camera_outlined,
         ),
-      if (lista.sinConexion)
-        _FilaDeEstado(
-          'Sin conexión. Se muestra lo guardado en el celular. $actualizada',
-          icono: Icons.cloud_off_outlined,
-        )
-      else if (problema != null)
+      // Sin conexión no va aquí: lo dice la franja fija de arriba ([FranjaSinSenal]).
+      if (!lista.sinConexion && problema != null)
         _FilaDeEstado(
           '${problema.mensaje} $actualizada',
           icono: Icons.error_outline,
@@ -337,7 +447,12 @@ class _EstadoDeLaLista extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        if (filas.isNotEmpty) ...[_PanelDeEstado(filas), const SizedBox(height: 8)],
+        // El recuadro crece, se encoge, aparece y desaparece sin saltos.
+        TamanoAnimado(
+          child: filas.isEmpty
+              ? const SizedBox(width: double.infinity)
+              : Padding(padding: const EdgeInsets.only(bottom: 8), child: _PanelDeEstado(filas)),
+        ),
         for (final ajenos in cola.pendientesAjenos) ...[
           Recuadro(
             textoPendientesAjenos(ajenos),

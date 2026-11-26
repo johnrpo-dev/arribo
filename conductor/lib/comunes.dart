@@ -49,6 +49,57 @@ class Recuadro extends StatelessWidget {
   }
 }
 
+/// Mientras una pantalla lee lo guardado en el celular: la rueda y debajo qué está haciendo.
+/// TalkBack lo lee como un solo elemento, con el texto.
+class Cargando extends StatelessWidget {
+  const Cargando(this.texto, {super.key});
+
+  final String texto;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Semantics(
+        container: true,
+        label: texto,
+        excludeSemantics: true,
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const CircularProgressIndicator(),
+              const SizedBox(height: 16),
+              Text(
+                texto,
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.bodyLarge
+                    ?.copyWith(color: context.colores.textoSecundario),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// El alto de [child] cambia sin saltos (crece, se encoge, aparece, desaparece), en
+/// [duracionDeTransicion]. Sin animaciones en el celular, el cambio es inmediato: [AnimatedSize] no
+/// admite una duración cero.
+class TamanoAnimado extends StatelessWidget {
+  const TamanoAnimado({super.key, required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final duracion = duracionDeTransicion(context);
+    if (duracion == Duration.zero) return child;
+    return AnimatedSize(duration: duracion, alignment: Alignment.topCenter, child: child);
+  }
+}
+
 /// Mientras la app lee lo guardado al abrir.
 class PantallaCargando extends StatelessWidget {
   const PantallaCargando({super.key});
