@@ -59,6 +59,10 @@ class _ArriboAppState extends State<ArriboApp> {
   StreamSubscription<MensajePush>? _avisos;
   late final PreferenciaTema _tema;
 
+  // Los dos temas se arman una vez: cambiar de modo solo elige cuál se usa.
+  final _temaClaro = temaArribo();
+  final _temaOscuro = temaArribo(Brightness.dark);
+
   @override
   void initState() {
     super.initState();
@@ -114,8 +118,8 @@ class _ArriboAppState extends State<ArriboApp> {
       navigatorKey: _navegador,
       restorationScopeId: 'arribo',
       debugShowCheckedModeBanner: false,
-      theme: temaArribo(),
-      darkTheme: temaArribo(Brightness.dark),
+      theme: _temaClaro,
+      darkTheme: _temaOscuro,
       themeMode: modo,
       locale: const Locale('es', 'CO'),
       supportedLocales: const [Locale('es', 'CO')],

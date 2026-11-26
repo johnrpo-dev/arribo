@@ -174,7 +174,9 @@ class BarraDeAvance extends StatelessWidget {
     final colores = context.colores;
     final lleno = conNovedad ? colores.peligro : colores.acento;
     final estilo = Theme.of(context).textTheme.bodySmall;
-    final escala = MediaQuery.textScalerOf(context);
+    // Con letra muy grande cada nombre se achica para caber en su tercio, en una sola línea:
+    // nunca se parte una palabra. TalkBack igual lee la etiqueta completa de la barra.
+    final escala = MediaQuery.textScalerOf(context).clamp(maxScaleFactor: 1.6);
     final etiqueta = StringBuffer('Avance: paso $cumplidos de ${pasosDeAvance.length}');
     if (cumplidos > 0) etiqueta.write(', ${nombreEstado(pasosDeAvance[cumplidos - 1])}');
     if (conNovedad) etiqueta.write(', con novedad');
@@ -194,21 +196,26 @@ class BarraDeAvance extends StatelessWidget {
                     key: Key('avance-$i'),
                     height: 8,
                     decoration: BoxDecoration(
-                      color: i < cumplidos ? lleno : colores.borde,
+                      color: i < cumplidos ? lleno : colores.pista,
                       borderRadius: const BorderRadius.all(Radius.circular(4)),
                     ),
                   ),
                   const SizedBox(height: 6),
                   // RichText y no Text: el nombre del paso no se confunde con la etiqueta del
                   // estado cuando se busca el texto en pantalla, y TalkBack lee la barra entera.
-                  RichText(
-                    textAlign: TextAlign.center,
-                    textScaler: escala,
-                    text: TextSpan(
-                      text: nombreEstado(pasosDeAvance[i]),
-                      style: i == cumplidos - 1
-                          ? estilo?.copyWith(color: colores.texto, fontWeight: FontWeight.w700)
-                          : estilo?.copyWith(color: colores.textoSecundario),
+                  FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: RichText(
+                      textAlign: TextAlign.center,
+                      textScaler: escala,
+                      maxLines: 1,
+                      softWrap: false,
+                      text: TextSpan(
+                        text: nombreEstado(pasosDeAvance[i]),
+                        style: i == cumplidos - 1
+                            ? estilo?.copyWith(color: colores.texto, fontWeight: FontWeight.w700)
+                            : estilo?.copyWith(color: colores.textoSecundario),
+                      ),
                     ),
                   ),
                 ],

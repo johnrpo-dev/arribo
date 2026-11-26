@@ -34,20 +34,45 @@ class PreferenciaTema extends ValueNotifier<ThemeMode> {
   /// El conductor ya eligió en esta sesión de la app: lo leído después no lo pisa.
   bool _elegido = false;
 
-  /// Lee lo guardado antes de mostrar la app, para que no aparezca un instante con otro tema.
+  /// La app ya no la usa: lo que llegue tarde de la base no se aplica.
+  bool _desechada = false;
+
+  /// Lee lo guardado antes de mostrar la app, para que no aparezca un instante con otro tema. Si
+  /// la base no responde, la app arranca igual siguiendo al teléfono.
   static Future<PreferenciaTema> cargar(BaseLocal base) async =>
-      PreferenciaTema(base, _modoDe(await base.leerPreferencia(Preferencia.tema)));
+      PreferenciaTema(base, await _leer(base) ?? ThemeMode.system);
+
+  /// Lo guardado, o null si no se pudo leer.
+  static Future<ThemeMode?> _leer(BaseLocal base) async {
+    try {
+      return _modoDe(await base.leerPreferencia(Preferencia.tema));
+    } catch (error) {
+      debugPrint('No se pudo leer el tema guardado; sigue al teléfono ($error).');
+      return null;
+    }
+  }
 
   /// Vuelve a leer lo guardado (cuando la app arranca sin haberlo cargado antes).
   Future<void> recargar() async {
-    final guardado = _modoDe(await _base.leerPreferencia(Preferencia.tema));
-    if (!_elegido) value = guardado;
+    final guardado = await _leer(_base);
+    if (guardado != null && !_elegido && !_desechada) value = guardado;
   }
 
-  /// Aplica [modo] de inmediato y lo guarda.
+  /// Aplica [modo] de inmediato y lo guarda. Si no se puede guardar, queda aplicado mientras la
+  /// app siga abierta: el conductor no recibe un error por esto.
   Future<void> elegir(ThemeMode modo) async {
     _elegido = true;
     value = modo;
-    await _base.escribirPreferencia(Preferencia.tema, _datoDe(modo));
+    try {
+      await _base.escribirPreferencia(Preferencia.tema, _datoDe(modo));
+    } catch (error) {
+      debugPrint('No se pudo guardar el tema elegido; queda aplicado sin guardar ($error).');
+    }
+  }
+
+  @override
+  void dispose() {
+    _desechada = true;
+    super.dispose();
   }
 }

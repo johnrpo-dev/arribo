@@ -30,6 +30,7 @@ class ColoresArribo extends ThemeExtension<ColoresArribo> {
     required this.avisoFondo,
     required this.regreso,
     required this.regresoFondo,
+    required this.pista,
     required this.asignado,
     required this.enCamino,
     required this.recogido,
@@ -53,6 +54,7 @@ class ColoresArribo extends ThemeExtension<ColoresArribo> {
     avisoFondo: Color(0xFFFCF1E1),
     regreso: Color(0xFF08564F),
     regresoFondo: Color(0xFFE1F4F1),
+    pista: Color(0xFF808892),
     asignado: (texto: Color(0xFF1A3F99), fondo: Color(0xFFE8EEFB)),
     enCamino: (texto: Color(0xFF553180), fondo: Color(0xFFF2ECF8)),
     recogido: (texto: Color(0xFF774600), fondo: Color(0xFFFCF1E1)),
@@ -76,6 +78,7 @@ class ColoresArribo extends ThemeExtension<ColoresArribo> {
     avisoFondo: Color(0xFF3A2A10),
     regreso: Color(0xFF8EE3D6),
     regresoFondo: Color(0xFF10332F),
+    pista: Color(0xFF8A929C),
     asignado: (texto: Color(0xFFB9CCFF), fondo: Color(0xFF1E2A4A)),
     enCamino: (texto: Color(0xFFDCC6FF), fondo: Color(0xFF2E2340)),
     recogido: (texto: Color(0xFFFFD08A), fondo: Color(0xFF3A2A10)),
@@ -99,6 +102,9 @@ class ColoresArribo extends ThemeExtension<ColoresArribo> {
   /// Regreso de un evento (el mismo verde azulado del panel).
   final Color regreso;
   final Color regresoFondo;
+
+  /// Lo que falta de una barra de avance: se distingue (3:1) del fondo y de las tarjetas.
+  final Color pista;
 
   final ColoresDeEstado asignado;
   final ColoresDeEstado enCamino;
@@ -136,6 +142,7 @@ class ColoresArribo extends ThemeExtension<ColoresArribo> {
     Color? avisoFondo,
     Color? regreso,
     Color? regresoFondo,
+    Color? pista,
     ColoresDeEstado? asignado,
     ColoresDeEstado? enCamino,
     ColoresDeEstado? recogido,
@@ -156,6 +163,7 @@ class ColoresArribo extends ThemeExtension<ColoresArribo> {
     avisoFondo: avisoFondo ?? this.avisoFondo,
     regreso: regreso ?? this.regreso,
     regresoFondo: regresoFondo ?? this.regresoFondo,
+    pista: pista ?? this.pista,
     asignado: asignado ?? this.asignado,
     enCamino: enCamino ?? this.enCamino,
     recogido: recogido ?? this.recogido,
@@ -184,6 +192,7 @@ class ColoresArribo extends ThemeExtension<ColoresArribo> {
       avisoFondo: c(avisoFondo, other.avisoFondo),
       regreso: c(regreso, other.regreso),
       regresoFondo: c(regresoFondo, other.regresoFondo),
+      pista: c(pista, other.pista),
       asignado: e(asignado, other.asignado),
       enCamino: e(enCamino, other.enCamino),
       recogido: e(recogido, other.recogido),

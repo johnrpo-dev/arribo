@@ -2,6 +2,7 @@
 
 import 'package:arribo_conductor/asignaciones/componentes.dart';
 import 'package:arribo_conductor/tema.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
 
@@ -118,7 +119,7 @@ void main() {
       expect(pasosCumplidos('novedad'), 0);
     });
 
-    final vacio = ColoresArribo.claro.borde;
+    final vacio = ColoresArribo.claro.pista;
     final lleno = ColoresArribo.claro.acento;
     final casos = {
       'asignado': [vacio, vacio, vacio],
@@ -142,13 +143,13 @@ void main() {
       expect(coloresDeTramos(tester), [ColoresArribo.claro.peligro, vacio, vacio]);
     });
 
-    testWidgets('en el tema oscuro llena con el acento oscuro y deja vacíos con el borde oscuro', (
+    testWidgets('en el tema oscuro llena con el acento oscuro y deja vacíos con la pista oscura', (
       tester,
     ) async {
       await mostrar(tester, const BarraDeAvance('en_camino'), brillo: Brightness.dark);
 
       const o = ColoresArribo.oscuro;
-      expect(coloresDeTramos(tester), [o.acento, o.borde, o.borde]);
+      expect(coloresDeTramos(tester), [o.acento, o.pista, o.pista]);
     });
 
     testWidgets('cancelado: no muestra la barra', (tester) async {
@@ -179,6 +180,48 @@ void main() {
 
       for (final paso in ['En camino', 'Recogido', 'Entregado']) {
         expect(find.text(paso, findRichText: true), findsOneWidget);
+      }
+    });
+
+    testWidgets('con el texto al 200 % en 360 dp cada paso cabe entero en una línea', (
+      tester,
+    ) async {
+      tester.view.physicalSize = const Size(1080, 2400);
+      tester.view.devicePixelRatio = 3;
+      tester.platformDispatcher.textScaleFactorTestValue = 2;
+      addTearDown(tester.view.reset);
+      addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+
+      await mostrar(
+        tester,
+        const Padding(
+          padding: EdgeInsets.symmetric(horizontal: 16),
+          child: BarraDeAvance('recogido'),
+        ),
+      );
+
+      expect(tester.takeException(), isNull);
+      for (final (i, paso) in ['En camino', 'Recogido', 'Entregado'].indexed) {
+        final nombre = find.text(paso, findRichText: true);
+        final texto = tester.widget<RichText>(nombre);
+        final parrafo = tester.renderObject<RenderParagraph>(nombre);
+        // El nombre completo en una sola línea, sin cortarse.
+        final unaLinea = TextPainter(
+          text: texto.text,
+          textScaler: texto.textScaler,
+          textDirection: TextDirection.ltr,
+        )..layout();
+        addTearDown(unaLinea.dispose);
+        expect(parrafo.didExceedMaxLines, isFalse, reason: paso);
+        expect(parrafo.size.height, unaLinea.height, reason: paso);
+        expect(parrafo.size.width, closeTo(unaLinea.width, 0.01), reason: paso);
+        // Y, achicado si hace falta, no se sale de su tramo.
+        final ajustado = find.ancestor(of: nombre, matching: find.byType(FittedBox));
+        expect(
+          tester.getSize(ajustado).width,
+          lessThanOrEqualTo(tester.getSize(find.byKey(Key('avance-$i'))).width),
+          reason: paso,
+        );
       }
     });
   });

@@ -141,4 +141,67 @@ void main() {
     expect(brilloDeLaLista(tester), Brightness.light);
     expect((await PreferenciaTema.cargar(prueba.base)).value, ThemeMode.light);
   });
+
+  testWidgets('dos toques seguidos en una opción cierran solo el diálogo, no la lista', (
+    tester,
+  ) async {
+    await abrirApp(tester);
+    await tester.tap(find.byTooltip('Más opciones'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Tema'));
+    await tester.pumpAndSettle();
+
+    // Dos toques antes de que alcance a guardarse el primero: en el celular la escritura en la
+    // base tarda más que un cuadro; aquí los dos llegan sin que pase nada entre ellos.
+    final grupo = tester.widget<RadioGroup<ThemeMode>>(find.byType(RadioGroup<ThemeMode>));
+    grupo.onChanged(ThemeMode.dark);
+    grupo.onChanged(ThemeMode.dark);
+    await tester.pumpAndSettle();
+
+    expect(tester.takeException(), isNull);
+    expect(find.byType(AlertDialog), findsNothing);
+    expect(find.text('Mis servicios'), findsOneWidget);
+    expect(brilloDeLaLista(tester), Brightness.dark);
+    expect(await prueba.base.leerPreferencia(Preferencia.tema), 'oscuro');
+  });
+
+  group('si la base falla', () {
+    /// Con la base cerrada, leer y escribir fallan. Al final se abre otra vez (la cierra tearDown).
+    Future<void> sinBase(Future<void> Function(BaseLocal cerrada) cuerpo) async {
+      final cerrada = prueba.base;
+      await cerrada.cerrar();
+      try {
+        await cuerpo(cerrada);
+      } finally {
+        prueba.base = await BaseLocal.abrir(fabricaDePrueba, prueba.ruta);
+      }
+    }
+
+    test('si no se puede guardar, el tema elegido queda aplicado y no hay error', () async {
+      await sinBase((cerrada) async {
+        final tema = PreferenciaTema(cerrada);
+
+        await expectLater(tema.elegir(ThemeMode.dark), completes);
+        expect(tema.value, ThemeMode.dark);
+      });
+    });
+
+    test('si no se puede leer lo guardado, la app arranca siguiendo al teléfono', () async {
+      await prueba.base.escribirPreferencia(Preferencia.tema, 'oscuro');
+      await sinBase((cerrada) async {
+        final tema = await PreferenciaTema.cargar(cerrada);
+        expect(tema.value, ThemeMode.system);
+      });
+    });
+  });
+
+  test('lo leído después de cerrar la app no se aplica ni da error', () async {
+    await prueba.base.escribirPreferencia(Preferencia.tema, 'oscuro');
+    final tema = PreferenciaTema(prueba.base);
+
+    final lectura = tema.recargar();
+    tema.dispose();
+
+    await expectLater(lectura, completes);
+  });
 }

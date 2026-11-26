@@ -53,6 +53,11 @@ void main() {
       test('el aviso sobre su fondo tiene contraste de al menos 7:1', () {
         expect(contraste(paleta.aviso, paleta.avisoFondo), greaterThanOrEqualTo(7.0));
       });
+
+      test('lo que falta de la barra de avance se distingue (3:1) del fondo y de las tarjetas', () {
+        expect(contraste(paleta.pista, paleta.fondo), greaterThanOrEqualTo(3.0));
+        expect(contraste(paleta.pista, paleta.superficie), greaterThanOrEqualTo(3.0));
+      });
     });
   }
 

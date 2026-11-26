@@ -25,8 +25,15 @@ Future<void> main() async {
     databaseFactory,
     '${await getDatabasesPath()}/$nombreArchivoBase',
   );
-  // El tema elegido se lee antes del primer cuadro: la app no aparece un instante con otro.
-  final tema = await PreferenciaTema.cargar(base);
+  // El tema elegido se lee antes del primer cuadro: la app no aparece un instante con otro. Si la
+  // lectura falla, `cargar` ya devuelve el automático; esto es por si algo más fallara al armarlo.
+  PreferenciaTema tema;
+  try {
+    tema = await PreferenciaTema.cargar(base);
+  } catch (error) {
+    debugPrint('No se pudo cargar el tema; sigue al teléfono ($error).');
+    tema = PreferenciaTema(base);
+  }
   final api = ClienteApi();
   final sesion = Sesion(
     api: api,

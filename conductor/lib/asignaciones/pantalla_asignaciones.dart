@@ -1,6 +1,8 @@
 // La lista de servicios del conductor, en el orden de su ronda. Se muestra siempre desde la base
 // local y se refresca al abrir, al volver a primer plano y al deslizar hacia abajo.
 
+import 'dart:async';
+
 import 'package:material_ui/material_ui.dart';
 
 import '../comunes.dart';
@@ -139,35 +141,43 @@ class _PantallaAsignacionesState extends State<PantallaAsignaciones> {
     }
   }
 
-  /// Automático, claro u oscuro: se aplica y se guarda al tocar la opción.
-  Future<void> _elegirTema(PreferenciaTema tema) => showDialog<void>(
-    context: context,
-    builder: (context) => AlertDialog(
-      title: const Text('Tema'),
-      contentPadding: const EdgeInsets.symmetric(vertical: 12),
-      content: RadioGroup<ThemeMode>(
-        groupValue: tema.value,
-        onChanged: (modo) async {
-          if (modo == null) return;
-          final navegador = Navigator.of(context);
-          await tema.elegir(modo);
-          navegador.pop();
-        },
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            for (final opcion in opcionesDeTema)
-              RadioListTile<ThemeMode>(
-                key: Key('tema-${opcion.modo.name}'),
-                value: opcion.modo,
-                minTileHeight: 56,
-                title: Text(opcion.nombre),
-              ),
-          ],
+  /// Automático, claro u oscuro: al tocar la opción se cierra el diálogo y el tema se aplica y se
+  /// guarda.
+  Future<void> _elegirTema(PreferenciaTema tema) {
+    // Un segundo toque mientras el diálogo se cierra no debe cerrar también la lista.
+    var cerrado = false;
+    return showDialog<void>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Tema'),
+        contentPadding: const EdgeInsets.symmetric(vertical: 12),
+        // Con letra grande y el celular acostado, las opciones se desplazan en vez de no caber.
+        content: SingleChildScrollView(
+          child: RadioGroup<ThemeMode>(
+            groupValue: tema.value,
+            onChanged: (modo) {
+              if (modo == null || cerrado) return;
+              cerrado = true;
+              Navigator.of(context).pop();
+              unawaited(tema.elegir(modo));
+            },
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                for (final opcion in opcionesDeTema)
+                  RadioListTile<ThemeMode>(
+                    key: Key('tema-${opcion.modo.name}'),
+                    value: opcion.modo,
+                    minTileHeight: 56,
+                    title: Text(opcion.nombre),
+                  ),
+              ],
+            ),
+          ),
         ),
       ),
-    ),
-  );
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
