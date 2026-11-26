@@ -1703,6 +1703,40 @@ tiene botón de actualizar información".
   4. En una línea por facturar suelta, el formulario "Facturar" trae la misma pregunta.
 - **Pruebas:** servidor 2371 (`uv run pytest -q`), ruff sin errores. La app no cambió.
 
+### Rediseño de la app, etapas 1 y 1b (26/11/2026) · Tema para el sol, estados y modo oscuro
+
+- **Quién lo hizo.** El dueño pidió mejorar el diseño de la app y que lo hiciera el agente más
+  indicado. Se consultó al revisor de Flutter (`ecc:flutter-reviewer`) y al de accesibilidad
+  (`ecc:a11y-architect`); los dos recomendaron `savvy-flow:savvy-careful`, que lo implementó. El
+  diseño lo fijó la sesión principal y los dos revisores auditaron el resultado (nada bloqueante;
+  sus observaciones se corrigieron en una ronda).
+- **Etapa 1.** Paleta más oscura de los mismos tonos del panel: el texto de cada estado sobre su
+  fondo tiene contraste de al menos 7:1 (lo vigila `test/tema_test.dart`). Etiquetas de estado en
+  pastilla con icono, texto y borde (no dependen solo del color) y una sola lectura para TalkBack
+  ("Estado: …"). En el detalle: barra de avance En camino → Recogido → Entregado (roja hasta donde
+  iba si hay novedad; no aparece si está cancelado), placa a 30 sp y 16 dp entre "Marcar …" y
+  "Reportar novedad".
+- **Etapa 1b, modo oscuro.** Los colores pasaron a una extensión del tema (`ColoresArribo` claro y
+  oscuro, `context.colores`); la paleta oscura también está a 7:1. Menú "Tema" en la pantalla de
+  servicios: Automático (como el teléfono, por defecto), Claro u Oscuro. Se aplica al instante y se
+  guarda en la base local (tabla `preferencias`, versión 7); se lee antes de mostrar la app.
+- **Correcciones de la revisión.** El diálogo Tema se cierra una sola vez aunque se toque dos veces;
+  si guardar falla, el tema queda puesto y la app no se cae; si leer la preferencia falla, arranca
+  en automático. Los tramos vacíos de la barra están a 3:1 o más en los dos temas y los nombres de
+  los pasos no se parten con la letra al 200 %.
+- **Cómo probar (menos de 5 minutos).** Instalar la app nueva (celular por USB, desde `conductor/`:
+  `flutter run --release`, o el APK de `compilar-apk.ps1`).
+  1. Abrir un servicio: la etiqueta de estado lleva icono, debajo está la barra de avance y la
+     placa sale en grande.
+  2. Menú (⋮) → Tema → Oscuro: cambia al instante. Cerrar la app y abrirla: sigue en oscuro.
+  3. Tema → Automático y cambiar el modo oscuro del teléfono: la app lo sigue.
+  4. Al sol, comparar con la versión anterior: estados y textos grises deben leerse mejor.
+- **Pendiente.** Etapa 2 (tarjetas de la lista: servicio activo destacado, avisos en una barra
+  compacta; falta la respuesta del dueño sobre el botón "Marcar …" en la tarjeta), etapa 3
+  (vibración) y etapa 4 (transiciones y estados vacío/sin conexión).
+- **Pruebas:** app 512 (`flutter test`, 464 antes + 48 nuevas), `flutter analyze` sin problemas. El
+  servidor no cambió.
+
 ## Escalamientos
 
 Ninguno todavía.
