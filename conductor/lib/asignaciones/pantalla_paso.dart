@@ -20,6 +20,7 @@ import '../formato.dart';
 import '../fotos/camara.dart';
 import '../fotos/foto.dart';
 import '../tema.dart';
+import '../vibracion.dart';
 import 'componentes.dart';
 import 'estados.dart';
 import 'lista_asignaciones.dart';
@@ -226,10 +227,13 @@ class _PantallaPasoState extends State<PantallaPaso> {
         await almacen.camaraCerrada(paso);
       } else {
         await almacen.agregarFoto(paso, ruta, hora: widget.reloj());
+        vibrarAtencion();
       }
     } on ErrorDeCamara catch (error) {
+      vibrarBloqueo();
       _aviso = error.mensaje;
     } on FotoNoValida catch (error) {
+      vibrarBloqueo();
       _aviso = error.mensaje;
     } finally {
       await _releer();
@@ -280,6 +284,7 @@ class _PantallaPasoState extends State<PantallaPaso> {
       ),
     ];
     if (faltantes.isNotEmpty) {
+      vibrarBloqueo();
       setState(() => _faltantes = faltantes);
       return;
     }
@@ -293,8 +298,10 @@ class _PantallaPasoState extends State<PantallaPaso> {
         placaDigitada: placa,
         vinDigitado: vin,
       );
+      vibrarPasoGuardado();
       if (mounted) Navigator.of(context).pop();
     } on ToqueNoValido catch (error) {
+      vibrarBloqueo();
       if (mounted) setState(() => _faltantes = [error.mensaje]);
     } finally {
       if (mounted) setState(() => _ocupado = false);

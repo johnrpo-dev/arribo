@@ -1797,3 +1797,29 @@ tiene botón de actualizar información".
 ## Escalamientos
 
 Ninguno todavía.
+
+### Rediseño de la app, etapa 3 (26/11/2026) · Vibración
+
+- **Qué se hizo** (`savvy-flow:savvy-careful`; diseño y revisión de la sesión principal): vibración
+  corta en los momentos clave, siempre junto a un cambio que se ve. El tipo de cada momento se
+  decide solo en `lib/vibracion.dart`. Sin paquetes nuevos (`HapticFeedback` de Flutter); en
+  Android respeta el ajuste del sistema "vibración al tocar", así que no hay preferencia en la app.
+  - Media: un paso quedó guardado (En camino, Novedad, Recogido, Entregado).
+  - Ligera: se abre la confirmación o el motivo de novedad; una foto quedó aceptada.
+  - Fuerte: algo se bloqueó o rechazó y se muestra por qué (grúa llena, servicio sin finalizar,
+    faltan fotos o nombre, el servicio cambió mientras confirmaba, la cámara no abrió o la foto no
+    sirve).
+  - De selección: elegir el tema.
+  - Nunca al actualizar, al deslizar para actualizar, al sincronizar, al quitar una foto ni al
+    cancelar.
+- **Cómo probar (menos de 5 minutos).** Instalar la app nueva (`flutter run --release` desde
+  `conductor/`), con la vibración al tocar activada en el celular.
+  1. Tocar "Marcar En camino": vibra suave al abrir la confirmación; al confirmar, vibra un poco más.
+  2. Con otro servicio ya En camino en grúa de 1 puesto, tocar "Marcar En camino" en el segundo:
+     vibra fuerte con el aviso.
+  3. En la pantalla de fotos, tomar una foto: vibra suave. Tocar "Marcar Recogido" sin nombre:
+     vibra fuerte con lo que falta.
+  4. Tocar Actualizar: no vibra.
+- **Pruebas:** app 581 (16 nuevas en `test/asignaciones/vibracion_test.dart`), `flutter analyze`
+  sin problemas. El servidor no cambió. No se ha probado en un celular real.
+- **Pendiente.** Etapa 4 (transiciones; estados vacío, de carga y sin señal).
