@@ -204,7 +204,7 @@ void main() {
   Future<void> abrirDetalle(WidgetTester tester, {String vehiculo = 'ABC123'}) async {
     pantallaAlta(tester);
     await abrirApp(tester);
-    await tocar(tester, find.text(vehiculo));
+    await abrirDetalleDe(tester, vehiculo);
   }
 
   /// Desde la lista hasta la pantalla de fotos y nombre del paso que sigue.
@@ -651,7 +651,7 @@ void main() {
 
       await lista.actualizar();
       await tester.pumpAndSettle();
-      await tocar(tester, find.text('ABC123'));
+      await abrirDetalleDe(tester, 'ABC123');
       await tocar(tester, find.text('Marcar Recogido'));
 
       expect(enLaPantallaDelPaso(), isTrue);
@@ -690,7 +690,7 @@ void main() {
       await marcar(tester);
       await volver(tester);
 
-      await tocar(tester, find.text('XYZ789'));
+      await abrirDetalleDe(tester, 'XYZ789');
       await tocar(tester, find.text('Marcar Recogido'));
 
       expect(find.text('La grúa va llena'), findsOneWidget);
@@ -718,7 +718,7 @@ void main() {
       await marcar(tester);
       await volver(tester);
 
-      await tocar(tester, find.text('XYZ789'));
+      await abrirDetalleDe(tester, 'XYZ789');
       await tocar(tester, find.text('Marcar Recogido'));
 
       expect(find.text('La grúa va llena'), findsNothing);
@@ -732,7 +732,7 @@ void main() {
       await abrirApp(tester);
 
       // El segundo: hay un puesto libre.
-      await tocar(tester, find.text('XYZ789'));
+      await abrirDetalleDe(tester, 'XYZ789');
       await tocar(tester, find.text('Marcar Recogido'));
       expect(enLaPantallaDelPaso(), isTrue);
       await tomarFotos(tester, 4);
@@ -745,7 +745,7 @@ void main() {
       await tester.scrollUntilVisible(find.text('JKL456'), 400);
       await tester.ensureVisible(find.text('JKL456'));
       await tester.pumpAndSettle();
-      await tocar(tester, find.text('JKL456'));
+      await abrirDetalleDe(tester, 'JKL456');
       await tocar(tester, find.text('Marcar Recogido'));
       expect(find.text('La grúa va llena'), findsOneWidget);
       expect(find.byKey(const Key('falta-entregar-41')), findsOneWidget);
@@ -974,7 +974,7 @@ void main() {
 
     await tester.scrollUntilVisible(find.text('XYZ789'), 400);
     await tester.pumpAndSettle();
-    await tocar(tester, find.text('XYZ789'));
+    await abrirDetalleDe(tester, 'XYZ789');
     await tocar(tester, find.text('Marcar Recogido'));
     expect(find.text('La grúa va llena'), findsOneWidget);
     expect(tester.takeException(), isNull);
@@ -984,7 +984,7 @@ void main() {
 
     await tester.scrollUntilVisible(find.text('ABC123'), -400);
     await tester.pumpAndSettle();
-    await tocar(tester, find.text('ABC123'));
+    await abrirDetalleDe(tester, 'ABC123');
     await tocar(tester, find.text('Marcar Entregado'));
     expect(tester.takeException(), isNull);
     await tomarFotos(tester, 4);

@@ -13,6 +13,7 @@ import 'package:arribo_conductor/ingreso/almacen_token.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
+import 'package:material_ui/material_ui.dart' show Card;
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 /// Sin aislado aparte: las consultas terminan en microtareas y funcionan también dentro de
@@ -556,3 +557,19 @@ http.Response fotoDemasiadoGrande() => errorDelContrato(
   'La foto pesa más de 5 MB.',
   extra: {'maximo_bytes': 5242880},
 );
+
+/// "Ver detalle" de la tarjeta de la lista que muestra [texto] (por ejemplo, la placa). La
+/// tarjeta del servicio activo no se abre al tocarla en cualquier parte: solo con ese botón.
+Finder verDetalleDe(String texto) => find.descendant(
+  of: find.ancestor(of: find.text(texto), matching: find.byType(Card)).first,
+  matching: find.text('Ver detalle'),
+);
+
+/// Abre el detalle del servicio de la lista que muestra [texto], con su "Ver detalle".
+Future<void> abrirDetalleDe(WidgetTester tester, String texto) async {
+  final boton = verDetalleDe(texto);
+  await tester.ensureVisible(boton);
+  await tester.pumpAndSettle();
+  await tester.tap(boton);
+  await tester.pumpAndSettle();
+}

@@ -5,6 +5,7 @@
 
 import 'package:material_ui/material_ui.dart';
 
+import '../cola/cola_eventos.dart';
 import '../formato.dart';
 import 'componentes.dart';
 import 'estados.dart';
@@ -12,6 +13,70 @@ import 'lista_asignaciones.dart';
 import 'pantalla_paso.dart';
 import 'requisitos.dart';
 import 'servicio.dart';
+
+/// Lo que se le dice al conductor si el servicio cambió mientras confirmaba un paso.
+const String textoServicioCambio = 'El servicio cambió mientras confirmaba. Revíselo de nuevo.';
+
+/// Un toque en un botón de estado, igual desde el detalle y desde la tarjeta del servicio activo.
+/// En camino pide confirmación y Novedad el motivo; luego el toque queda en la cola. Recogido y
+/// Entregado abren su pantalla de fotos y nombre ([abrirRecogidoOEntregado]). Si el paso no
+/// corresponde, lo dice en un aviso flotante y no guarda nada.
+Future<void> marcarPaso(
+  BuildContext context, {
+  required Servicio servicio,
+  required String destino,
+  required ListaAsignaciones lista,
+}) async {
+  final mensajero = ScaffoldMessenger.of(context);
+  try {
+    String? motivo;
+    if (destino == Estado.recogido || destino == Estado.entregado) {
+      // Recogido y Entregado se marcan en su propia pantalla, con las fotos y el nombre.
+      return await abrirRecogidoOEntregado(
+        context,
+        servicio: servicio,
+        destino: destino,
+        lista: lista,
+      );
+    }
+    if (destino == Estado.novedad) {
+      motivo = await pedirMotivoDeNovedad(context, servicio: servicio);
+      if (motivo == null) return;
+    } else if (!await confirmarPaso(context, servicio: servicio, destino: destino)) {
+      return;
+    }
+    // Mientras confirmaba, la lista pudo cambiar (llegó del servidor): se revisa contra lo de ahora.
+    final actual = lista.servicio(servicio.id);
+    if (actual == null || !puedeMarcar(actual.estado, destino)) {
+      mensajero.showSnackBar(const SnackBar(content: Text(textoServicioCambio)));
+      return;
+    }
+    // Primero queda guardado en la cola; la pantalla cambia cuando la lista vuelve a leer.
+    await lista.marcar(servicio.id, destino, motivo: motivo);
+  } on ToqueNoValido catch (error) {
+    mensajero.showSnackBar(SnackBar(content: Text(error.mensaje)));
+  }
+}
+
+/// Para las pantallas con botones de estado: entre el toque y el evento guardado no se aceptan
+/// más toques ([ocupado]).
+mixin MarcadorDePaso<T extends StatefulWidget> on State<T> {
+  bool ocupado = false;
+
+  Future<void> marcarUnaVez({
+    required Servicio servicio,
+    required String destino,
+    required ListaAsignaciones lista,
+  }) async {
+    if (ocupado) return;
+    setState(() => ocupado = true);
+    try {
+      await marcarPaso(context, servicio: servicio, destino: destino, lista: lista);
+    } finally {
+      if (mounted) setState(() => ocupado = false);
+    }
+  }
+}
 
 /// Todo Recogido y todo Entregado pasan por aquí. Un Recogido se bloquea si la grúa va llena (se le
 /// muestra al conductor qué vehículo le falta marcar como Entregado) o, con la configuración

@@ -5,7 +5,6 @@
 
 import 'package:material_ui/material_ui.dart';
 
-import '../cola/cola_eventos.dart';
 import '../cola/evento.dart';
 import '../comunes.dart';
 import '../formato.dart';
@@ -105,40 +104,9 @@ class _Acciones extends StatefulWidget {
   State<_Acciones> createState() => _AccionesState();
 }
 
-class _AccionesState extends State<_Acciones> {
-  /// Entre el toque y el evento guardado no se aceptan más toques.
-  bool _ocupado = false;
-
-  Future<void> _marcar(String destino) async {
-    if (_ocupado) return;
-    final servicio = widget.servicio;
-    final mensajero = ScaffoldMessenger.of(context);
-    setState(() => _ocupado = true);
-    try {
-      String? motivo;
-      if (destino == Estado.recogido || destino == Estado.entregado) {
-        // Recogido y Entregado se marcan en su propia pantalla, con las fotos y el nombre.
-        return await abrirRecogidoOEntregado(
-          context,
-          servicio: servicio,
-          destino: destino,
-          lista: widget.lista,
-        );
-      }
-      if (destino == Estado.novedad) {
-        motivo = await pedirMotivoDeNovedad(context, servicio: servicio);
-        if (motivo == null) return;
-      } else if (!await confirmarPaso(context, servicio: servicio, destino: destino)) {
-        return;
-      }
-      // Primero queda guardado en la cola; la pantalla cambia cuando la lista vuelve a leer.
-      await widget.lista.marcar(servicio.id, destino, motivo: motivo);
-    } on ToqueNoValido catch (error) {
-      mensajero.showSnackBar(SnackBar(content: Text(error.mensaje)));
-    } finally {
-      if (mounted) setState(() => _ocupado = false);
-    }
-  }
+class _AccionesState extends State<_Acciones> with MarcadorDePaso {
+  Future<void> _marcar(String destino) =>
+      marcarUnaVez(servicio: widget.servicio, destino: destino, lista: widget.lista);
 
   @override
   Widget build(BuildContext context) {
@@ -191,14 +159,14 @@ class _AccionesState extends State<_Acciones> {
               else if (siguiente != null)
                 FilledButton(
                   key: Key('marcar-$siguiente'),
-                  onPressed: _ocupado ? null : () => _marcar(siguiente),
+                  onPressed: ocupado ? null : () => _marcar(siguiente),
                   child: Text('Marcar ${nombreEstado(siguiente)}', textAlign: TextAlign.center),
                 ),
               if (siguiente != null && conNovedad) const SizedBox(height: 16),
               if (conNovedad)
                 OutlinedButton(
                   key: const Key('marcar-novedad'),
-                  onPressed: _ocupado ? null : () => _marcar(Estado.novedad),
+                  onPressed: ocupado ? null : () => _marcar(Estado.novedad),
                   child: const Text('Reportar novedad', textAlign: TextAlign.center),
                 ),
             ],

@@ -1737,6 +1737,32 @@ tiene botón de actualizar información".
 - **Pruebas:** app 512 (`flutter test`, 464 antes + 48 nuevas), `flutter analyze` sin problemas. El
   servidor no cambió.
 
+### Rediseño de la app, etapa 2 (26/11/2026) · Lista con el servicio activo
+
+- **Qué se hizo** (`savvy-flow:savvy-careful`; diseño de la sesión principal; auditado por
+  `ecc:flutter-reviewer` y `ecc:a11y-architect`, nada bloqueante, observaciones corregidas):
+  - La lista se divide en "Ahora" (el servicio activo) y "Después" (los demás, en su orden). El
+    activo es el primero En camino o Recogido; si no hay, el primer Asignado que no espere su ida
+    (`lib/asignaciones/servicio_activo.dart`; supuesto en `QUESTIONS.md`).
+  - Tarjeta activa: franja del color del estado, barra de avance, placa grande, lugares con Maps,
+    Waze y Llamar, y el botón "Marcar …" con la misma confirmación del detalle (el flujo es uno solo,
+    `marcarPaso` en `confirmacion.dart`). Recogido y Entregado abren directo la pantalla de fotos.
+    Sin botón si espera su ida; "Reportar novedad" solo en el detalle. Se abre solo con "Ver
+    detalle" (un roce al desplazar no la abre).
+  - Tarjetas compactas: estado, placa, hora y "Recoger en: …"; se abren tocándolas.
+  - Los avisos informativos (sin conexión, cambios y fotos por enviar) van en un solo panel; los que
+    piden acción (conflictos, fotos rechazadas) siguen aparte.
+  - Si el servicio cambia mientras se confirma (reasignado, cancelado, otro estado), no se marca y
+    se avisa "El servicio cambió mientras confirmaba. Revíselo de nuevo." (también en el detalle).
+- **Cómo probar (menos de 5 minutos).** Instalar la app nueva (`flutter run --release` desde
+  `conductor/` con el celular por USB). Asignarle al conductor dos servicios desde el panel.
+  1. Arriba, en "Ahora", está el primero con el botón "Marcar En camino"; el otro está en "Después",
+     compacto.
+  2. Tocar "Marcar En camino" y confirmar: el servicio pasa a En camino sin entrar al detalle.
+  3. Tocar "Marcar Recogido": abre directo la pantalla de fotos.
+  4. Con la app sin señal, el panel de arriba dice que no hay conexión y cuántos cambios faltan.
+- **Pruebas:** app 539 (`flutter test`), `flutter analyze` sin problemas. El servidor no cambió.
+
 ## Escalamientos
 
 Ninguno todavía.

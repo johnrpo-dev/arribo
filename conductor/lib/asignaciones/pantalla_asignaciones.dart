@@ -11,9 +11,13 @@ import '../ingreso/sesion.dart';
 import '../preferencia_tema.dart';
 import '../tema.dart';
 import 'componentes.dart';
+import 'confirmacion.dart';
 import 'enlaces.dart';
+import 'estados.dart';
 import 'lista_asignaciones.dart';
 import 'servicio.dart';
+import 'servicio_activo.dart';
+import 'trayecto.dart';
 
 /// Ruta del detalle; el argumento es el id del servicio. Es restaurable: si el sistema mata la app
 /// con el detalle abierto, vuelve a él (los datos salen de la base local).
@@ -212,6 +216,25 @@ class _PantallaAsignacionesState extends State<PantallaAsignaciones> {
           final lista = widget.lista;
           if (!lista.cargada) return const Center(child: CircularProgressIndicator());
           final ahora = widget.reloj();
+          // El servicio que está atendiendo va arriba ("Ahora"), con el botón del paso que sigue;
+          // los demás quedan debajo ("Después"), en el orden de la ronda.
+          final activo = servicioActivo(lista.servicios);
+          final despues = [
+            for (final servicio in lista.servicios)
+              if (servicio.id != activo?.id) servicio,
+          ];
+          Widget tarjeta(Servicio servicio, {bool activa = false}) => TarjetaServicio(
+            key: ValueKey('tarjeta-${servicio.id}'),
+            servicio: servicio,
+            pendiente: lista.pendientesDe(servicio.id) > 0,
+            fotosPendientes: lista.fotos.pendientesDe(servicio.id),
+            ahora: ahora,
+            abrirEnlace: widget.abrirEnlace,
+            activa: activa,
+            lista: activa ? lista : null,
+            alTocar: () =>
+                Navigator.of(context).restorablePushNamed(rutaServicio, arguments: servicio.id),
+          );
           return RefreshIndicator(
             onRefresh: lista.actualizar,
             child: ListView(
@@ -231,19 +254,13 @@ class _PantallaAsignacionesState extends State<PantallaAsignaciones> {
                       textAlign: TextAlign.center,
                     ),
                   ),
-                for (final servicio in lista.servicios) ...[
-                  TarjetaServicio(
-                    servicio: servicio,
-                    pendiente: lista.pendientesDe(servicio.id) > 0,
-                    fotosPendientes: lista.fotos.pendientesDe(servicio.id),
-                    ahora: ahora,
-                    abrirEnlace: widget.abrirEnlace,
-                    alTocar: () =>
-                        Navigator.of(context)
-                            .restorablePushNamed(rutaServicio, arguments: servicio.id),
-                  ),
+                if (activo != null) ...[
+                  const _TituloDeSeccion('Ahora'),
+                  tarjeta(activo, activa: true),
                   const SizedBox(height: 12),
+                  if (despues.isNotEmpty) const _TituloDeSeccion('Después'),
                 ],
+                for (final servicio in despues) ...[tarjeta(servicio), const SizedBox(height: 12)],
               ],
             ),
           );
@@ -253,9 +270,29 @@ class _PantallaAsignacionesState extends State<PantallaAsignaciones> {
   }
 }
 
-/// Una línea discreta con la hora de la última actualización y el aviso si no hay conexión; y,
-/// cuando los hay, cuántos cambios y cuántas fotos están pendientes por enviar, los cambios que el
-/// servidor no aplicó y las fotos que rechazó.
+/// "Ahora" y "Después" sobre las tarjetas.
+class _TituloDeSeccion extends StatelessWidget {
+  const _TituloDeSeccion(this.texto);
+
+  final String texto;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Semantics(
+        header: true,
+        child: Text(texto, style: Theme.of(context).textTheme.titleMedium),
+      ),
+    );
+  }
+}
+
+/// Arriba de la lista. Lo informativo (sin conexión o un error, con la hora de la última
+/// actualización; cambios y fotos pendientes por enviar) va junto en un solo recuadro, una fila
+/// por cosa. Lo que pide algo al conductor (cambios o fotos de otro conductor, cambios que el
+/// servidor no aplicó, fotos que rechazó) sigue aparte, cada uno en su recuadro. Si no hay nada
+/// que contar, una línea discreta con la hora de la última actualización.
 class _EstadoDeLaLista extends StatelessWidget {
   const _EstadoDeLaLista({required this.lista, required this.ahora});
 
@@ -269,32 +306,41 @@ class _EstadoDeLaLista extends StatelessWidget {
     final problema = lista.problema;
     final cola = lista.sincronizador;
     final fotos = lista.fotos;
+    final conProblemaDeConexion = lista.sinConexion || problema != null;
+    final filas = [
+      if (cola.pendientes > 0)
+        _FilaDeEstado(
+          textoPendientes(cola.pendientes, problema: cola.problema),
+          key: const Key('pendientes'),
+          icono: Icons.cloud_upload_outlined,
+        ),
+      if (fotos.pendientes > 0)
+        _FilaDeEstado(
+          textoFotosPendientes(fotos.pendientes, problema: fotos.problema),
+          key: const Key('fotos-pendientes'),
+          icono: Icons.photo_camera_outlined,
+        ),
+      if (lista.sinConexion)
+        _FilaDeEstado(
+          'Sin conexión. Se muestra lo guardado en el celular. $actualizada',
+          icono: Icons.cloud_off_outlined,
+        )
+      else if (problema != null)
+        _FilaDeEstado(
+          '${problema.mensaje} $actualizada',
+          icono: Icons.error_outline,
+          tipo: TipoRecuadro.error,
+        ),
+    ];
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        if (cola.pendientes > 0) ...[
-          Recuadro(
-            textoPendientes(cola.pendientes, problema: cola.problema),
-            key: const Key('pendientes'),
-            tipo: TipoRecuadro.aviso,
-            icono: Icons.cloud_upload_outlined,
-          ),
-          const SizedBox(height: 8),
-        ],
+        if (filas.isNotEmpty) ...[_PanelDeEstado(filas), const SizedBox(height: 8)],
         for (final ajenos in cola.pendientesAjenos) ...[
           Recuadro(
             textoPendientesAjenos(ajenos),
             tipo: TipoRecuadro.aviso,
             icono: Icons.report_problem_outlined,
-          ),
-          const SizedBox(height: 8),
-        ],
-        if (fotos.pendientes > 0) ...[
-          Recuadro(
-            textoFotosPendientes(fotos.pendientes, problema: fotos.problema),
-            key: const Key('fotos-pendientes'),
-            tipo: TipoRecuadro.aviso,
-            icono: Icons.photo_camera_outlined,
           ),
           const SizedBox(height: 8),
         ],
@@ -318,14 +364,7 @@ class _EstadoDeLaLista extends StatelessWidget {
           ),
           const SizedBox(height: 8),
         ],
-        if (lista.sinConexion)
-          Recuadro(
-            'Sin conexión. Se muestra lo guardado en el celular. $actualizada',
-            tipo: TipoRecuadro.aviso,
-          )
-        else if (problema != null)
-          Recuadro('${problema.mensaje} $actualizada', tipo: TipoRecuadro.error)
-        else
+        if (!conProblemaDeConexion)
           Row(
             children: [
               if (lista.actualizando)
@@ -349,6 +388,73 @@ class _EstadoDeLaLista extends StatelessWidget {
   }
 }
 
+/// Una fila del recuadro de estado: icono y texto. Se anuncia a TalkBack al aparecer.
+class _FilaDeEstado extends StatelessWidget {
+  const _FilaDeEstado(this.texto, {super.key, required this.icono, this.tipo = TipoRecuadro.aviso});
+
+  final String texto;
+  final IconData icono;
+  final TipoRecuadro tipo;
+
+  @override
+  Widget build(BuildContext context) {
+    final colores = context.colores;
+    return Semantics(
+      liveRegion: true,
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(icono, color: tipo == TipoRecuadro.error ? colores.peligro : colores.aviso),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                texto,
+                style: Theme.of(context).textTheme.bodyLarge?.copyWith(color: colores.texto),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Las filas de estado en un solo recuadro, separadas por líneas; rojo si alguna es un error.
+class _PanelDeEstado extends StatelessWidget {
+  const _PanelDeEstado(this.filas);
+
+  final List<_FilaDeEstado> filas;
+
+  @override
+  Widget build(BuildContext context) {
+    final colores = context.colores;
+    final conError = filas.any((fila) => fila.tipo == TipoRecuadro.error);
+    final color = conError ? colores.peligro : colores.aviso;
+    return Container(
+      key: const Key('estado-de-la-lista'),
+      decoration: BoxDecoration(
+        color: conError ? colores.peligroFondo : colores.avisoFondo,
+        border: Border.all(color: color),
+        borderRadius: const BorderRadius.all(Radius.circular(8)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          for (final (i, fila) in filas.indexed) ...[
+            if (i > 0) Divider(height: 1, thickness: 1, color: color),
+            fila,
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+/// Un servicio de la lista. La del servicio activo ([activa]) va completa: franja del color del
+/// estado, barra de avance, placa en grande, los lugares con sus botones de un toque y el botón del
+/// paso que sigue. Las demás van compactas: estado, vehículo, hora y dónde recoger.
 class TarjetaServicio extends StatelessWidget {
   const TarjetaServicio({
     super.key,
@@ -358,6 +464,8 @@ class TarjetaServicio extends StatelessWidget {
     required this.alTocar,
     this.pendiente = false,
     this.fotosPendientes = 0,
+    this.activa = false,
+    this.lista,
   });
 
   final Servicio servicio;
@@ -371,69 +479,185 @@ class TarjetaServicio extends StatelessWidget {
   final AbrirEnlace abrirEnlace;
   final VoidCallback alTocar;
 
+  /// Es el servicio que el conductor está atendiendo ([servicioActivo]).
+  final bool activa;
+
+  /// Con ella la tarjeta activa ofrece el botón del paso que sigue.
+  final ListaAsignaciones? lista;
+
   @override
   Widget build(BuildContext context) {
     final textos = Theme.of(context).textTheme;
+    final colores = context.colores;
     final vehiculo = servicio.vehiculo;
     final descripcion = vehiculo.descripcion;
-    return Card(
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: alTocar,
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Wrap(
-                spacing: 10,
-                runSpacing: 8,
-                crossAxisAlignment: WrapCrossAlignment.center,
-                children: [
-                  if (servicio.ordenRonda != null)
-                    Text(
-                      '${servicio.ordenRonda}.',
-                      style: textos.titleLarge,
-                      semanticsLabel: 'Puesto ${servicio.ordenRonda} en la ronda',
-                    ),
-                  EtiquetaEstado(servicio.estado),
-                  if (pendiente) const EtiquetaPendiente(),
-                  if (fotosPendientes > 0) EtiquetaFotosPendientes(fotosPendientes),
-                  if (servicio.esperaIda) const EtiquetaEsperaIda(),
-                  Text(tipoDe(servicio), style: textos.bodyLarge),
-                ],
-              ),
-              const SizedBox(height: 12),
-              Text(identificacionDe(vehiculo), style: textos.headlineSmall),
-              if (vehiculo.placa != null && vehiculo.vin != null)
-                Text(
-                  'VIN ${vehiculo.vin}',
-                  style: textos.bodyLarge?.copyWith(color: context.colores.textoSecundario),
-                ),
-              if (descripcion != null) Text(descripcion, style: textos.bodyLarge),
-              const SizedBox(height: 8),
+    final siguiente = siguientePaso(servicio.estado);
+    final lista = this.lista;
+    // Un regreso que espera a su ida no ofrece el paso: la etiqueta "Espera la ida" dice por qué.
+    final conBoton =
+        activa &&
+        lista != null &&
+        siguiente != null &&
+        !(servicio.esperaIda &&
+            regresoBloqueado(
+              esRegreso: servicio.esRegreso,
+              idaEntregada: false,
+              destino: siguiente,
+            ));
+
+    final contenido = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Wrap(
+          spacing: 10,
+          runSpacing: 8,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: [
+            if (servicio.ordenRonda != null)
               Text(
-                'Hora: ${textoProgramada(servicio.programadaPara, ahora: ahora)}',
-                style: textos.bodyLarge,
+                '${servicio.ordenRonda}.',
+                style: textos.titleLarge,
+                semanticsLabel: 'Puesto ${servicio.ordenRonda} en la ronda',
               ),
-              const Divider(height: 32),
-              SeccionLugar(titulo: 'Recoger en', lugar: servicio.origen, abrirEnlace: abrirEnlace),
-              const Divider(height: 32),
-              SeccionLugar(
-                titulo: 'Entregar en',
-                lugar: servicio.destino,
-                abrirEnlace: abrirEnlace,
-                textoSinDatos: 'Sin destino registrado.',
-              ),
-              const SizedBox(height: 12),
-              Align(
-                alignment: Alignment.centerRight,
-                child: TextButton(onPressed: alTocar, child: const Text('Ver detalle')),
-              ),
-            ],
+            EtiquetaEstado(servicio.estado),
+            if (pendiente) const EtiquetaPendiente(),
+            if (fotosPendientes > 0) EtiquetaFotosPendientes(fotosPendientes),
+            if (servicio.esperaIda) const EtiquetaEsperaIda(),
+            Text(tipoDe(servicio), style: textos.bodyLarge),
+          ],
+        ),
+        if (activa) ...[
+          const SizedBox(height: 16),
+          BarraDeAvance(servicio.estado, estadoPrevio: servicio.estadoPrevio),
+        ],
+        const SizedBox(height: 12),
+        Text(identificacionDe(vehiculo), style: activa ? estiloPlaca : textos.headlineSmall),
+        if (activa) ...[
+          if (vehiculo.placa != null && vehiculo.vin != null)
+            Text(
+              'VIN ${vehiculo.vin}',
+              style: textos.bodyLarge?.copyWith(color: colores.textoSecundario),
+            ),
+          if (descripcion != null) Text(descripcion, style: textos.bodyLarge),
+        ],
+        const SizedBox(height: 8),
+        Text(
+          'Hora: ${textoProgramada(servicio.programadaPara, ahora: ahora)}',
+          style: textos.bodyLarge,
+        ),
+        if (activa) ...[
+          const Divider(height: 32),
+          SeccionLugar(titulo: 'Recoger en', lugar: servicio.origen, abrirEnlace: abrirEnlace),
+          const Divider(height: 32),
+          SeccionLugar(
+            titulo: 'Entregar en',
+            lugar: servicio.destino,
+            abrirEnlace: abrirEnlace,
+            textoSinDatos: 'Sin destino registrado.',
           ),
+          if (conBoton) ...[
+            const SizedBox(height: 20),
+            SizedBox(
+              width: double.infinity,
+              child: _BotonDelPaso(
+                key: ValueKey('paso-${servicio.id}-$siguiente'),
+                servicio: servicio,
+                destino: siguiente,
+                lista: lista,
+              ),
+            ),
+          ],
+        ] else ...[
+          const SizedBox(height: 4),
+          Text(
+            'Recoger en: ${servicio.origen.direccion ?? 'Sin dirección'}',
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: textos.bodyLarge?.copyWith(color: colores.textoSecundario),
+          ),
+        ],
+        const SizedBox(height: 12),
+        Align(
+          alignment: Alignment.centerRight,
+          child: TextButton(onPressed: alTocar, child: const Text('Ver detalle')),
+        ),
+      ],
+    );
+
+    if (activa) {
+      // La activa no se abre al tocarla en cualquier parte (un roce con guantes al desplazar):
+      // solo con "Ver detalle". Y TalkBack lee cada parte por separado.
+      return Card(
+        clipBehavior: Clip.antiAlias,
+        child: Stack(
+          children: [
+            Padding(padding: const EdgeInsets.fromLTRB(22, 16, 16, 16), child: contenido),
+            // La franja del color del estado, dentro de la forma de la tarjeta.
+            Positioned(
+              left: 0,
+              top: 0,
+              bottom: 0,
+              width: 6,
+              child: ColoredBox(
+                key: const Key('franja-activa'),
+                color: colores.deEstado(servicio.estado).texto,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+    // Una compacta se abre al tocarla en cualquier parte (es lo único que hace) y TalkBack la lee
+    // como un solo botón corto; "Ver detalle" se ve, pero no se anuncia aparte.
+    return Semantics(
+      key: Key('tarjeta-compacta-${servicio.id}'),
+      container: true,
+      button: true,
+      label: '${identificacionDe(vehiculo)}, ${nombreEstado(servicio.estado)}. Ver detalle',
+      onTap: alTocar,
+      excludeSemantics: true,
+      child: Card(
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: alTocar,
+          child: Padding(padding: const EdgeInsets.all(16), child: contenido),
         ),
       ),
+    );
+  }
+}
+
+/// "Marcar En camino" (o Recogido, o Entregado) en la tarjeta activa: el mismo recorrido que el
+/// botón del detalle ([marcarPaso]), con la misma protección contra dos toques.
+class _BotonDelPaso extends StatefulWidget {
+  const _BotonDelPaso({
+    super.key,
+    required this.servicio,
+    required this.destino,
+    required this.lista,
+  });
+
+  final Servicio servicio;
+  final String destino;
+  final ListaAsignaciones lista;
+
+  @override
+  State<_BotonDelPaso> createState() => _BotonDelPasoState();
+}
+
+class _BotonDelPasoState extends State<_BotonDelPaso> with MarcadorDePaso {
+  @override
+  Widget build(BuildContext context) {
+    return FilledButton(
+      key: Key('tarjeta-marcar-${widget.destino}'),
+      onPressed: ocupado
+          ? null
+          : () => marcarUnaVez(
+              servicio: widget.servicio,
+              destino: widget.destino,
+              lista: widget.lista,
+            ),
+      child: Text('Marcar ${nombreEstado(widget.destino)}', textAlign: TextAlign.center),
     );
   }
 }

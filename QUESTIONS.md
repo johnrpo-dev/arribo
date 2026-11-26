@@ -7,6 +7,14 @@ Formato: fecha, tarea, pregunta, qué se asumió mientras tanto (si se asumió a
 
 ## Abiertas
 
+### Servicio activo en la app (26/11/2026)
+
+- **2026-11-26. ¿Cuál es el servicio "Ahora" del conductor?** Asumido: en el orden de la lista
+  (el de la ronda), el primero En camino o Recogido; si no hay, el primer Asignado que no espere su
+  ida. Nunca uno con novedad. Si hay dos en curso (por ejemplo, uno Recogido y otro En camino), el
+  activo es el que va primero en la ronda, no necesariamente el que lleva montado. Si se prefiere
+  otro criterio, cambia solo `conductor/lib/asignaciones/servicio_activo.dart` y su prueba.
+
 ### ¿Lleva IVA? (24/11/2026)
 
 - **2026-11-24. ¿Dónde se pregunta?** Asumido: en los dos lugares donde se fija el total a

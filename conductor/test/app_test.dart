@@ -87,7 +87,7 @@ void main() {
   ) async {
     token.token = 'token-ana';
     await abrirApp(tester);
-    await tester.tap(find.text('ABC123'));
+    await abrirDetalleDe(tester, 'ABC123');
     await tester.pumpAndSettle();
     expect(find.text('Servicio N.º 41'), findsOneWidget);
     servidor.responder = (_) async =>
