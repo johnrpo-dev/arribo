@@ -5,12 +5,13 @@ import 'package:arribo_conductor/tema.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
 
-Future<void> mostrar(WidgetTester tester, Widget hijo) => tester.pumpWidget(
-  MaterialApp(
-    theme: temaArribo(),
-    home: Scaffold(body: Center(child: hijo)),
-  ),
-);
+Future<void> mostrar(WidgetTester tester, Widget hijo, {Brightness brillo = Brightness.light}) =>
+    tester.pumpWidget(
+      MaterialApp(
+        theme: temaArribo(brillo),
+        home: Scaffold(body: Center(child: hijo)),
+      ),
+    );
 
 /// El color de cada uno de los tres tramos de la barra.
 List<Color?> coloresDeTramos(WidgetTester tester) => [
@@ -38,10 +39,25 @@ void main() {
         expect(find.text(nombre), findsOneWidget);
         final icon = tester.widget<Icon>(find.byType(Icon));
         expect(icon.icon, icono);
-        expect(icon.color, coloresDeEstado(estado).texto);
-        expect(tester.widget<Text>(find.text(nombre)).style?.color, coloresDeEstado(estado).texto);
+        expect(icon.color, ColoresArribo.claro.deEstado(estado).texto);
+        expect(
+          tester.widget<Text>(find.text(nombre)).style?.color,
+          ColoresArribo.claro.deEstado(estado).texto,
+        );
       });
     }
+
+    testWidgets('en el tema oscuro usa los colores oscuros del estado', (tester) async {
+      await mostrar(tester, const EtiquetaEstado('recogido'), brillo: Brightness.dark);
+
+      final oscuro = ColoresArribo.oscuro.deEstado('recogido');
+      expect(tester.widget<Icon>(find.byType(Icon)).color, oscuro.texto);
+      expect(tester.widget<Text>(find.text('Recogido')).style?.color, oscuro.texto);
+      final caja = tester.widget<Container>(
+        find.descendant(of: find.byType(EtiquetaEstado), matching: find.byType(Container)),
+      );
+      expect((caja.decoration! as ShapeDecoration).color, oscuro.fondo);
+    });
 
     testWidgets('TalkBack la lee una sola vez como "Estado: …"', (tester) async {
       final semantica = tester.ensureSemantics();
@@ -102,9 +118,9 @@ void main() {
       expect(pasosCumplidos('novedad'), 0);
     });
 
-    const vacio = Colores.borde;
-    const lleno = Colores.acento;
-    const casos = {
+    final vacio = ColoresArribo.claro.borde;
+    final lleno = ColoresArribo.claro.acento;
+    final casos = {
       'asignado': [vacio, vacio, vacio],
       'en_camino': [lleno, vacio, vacio],
       'recogido': [lleno, lleno, vacio],
@@ -123,7 +139,16 @@ void main() {
     testWidgets('novedad: llena en rojo hasta donde iba', (tester) async {
       await mostrar(tester, const BarraDeAvance('novedad', estadoPrevio: 'en_camino'));
 
-      expect(coloresDeTramos(tester), [Colores.peligro, vacio, vacio]);
+      expect(coloresDeTramos(tester), [ColoresArribo.claro.peligro, vacio, vacio]);
+    });
+
+    testWidgets('en el tema oscuro llena con el acento oscuro y deja vacíos con el borde oscuro', (
+      tester,
+    ) async {
+      await mostrar(tester, const BarraDeAvance('en_camino'), brillo: Brightness.dark);
+
+      const o = ColoresArribo.oscuro;
+      expect(coloresDeTramos(tester), [o.acento, o.borde, o.borde]);
     });
 
     testWidgets('cancelado: no muestra la barra', (tester) async {

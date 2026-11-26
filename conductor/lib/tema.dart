@@ -1,39 +1,203 @@
-// Tema de la app: sobrio y legible bajo el sol. Fondo claro, texto casi negro, letra grande y
-// botones altos para usar con una mano. Los colores son los mismos tonos del panel web
-// (backend/panel/static/panel/arribo.css), más oscuros para que se lean al sol directo: el texto
-// de cada estado sobre su fondo tiene contraste de al menos 7:1 (lo vigila test/tema_test.dart).
+// Tema de la app: sobrio y legible bajo el sol, con letra grande y botones altos para usar con
+// una mano. Hay dos paletas: clara (fondo claro, texto casi negro) y oscura (para la noche). Los
+// colores son los mismos tonos del panel web (backend/panel/static/panel/arribo.css), ajustados
+// para que se lean al sol directo o de noche: el texto de cada estado sobre su fondo tiene
+// contraste de al menos 7:1 en las dos (lo vigila test/tema_test.dart).
 // Sin gradientes, sombras ni ilustraciones.
+//
+// Las pantallas toman los colores del tema con `context.colores`, nunca de una constante: así
+// cambian solos al pasar de claro a oscuro.
 
 import 'package:material_ui/material_ui.dart';
 
-abstract final class Colores {
-  static const fondo = Color(0xFFEEF0F3);
-  static const superficie = Color(0xFFFFFFFF);
-  static const borde = Color(0xFFB9C0C9);
-  static const texto = Color(0xFF1B1F24);
-  static const textoSecundario = Color(0xFF49515B);
-  static const acento = Color(0xFF1F4FBF);
-  static const acentoFondo = Color(0xFFE8EEFB);
-  static const peligro = Color(0xFFB3261E);
-  static const peligroFondo = Color(0xFFFBE9E8);
-  static const avisoFondo = Color(0xFFFCF1E1);
-  static const aviso = Color(0xFF774600);
+/// Texto y fondo de una etiqueta de estado.
+typedef ColoresDeEstado = ({Color texto, Color fondo});
+
+/// Los colores propios de Arribo, como extensión del tema.
+@immutable
+class ColoresArribo extends ThemeExtension<ColoresArribo> {
+  const ColoresArribo({
+    required this.fondo,
+    required this.superficie,
+    required this.borde,
+    required this.texto,
+    required this.textoSecundario,
+    required this.acento,
+    required this.acentoFondo,
+    required this.peligro,
+    required this.peligroFondo,
+    required this.aviso,
+    required this.avisoFondo,
+    required this.regreso,
+    required this.regresoFondo,
+    required this.asignado,
+    required this.enCamino,
+    required this.recogido,
+    required this.entregado,
+    required this.novedad,
+    required this.otroEstado,
+  });
+
+  /// La paleta para el sol.
+  static const claro = ColoresArribo(
+    fondo: Color(0xFFEEF0F3),
+    superficie: Color(0xFFFFFFFF),
+    borde: Color(0xFFB9C0C9),
+    texto: Color(0xFF1B1F24),
+    textoSecundario: Color(0xFF49515B),
+    acento: Color(0xFF1F4FBF),
+    acentoFondo: Color(0xFFE8EEFB),
+    peligro: Color(0xFFB3261E),
+    peligroFondo: Color(0xFFFBE9E8),
+    aviso: Color(0xFF774600),
+    avisoFondo: Color(0xFFFCF1E1),
+    regreso: Color(0xFF08564F),
+    regresoFondo: Color(0xFFE1F4F1),
+    asignado: (texto: Color(0xFF1A3F99), fondo: Color(0xFFE8EEFB)),
+    enCamino: (texto: Color(0xFF553180), fondo: Color(0xFFF2ECF8)),
+    recogido: (texto: Color(0xFF774600), fondo: Color(0xFFFCF1E1)),
+    entregado: (texto: Color(0xFF12603A), fondo: Color(0xFFEEF8F2)),
+    novedad: (texto: Color(0xFF8C1D18), fondo: Color(0xFFFBE9E8)),
+    otroEstado: (texto: Color(0xFF3F4650), fondo: Color(0xFFEEF0F3)),
+  );
+
+  /// La paleta para la noche: fondos oscuros y los mismos tonos, claros.
+  static const oscuro = ColoresArribo(
+    fondo: Color(0xFF121417),
+    superficie: Color(0xFF1C1F24),
+    borde: Color(0xFF5E6670),
+    texto: Color(0xFFECEEF1),
+    textoSecundario: Color(0xFFB8BEC6),
+    acento: Color(0xFFA8C2FF),
+    acentoFondo: Color(0xFF1E2A4A),
+    peligro: Color(0xFFFFB4AB),
+    peligroFondo: Color(0xFF3D1A18),
+    aviso: Color(0xFFFFD08A),
+    avisoFondo: Color(0xFF3A2A10),
+    regreso: Color(0xFF8EE3D6),
+    regresoFondo: Color(0xFF10332F),
+    asignado: (texto: Color(0xFFB9CCFF), fondo: Color(0xFF1E2A4A)),
+    enCamino: (texto: Color(0xFFDCC6FF), fondo: Color(0xFF2E2340)),
+    recogido: (texto: Color(0xFFFFD08A), fondo: Color(0xFF3A2A10)),
+    entregado: (texto: Color(0xFF9EE6BC), fondo: Color(0xFF143323)),
+    novedad: (texto: Color(0xFFFFB8B0), fondo: Color(0xFF3D1A18)),
+    otroEstado: (texto: Color(0xFFD5DAE0), fondo: Color(0xFF2A2F36)),
+  );
+
+  final Color fondo;
+  final Color superficie;
+  final Color borde;
+  final Color texto;
+  final Color textoSecundario;
+  final Color acento;
+  final Color acentoFondo;
+  final Color peligro;
+  final Color peligroFondo;
+  final Color aviso;
+  final Color avisoFondo;
 
   /// Regreso de un evento (el mismo verde azulado del panel).
-  static const regreso = Color(0xFF08564F);
-  static const regresoFondo = Color(0xFFE1F4F1);
+  final Color regreso;
+  final Color regresoFondo;
+
+  final ColoresDeEstado asignado;
+  final ColoresDeEstado enCamino;
+  final ColoresDeEstado recogido;
+  final ColoresDeEstado entregado;
+
+  /// Novedad y cancelado.
+  final ColoresDeEstado novedad;
+
+  /// Pendiente de asignar y cualquier estado que la app no conozca.
+  final ColoresDeEstado otroEstado;
+
+  /// Texto y fondo de la etiqueta de [estado] (contraste de al menos 7:1).
+  ColoresDeEstado deEstado(String estado) => switch (estado) {
+    'asignado' => asignado,
+    'en_camino' => enCamino,
+    'recogido' => recogido,
+    'entregado' => entregado,
+    'novedad' || 'cancelado' => novedad,
+    _ => otroEstado,
+  };
+
+  @override
+  ColoresArribo copyWith({
+    Color? fondo,
+    Color? superficie,
+    Color? borde,
+    Color? texto,
+    Color? textoSecundario,
+    Color? acento,
+    Color? acentoFondo,
+    Color? peligro,
+    Color? peligroFondo,
+    Color? aviso,
+    Color? avisoFondo,
+    Color? regreso,
+    Color? regresoFondo,
+    ColoresDeEstado? asignado,
+    ColoresDeEstado? enCamino,
+    ColoresDeEstado? recogido,
+    ColoresDeEstado? entregado,
+    ColoresDeEstado? novedad,
+    ColoresDeEstado? otroEstado,
+  }) => ColoresArribo(
+    fondo: fondo ?? this.fondo,
+    superficie: superficie ?? this.superficie,
+    borde: borde ?? this.borde,
+    texto: texto ?? this.texto,
+    textoSecundario: textoSecundario ?? this.textoSecundario,
+    acento: acento ?? this.acento,
+    acentoFondo: acentoFondo ?? this.acentoFondo,
+    peligro: peligro ?? this.peligro,
+    peligroFondo: peligroFondo ?? this.peligroFondo,
+    aviso: aviso ?? this.aviso,
+    avisoFondo: avisoFondo ?? this.avisoFondo,
+    regreso: regreso ?? this.regreso,
+    regresoFondo: regresoFondo ?? this.regresoFondo,
+    asignado: asignado ?? this.asignado,
+    enCamino: enCamino ?? this.enCamino,
+    recogido: recogido ?? this.recogido,
+    entregado: entregado ?? this.entregado,
+    novedad: novedad ?? this.novedad,
+    otroEstado: otroEstado ?? this.otroEstado,
+  );
+
+  @override
+  ColoresArribo lerp(ColoresArribo? other, double t) {
+    if (other == null) return this;
+    Color c(Color a, Color b) => Color.lerp(a, b, t)!;
+    ColoresDeEstado e(ColoresDeEstado a, ColoresDeEstado b) =>
+        (texto: c(a.texto, b.texto), fondo: c(a.fondo, b.fondo));
+    return ColoresArribo(
+      fondo: c(fondo, other.fondo),
+      superficie: c(superficie, other.superficie),
+      borde: c(borde, other.borde),
+      texto: c(texto, other.texto),
+      textoSecundario: c(textoSecundario, other.textoSecundario),
+      acento: c(acento, other.acento),
+      acentoFondo: c(acentoFondo, other.acentoFondo),
+      peligro: c(peligro, other.peligro),
+      peligroFondo: c(peligroFondo, other.peligroFondo),
+      aviso: c(aviso, other.aviso),
+      avisoFondo: c(avisoFondo, other.avisoFondo),
+      regreso: c(regreso, other.regreso),
+      regresoFondo: c(regresoFondo, other.regresoFondo),
+      asignado: e(asignado, other.asignado),
+      enCamino: e(enCamino, other.enCamino),
+      recogido: e(recogido, other.recogido),
+      entregado: e(entregado, other.entregado),
+      novedad: e(novedad, other.novedad),
+      otroEstado: e(otroEstado, other.otroEstado),
+    );
+  }
 }
 
-/// Texto y fondo de la etiqueta de cada estado: los tonos del panel, más oscuros para el sol
-/// (contraste de al menos 7:1).
-({Color texto, Color fondo}) coloresDeEstado(String estado) => switch (estado) {
-  'asignado' => (texto: Color(0xFF1A3F99), fondo: Color(0xFFE8EEFB)),
-  'en_camino' => (texto: Color(0xFF553180), fondo: Color(0xFFF2ECF8)),
-  'recogido' => (texto: Color(0xFF774600), fondo: Color(0xFFFCF1E1)),
-  'entregado' => (texto: Color(0xFF12603A), fondo: Color(0xFFEEF8F2)),
-  'novedad' || 'cancelado' => (texto: Color(0xFF8C1D18), fondo: Color(0xFFFBE9E8)),
-  _ => (texto: Color(0xFF3F4650), fondo: Color(0xFFEEF0F3)),
-};
+extension ColoresDelTema on BuildContext {
+  /// Los colores de Arribo del tema vigente (claro u oscuro).
+  ColoresArribo get colores => Theme.of(this).extension<ColoresArribo>() ?? ColoresArribo.claro;
+}
 
 /// Alto mínimo de los botones: más que los 48 dp de Material, para tocarlos con el pulgar.
 const double altoBoton = 56;
@@ -45,36 +209,68 @@ const double radioTarjeta = 12;
 const double radioControl = 10;
 
 /// La placa (o el VIN) en grande: la cifra de ancho fijo para leerla y compararla de un vistazo.
+/// Sin color: toma el del texto del tema.
 const estiloPlaca = TextStyle(
   fontSize: 30,
   fontWeight: FontWeight.w700,
   letterSpacing: 1.5,
   fontFeatures: [FontFeature.tabularFigures()],
-  color: Colores.texto,
 );
 
-ThemeData temaArribo() {
-  const esquema = ColorScheme.light(
-    primary: Colores.acento,
-    onPrimary: Colors.white,
-    primaryContainer: Colores.acentoFondo,
-    onPrimaryContainer: Colores.texto,
-    secondary: Colores.acento,
-    onSecondary: Colors.white,
-    surface: Colores.superficie,
-    onSurface: Colores.texto,
-    onSurfaceVariant: Colores.textoSecundario,
-    surfaceContainerLowest: Colores.superficie,
-    surfaceContainerLow: Colores.fondo,
-    surfaceContainer: Colores.fondo,
-    surfaceContainerHigh: Colores.superficie,
-    surfaceContainerHighest: Colores.superficie,
-    outline: Color(0xFF8A929C),
-    outlineVariant: Colores.borde,
-    error: Colores.peligro,
-    onError: Colors.white,
-    surfaceTint: Colors.transparent,
-  );
+/// Borde de los campos de texto: se distingue del fondo en las dos paletas.
+const _bordeCampo = Color(0xFF8A929C);
+
+/// El tema claro ([Brightness.light], el de siempre) o el oscuro.
+ThemeData temaArribo([Brightness brillo = Brightness.light]) {
+  final oscuro = brillo == Brightness.dark;
+  final c = oscuro ? ColoresArribo.oscuro : ColoresArribo.claro;
+  final esquema = oscuro
+      ? ColorScheme.dark(
+          primary: c.acento,
+          onPrimary: const Color(0xFF0B1F4D),
+          primaryContainer: c.acentoFondo,
+          onPrimaryContainer: c.texto,
+          secondary: c.acento,
+          onSecondary: const Color(0xFF0B1F4D),
+          surface: c.superficie,
+          onSurface: c.texto,
+          onSurfaceVariant: c.textoSecundario,
+          surfaceContainerLowest: c.fondo,
+          surfaceContainerLow: c.fondo,
+          surfaceContainer: c.superficie,
+          surfaceContainerHigh: c.superficie,
+          surfaceContainerHighest: c.superficie,
+          outline: _bordeCampo,
+          outlineVariant: c.borde,
+          error: c.peligro,
+          onError: const Color(0xFF410E0B),
+          // Los avisos flotantes (SnackBar) van claros sobre la pantalla oscura.
+          inverseSurface: c.texto,
+          onInverseSurface: c.fondo,
+          inversePrimary: ColoresArribo.claro.acento,
+          surfaceTint: Colors.transparent,
+        )
+      : ColorScheme.light(
+          primary: c.acento,
+          onPrimary: Colors.white,
+          primaryContainer: c.acentoFondo,
+          onPrimaryContainer: c.texto,
+          secondary: c.acento,
+          onSecondary: Colors.white,
+          surface: c.superficie,
+          onSurface: c.texto,
+          onSurfaceVariant: c.textoSecundario,
+          surfaceContainerLowest: c.superficie,
+          surfaceContainerLow: c.fondo,
+          surfaceContainer: c.fondo,
+          surfaceContainerHigh: c.superficie,
+          surfaceContainerHighest: c.superficie,
+          outline: _bordeCampo,
+          outlineVariant: c.borde,
+          error: c.peligro,
+          onError: Colors.white,
+          surfaceTint: Colors.transparent,
+        );
 
   final base = ThemeData(colorScheme: esquema, useMaterial3: true);
   final textos = base.textTheme
@@ -88,32 +284,33 @@ ThemeData temaArribo() {
         labelLarge: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
         labelMedium: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
       )
-      .apply(bodyColor: Colores.texto, displayColor: Colores.texto);
+      .apply(bodyColor: c.texto, displayColor: c.texto);
 
   const forma = RoundedRectangleBorder(
     borderRadius: BorderRadius.all(Radius.circular(radioControl)),
   );
 
   return base.copyWith(
-    scaffoldBackgroundColor: Colores.fondo,
+    scaffoldBackgroundColor: c.fondo,
     textTheme: textos,
-    appBarTheme: const AppBarTheme(
-      backgroundColor: Colores.superficie,
-      foregroundColor: Colores.texto,
+    extensions: [c],
+    appBarTheme: AppBarTheme(
+      backgroundColor: c.superficie,
+      foregroundColor: c.texto,
       elevation: 0,
       scrolledUnderElevation: 0,
       surfaceTintColor: Colors.transparent,
       centerTitle: false,
-      titleTextStyle: TextStyle(fontSize: 22, fontWeight: FontWeight.w600, color: Colores.texto),
-      shape: Border(bottom: BorderSide(color: Colores.borde)),
+      titleTextStyle: TextStyle(fontSize: 22, fontWeight: FontWeight.w600, color: c.texto),
+      shape: Border(bottom: BorderSide(color: c.borde)),
     ),
-    cardTheme: const CardThemeData(
-      color: Colores.superficie,
+    cardTheme: CardThemeData(
+      color: c.superficie,
       elevation: 0,
       margin: EdgeInsets.zero,
       shape: RoundedRectangleBorder(
-        side: BorderSide(color: Colores.borde),
-        borderRadius: BorderRadius.all(Radius.circular(radioTarjeta)),
+        side: BorderSide(color: c.borde),
+        borderRadius: const BorderRadius.all(Radius.circular(radioTarjeta)),
       ),
     ),
     filledButtonTheme: FilledButtonThemeData(
@@ -128,43 +325,47 @@ ThemeData temaArribo() {
       style: OutlinedButton.styleFrom(
         minimumSize: const Size(64, altoBoton),
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        foregroundColor: Colores.acento,
+        foregroundColor: c.acento,
         textStyle: textos.labelLarge,
-        side: const BorderSide(color: Colores.acento, width: 1.5),
+        side: BorderSide(color: c.acento, width: 1.5),
         shape: forma,
       ),
     ),
     textButtonTheme: TextButtonThemeData(
       style: TextButton.styleFrom(
         minimumSize: const Size(64, 52),
-        foregroundColor: Colores.acento,
+        foregroundColor: c.acento,
         textStyle: textos.labelLarge,
         shape: forma,
       ),
     ),
-    inputDecorationTheme: const InputDecorationTheme(
+    inputDecorationTheme: InputDecorationTheme(
       filled: true,
-      fillColor: Colores.superficie,
-      contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 18),
-      border: OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(radioControl))),
-      enabledBorder: OutlineInputBorder(
+      fillColor: c.superficie,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
+      border: const OutlineInputBorder(
         borderRadius: BorderRadius.all(Radius.circular(radioControl)),
-        borderSide: BorderSide(color: Color(0xFF8A929C)),
+      ),
+      enabledBorder: const OutlineInputBorder(
+        borderRadius: BorderRadius.all(Radius.circular(radioControl)),
+        borderSide: BorderSide(color: _bordeCampo),
       ),
       focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.all(Radius.circular(radioControl)),
-        borderSide: BorderSide(color: Colores.acento, width: 2),
+        borderRadius: const BorderRadius.all(Radius.circular(radioControl)),
+        borderSide: BorderSide(color: c.acento, width: 2),
       ),
-      labelStyle: TextStyle(fontSize: 18, color: Colores.textoSecundario),
-      floatingLabelStyle: TextStyle(fontSize: 18, color: Colores.acento),
-      errorStyle: TextStyle(fontSize: 15, color: Colores.peligro),
-      helperStyle: TextStyle(fontSize: 15, color: Colores.textoSecundario),
+      labelStyle: TextStyle(fontSize: 18, color: c.textoSecundario),
+      floatingLabelStyle: TextStyle(fontSize: 18, color: c.acento),
+      errorStyle: TextStyle(fontSize: 15, color: c.peligro),
+      helperStyle: TextStyle(fontSize: 15, color: c.textoSecundario),
     ),
-    dividerTheme: const DividerThemeData(color: Colores.borde, space: 1, thickness: 1),
-    progressIndicatorTheme: const ProgressIndicatorThemeData(color: Colores.acento),
+    dividerTheme: DividerThemeData(color: c.borde, space: 1, thickness: 1),
+    progressIndicatorTheme: ProgressIndicatorThemeData(color: c.acento),
     snackBarTheme: SnackBarThemeData(
       behavior: SnackBarBehavior.floating,
-      contentTextStyle: textos.bodyLarge?.copyWith(color: Colors.white),
+      contentTextStyle: textos.bodyLarge?.copyWith(
+        color: oscuro ? esquema.onInverseSurface : Colors.white,
+      ),
     ),
   );
 }

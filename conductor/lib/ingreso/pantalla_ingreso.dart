@@ -152,7 +152,7 @@ class _PantallaIngresoState extends State<PantallaIngreso> {
                       const SizedBox(height: 8),
                       Text(
                         'Ingrese con su número de celular y el PIN de 6 dígitos que le dio logística.',
-                        style: textos.bodyLarge?.copyWith(color: Colores.textoSecundario),
+                        style: textos.bodyLarge?.copyWith(color: context.colores.textoSecundario),
                       ),
                       const SizedBox(height: 24),
                       if (aviso != null) ...[
@@ -249,7 +249,7 @@ class _PantallaIngresoState extends State<PantallaIngreso> {
                       const SizedBox(height: 32),
                       Text(
                         'Servidor: ${widget.servidor}',
-                        style: textos.bodySmall?.copyWith(color: Colores.textoSecundario),
+                        style: textos.bodySmall?.copyWith(color: context.colores.textoSecundario),
                         textAlign: TextAlign.center,
                       ),
                     ],

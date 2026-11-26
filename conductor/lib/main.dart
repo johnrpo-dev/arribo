@@ -16,6 +16,7 @@ import 'fotos/almacen_fotos.dart';
 import 'fotos/subidor_fotos.dart';
 import 'ingreso/almacen_token.dart';
 import 'ingreso/sesion.dart';
+import 'preferencia_tema.dart';
 import 'push.dart';
 
 Future<void> main() async {
@@ -24,6 +25,8 @@ Future<void> main() async {
     databaseFactory,
     '${await getDatabasesPath()}/$nombreArchivoBase',
   );
+  // El tema elegido se lee antes del primer cuadro: la app no aparece un instante con otro.
+  final tema = await PreferenciaTema.cargar(base);
   final api = ClienteApi();
   final sesion = Sesion(
     api: api,
@@ -48,7 +51,9 @@ Future<void> main() async {
   if (mensajeria != null) {
     RegistroPush(mensajeria: mensajeria, api: api, sesion: sesion, lista: lista).iniciar();
   }
-  runApp(ArriboApp(sesion: sesion, lista: lista, avisosTocados: mensajeria?.avisosTocados));
+  runApp(
+    ArriboApp(sesion: sesion, lista: lista, avisosTocados: mensajeria?.avisosTocados, tema: tema),
+  );
   await sesion.iniciar();
 }
 

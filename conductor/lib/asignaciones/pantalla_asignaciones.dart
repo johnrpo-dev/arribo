@@ -6,6 +6,7 @@ import 'package:material_ui/material_ui.dart';
 import '../comunes.dart';
 import '../formato.dart';
 import '../ingreso/sesion.dart';
+import '../preferencia_tema.dart';
 import '../tema.dart';
 import 'componentes.dart';
 import 'enlaces.dart';
@@ -23,12 +24,16 @@ class PantallaAsignaciones extends StatefulWidget {
     required this.sesion,
     required this.abrirEnlace,
     this.reloj = DateTime.now,
+    this.tema,
   });
 
   final ListaAsignaciones lista;
   final Sesion sesion;
   final AbrirEnlace abrirEnlace;
   final DateTime Function() reloj;
+
+  /// El tema elegido; con él, el menú ofrece cambiarlo.
+  final PreferenciaTema? tema;
 
   @override
   State<PantallaAsignaciones> createState() => _PantallaAsignacionesState();
@@ -134,9 +139,40 @@ class _PantallaAsignacionesState extends State<PantallaAsignaciones> {
     }
   }
 
+  /// Automático, claro u oscuro: se aplica y se guarda al tocar la opción.
+  Future<void> _elegirTema(PreferenciaTema tema) => showDialog<void>(
+    context: context,
+    builder: (context) => AlertDialog(
+      title: const Text('Tema'),
+      contentPadding: const EdgeInsets.symmetric(vertical: 12),
+      content: RadioGroup<ThemeMode>(
+        groupValue: tema.value,
+        onChanged: (modo) async {
+          if (modo == null) return;
+          final navegador = Navigator.of(context);
+          await tema.elegir(modo);
+          navegador.pop();
+        },
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            for (final opcion in opcionesDeTema)
+              RadioListTile<ThemeMode>(
+                key: Key('tema-${opcion.modo.name}'),
+                value: opcion.modo,
+                minTileHeight: 56,
+                title: Text(opcion.nombre),
+              ),
+          ],
+        ),
+      ),
+    ),
+  );
+
   @override
   Widget build(BuildContext context) {
     final nombre = widget.sesion.conductor?.nombre;
+    final tema = widget.tema;
     return Scaffold(
       appBar: AppBar(
         title: const Text('Mis servicios'),
@@ -150,9 +186,11 @@ class _PantallaAsignacionesState extends State<PantallaAsignaciones> {
             tooltip: 'Más opciones',
             onSelected: (opcion) {
               if (opcion == 'salir') _salir();
+              if (opcion == 'tema' && tema != null) _elegirTema(tema);
             },
             itemBuilder: (context) => [
               if (nombre != null) PopupMenuItem(enabled: false, child: Text(nombre)),
+              if (tema != null) const PopupMenuItem(value: 'tema', child: Text('Tema')),
               const PopupMenuItem(value: 'salir', child: Text('Cerrar sesión')),
             ],
           ),
@@ -286,12 +324,12 @@ class _EstadoDeLaLista extends StatelessWidget {
                   child: CircularProgressIndicator(strokeWidth: 2),
                 )
               else
-                const Icon(Icons.check_circle_outline, size: 18, color: Colores.textoSecundario),
+                Icon(Icons.check_circle_outline, size: 18, color: context.colores.textoSecundario),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
                   lista.actualizando ? 'Actualizando…' : actualizada,
-                  style: textos.bodySmall?.copyWith(color: Colores.textoSecundario),
+                  style: textos.bodySmall?.copyWith(color: context.colores.textoSecundario),
                 ),
               ),
             ],
@@ -360,7 +398,7 @@ class TarjetaServicio extends StatelessWidget {
               if (vehiculo.placa != null && vehiculo.vin != null)
                 Text(
                   'VIN ${vehiculo.vin}',
-                  style: textos.bodyLarge?.copyWith(color: Colores.textoSecundario),
+                  style: textos.bodyLarge?.copyWith(color: context.colores.textoSecundario),
                 ),
               if (descripcion != null) Text(descripcion, style: textos.bodyLarge),
               const SizedBox(height: 8),

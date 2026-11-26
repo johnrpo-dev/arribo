@@ -337,8 +337,8 @@ class _PantallaPasoState extends State<PantallaPaso> {
           bottomNavigationBar: !listo
               ? null
               : Material(
-                  color: Colores.superficie,
-                  shape: const Border(top: BorderSide(color: Colores.borde)),
+                  color: context.colores.superficie,
+                  shape: Border(top: BorderSide(color: context.colores.borde)),
                   child: SafeArea(
                     child: Padding(
                       padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
@@ -504,7 +504,7 @@ class _Contenido extends StatelessWidget {
             const SizedBox(height: 8),
             Text(
               'Toque una foto para quitarla.',
-              style: textos.bodySmall?.copyWith(color: Colores.textoSecundario),
+              style: textos.bodySmall?.copyWith(color: context.colores.textoSecundario),
             ),
           ],
           const SizedBox(height: 24),
@@ -594,9 +594,9 @@ class MiniaturaFoto extends StatelessWidget {
             errorBuilder: (context, error, stackTrace) => Container(
               width: lado,
               height: lado,
-              color: Colores.fondo,
+              color: context.colores.fondo,
               alignment: Alignment.center,
-              child: const Icon(Icons.broken_image_outlined, color: Colores.textoSecundario),
+              child: Icon(Icons.broken_image_outlined, color: context.colores.textoSecundario),
             ),
           ),
         ),

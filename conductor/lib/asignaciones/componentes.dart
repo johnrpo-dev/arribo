@@ -82,7 +82,7 @@ class EtiquetaEstado extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colores = coloresDeEstado(estado);
+    final colores = context.colores.deEstado(estado);
     final nombre = nombreEstado(estado);
     // TalkBack la lee una sola vez, como "Estado: En camino".
     return Semantics(
@@ -104,11 +104,11 @@ class EtiquetaPendiente extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const _Pastilla(
+    return _Pastilla(
       icono: Icons.cloud_upload_outlined,
       texto: 'Pendiente por enviar',
-      color: Colores.aviso,
-      fondo: Colores.avisoFondo,
+      color: context.colores.aviso,
+      fondo: context.colores.avisoFondo,
     );
   }
 }
@@ -119,12 +119,12 @@ class EtiquetaEsperaIda extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const _Pastilla(
-      key: Key('espera-ida'),
+    return _Pastilla(
+      key: const Key('espera-ida'),
       icono: Icons.lock_outline,
       texto: 'Espera la ida',
-      color: Colores.regreso,
-      fondo: Colores.regresoFondo,
+      color: context.colores.regreso,
+      fondo: context.colores.regresoFondo,
     );
   }
 }
@@ -140,8 +140,8 @@ class EtiquetaFotosPendientes extends StatelessWidget {
     return _Pastilla(
       icono: Icons.photo_camera_outlined,
       texto: cantidad == 1 ? '1 foto por subir' : '$cantidad fotos por subir',
-      color: Colores.aviso,
-      fondo: Colores.avisoFondo,
+      color: context.colores.aviso,
+      fondo: context.colores.avisoFondo,
     );
   }
 }
@@ -171,7 +171,8 @@ class BarraDeAvance extends StatelessWidget {
     if (estado == Estado.cancelado) return const SizedBox.shrink();
     final conNovedad = estado == Estado.novedad;
     final cumplidos = pasosCumplidos(estado, estadoPrevio: estadoPrevio);
-    final lleno = conNovedad ? Colores.peligro : Colores.acento;
+    final colores = context.colores;
+    final lleno = conNovedad ? colores.peligro : colores.acento;
     final estilo = Theme.of(context).textTheme.bodySmall;
     final escala = MediaQuery.textScalerOf(context);
     final etiqueta = StringBuffer('Avance: paso $cumplidos de ${pasosDeAvance.length}');
@@ -193,7 +194,7 @@ class BarraDeAvance extends StatelessWidget {
                     key: Key('avance-$i'),
                     height: 8,
                     decoration: BoxDecoration(
-                      color: i < cumplidos ? lleno : Colores.borde,
+                      color: i < cumplidos ? lleno : colores.borde,
                       borderRadius: const BorderRadius.all(Radius.circular(4)),
                     ),
                   ),
@@ -206,8 +207,8 @@ class BarraDeAvance extends StatelessWidget {
                     text: TextSpan(
                       text: nombreEstado(pasosDeAvance[i]),
                       style: i == cumplidos - 1
-                          ? estilo?.copyWith(color: Colores.texto, fontWeight: FontWeight.w700)
-                          : estilo?.copyWith(color: Colores.textoSecundario),
+                          ? estilo?.copyWith(color: colores.texto, fontWeight: FontWeight.w700)
+                          : estilo?.copyWith(color: colores.textoSecundario),
                     ),
                   ),
                 ],
@@ -350,7 +351,7 @@ class SeccionLugar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final textos = Theme.of(context).textTheme;
-    final secundario = textos.bodyLarge?.copyWith(color: Colores.textoSecundario);
+    final secundario = textos.bodyLarge?.copyWith(color: context.colores.textoSecundario);
     final llamar = enlaceLlamar(lugar.contactoTelefono);
     final maps = enlaceGoogleMaps(lugar);
     final waze = enlaceWaze(lugar);
@@ -362,7 +363,7 @@ class SeccionLugar extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(titulo, style: textos.labelMedium?.copyWith(color: Colores.textoSecundario)),
+        Text(titulo, style: textos.labelMedium?.copyWith(color: context.colores.textoSecundario)),
         const SizedBox(height: 4),
         if (lugar.vacio)
           Text(textoSinDatos, style: secundario)
@@ -466,7 +467,7 @@ class FilaDato extends StatelessWidget {
           children: [
             TextSpan(
               text: '$etiqueta: ',
-              style: textos.bodyLarge?.copyWith(color: Colores.textoSecundario),
+              style: textos.bodyLarge?.copyWith(color: context.colores.textoSecundario),
             ),
             TextSpan(text: valor, style: textos.bodyLarge),
           ],
