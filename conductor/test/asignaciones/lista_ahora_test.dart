@@ -353,11 +353,7 @@ void main() {
 
       expect(
         tester.getSemantics(find.byKey(const Key('tarjeta-compacta-42'))),
-        isSemantics(
-          label: 'XYZ789, Asignado. Ver detalle',
-          isButton: true,
-          hasTapAction: true,
-        ),
+        isSemantics(label: 'XYZ789, Asignado. Ver detalle', isButton: true, hasTapAction: true),
       );
       expect(find.bySemanticsLabel('XYZ789, Asignado. Ver detalle'), findsOneWidget);
       // Su "Ver detalle" se ve, pero no se anuncia aparte; el de la activa sí.
@@ -447,5 +443,71 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('pendientes')), findsOneWidget);
     expect(tester.takeException(), isNull);
+  });
+  group('vehículo identificado solo por número de bodega', () {
+    /// Un servicio cuyo vehículo no tiene placa ni VIN, solo el número que escribió la oficina.
+    Map<String, Object?> deBodega(
+      int id,
+      String? bodega, {
+      String estado = 'asignado',
+      int? ronda,
+    }) {
+      final json = servicioJson(id: id, estado: estado, ordenRonda: ronda ?? id - 40);
+      return {
+        ...json,
+        'vehiculo': {
+          ...(json['vehiculo']! as Map<String, Object?>),
+          'placa': null,
+          'vin': null,
+          'numero_bodega': bodega,
+        },
+      };
+    }
+
+    testWidgets('se reconoce por la bodega en la tarjeta activa, la compacta y el detalle', (
+      tester,
+    ) async {
+      await guardar([deBodega(41, 'B-7731'), deBodega(42, 'B-0042')]);
+      pantallaAlta(tester);
+      await abrirApp(tester);
+
+      expect(en(41, find.text('Bodega B-7731')), findsOneWidget);
+      expect(en(42, find.text('Bodega B-0042')), findsOneWidget);
+      expect(find.text('Sin placa, VIN ni número de bodega'), findsNothing);
+
+      await abrirDetalleDe(tester, 'Bodega B-7731');
+      expect(find.text('N.º de bodega: B-7731', findRichText: true), findsOneWidget);
+      expect(find.text('Placa: Sin placa', findRichText: true), findsOneWidget);
+    });
+
+    testWidgets('Recogido desde la tarjeta no pide placa ni VIN si hay número de bodega', (
+      tester,
+    ) async {
+      await guardar([deBodega(41, 'B-7731', estado: 'en_camino')]);
+      pantallaAlta(tester);
+      await abrirApp(tester);
+
+      await tocar(tester, find.byKey(const Key('tarjeta-marcar-recogido')));
+
+      expect(find.byKey(const Key('tomar-foto')), findsOneWidget);
+      expect(find.textContaining('Bodega B-7731 · Mazda CX-30'), findsOneWidget);
+      expect(find.byKey(const Key('pide-identificacion')), findsNothing);
+      expect(find.byKey(const Key('placa-digitada')), findsNothing);
+      expect(find.byKey(const Key('vin-digitado')), findsNothing);
+    });
+
+    testWidgets('sin placa, VIN ni número de bodega, Recogido sí pide digitar la identificación', (
+      tester,
+    ) async {
+      await guardar([deBodega(41, null, estado: 'en_camino')]);
+      pantallaAlta(tester);
+      await abrirApp(tester);
+
+      expect(en(41, find.text('Sin placa, VIN ni número de bodega')), findsOneWidget);
+      await tocar(tester, find.byKey(const Key('tarjeta-marcar-recogido')));
+
+      expect(find.byKey(const Key('pide-identificacion')), findsOneWidget);
+      expect(find.byKey(const Key('placa-digitada')), findsOneWidget);
+    });
   });
 }
