@@ -194,7 +194,7 @@ class _AccionesState extends State<_Acciones> {
                   onPressed: _ocupado ? null : () => _marcar(siguiente),
                   child: Text('Marcar ${nombreEstado(siguiente)}', textAlign: TextAlign.center),
                 ),
-              if (siguiente != null && conNovedad) const SizedBox(height: 8),
+              if (siguiente != null && conNovedad) const SizedBox(height: 16),
               if (conNovedad)
                 OutlinedButton(
                   key: const Key('marcar-novedad'),
@@ -270,6 +270,10 @@ class _Detalle extends StatelessWidget {
             Text(tipoDe(servicio), style: textos.bodyLarge),
           ],
         ),
+        if (servicio.estado != Estado.cancelado) ...[
+          const SizedBox(height: 16),
+          BarraDeAvance(servicio.estado, estadoPrevio: estadoPrevio),
+        ],
         if (servicio.estado == Estado.novedad && estadoPrevio != null) ...[
           const SizedBox(height: 8),
           Text(
@@ -290,7 +294,7 @@ class _Detalle extends StatelessWidget {
           AvisoDeEvento(evento: evento, alEntender: () => alEntender(evento)),
         ],
         const SizedBox(height: 12),
-        Text(identificacionDe(vehiculo), style: textos.headlineSmall),
+        Text(identificacionDe(vehiculo), style: estiloPlaca),
         const SizedBox(height: 4),
         Text(
           'Hora: ${textoProgramada(servicio.programadaPara, ahora: ahora)}',
