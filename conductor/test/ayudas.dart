@@ -10,6 +10,7 @@ import 'package:arribo_conductor/api.dart';
 import 'package:arribo_conductor/base_local.dart';
 import 'package:arribo_conductor/fotos/camara.dart';
 import 'package:arribo_conductor/ingreso/almacen_token.dart';
+import 'package:flutter/services.dart' show SystemChannels;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
@@ -201,6 +202,22 @@ void celularConTextoGrande(WidgetTester tester) {
   tester.platformDispatcher.textScaleFactorTestValue = 2;
   addTearDown(tester.view.reset);
   addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+}
+
+/// Las vibraciones que pide la app desde ahora hasta el final de la prueba, en orden, con el tipo
+/// como le llega a Android (por ejemplo `'HapticFeedbackType.mediumImpact'`). Las demás llamadas al
+/// canal de la plataforma (sonido del toque, portapapeles...) responden null, como sin el registro.
+List<String> registrarVibraciones(WidgetTester tester) {
+  final vibraciones = <String>[];
+  final mensajero = tester.binding.defaultBinaryMessenger;
+  mensajero.setMockMethodCallHandler(SystemChannels.platform, (llamada) async {
+    if (llamada.method == 'HapticFeedback.vibrate') {
+      vibraciones.add(llamada.arguments as String? ?? 'HapticFeedback.vibrate');
+    }
+    return null;
+  });
+  addTearDown(() => mensajero.setMockMethodCallHandler(SystemChannels.platform, null));
+  return vibraciones;
 }
 
 /// Sin señal: el cliente HTTP falla antes de llegar al servidor.

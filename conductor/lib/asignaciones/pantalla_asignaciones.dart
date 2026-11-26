@@ -10,6 +10,7 @@ import '../formato.dart';
 import '../ingreso/sesion.dart';
 import '../preferencia_tema.dart';
 import '../tema.dart';
+import '../vibracion.dart';
 import 'componentes.dart';
 import 'confirmacion.dart';
 import 'enlaces.dart';
@@ -162,6 +163,7 @@ class _PantallaAsignacionesState extends State<PantallaAsignaciones> {
             onChanged: (modo) {
               if (modo == null || cerrado) return;
               cerrado = true;
+              vibrarSeleccion();
               Navigator.of(context).pop();
               unawaited(tema.elegir(modo));
             },

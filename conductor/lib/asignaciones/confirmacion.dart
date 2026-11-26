@@ -9,6 +9,7 @@ import 'package:material_ui/material_ui.dart';
 
 import '../cola/cola_eventos.dart';
 import '../formato.dart';
+import '../vibracion.dart';
 import 'componentes.dart';
 import 'estados.dart';
 import 'lista_asignaciones.dart';
@@ -55,6 +56,7 @@ Future<void> marcarPaso(
     // Mientras confirmaba, la lista pudo cambiar (llegó del servidor): se revisa contra lo de ahora.
     final actual = lista.servicio(servicio.id);
     if (actual == null || !puedeMarcar(actual.estado, destino)) {
+      vibrarBloqueo();
       mensajero.showSnackBar(const SnackBar(content: Text(textoServicioCambio)));
       return;
     }
@@ -67,7 +69,9 @@ Future<void> marcarPaso(
     }
     // Primero queda guardado en la cola; la pantalla cambia cuando la lista vuelve a leer.
     await lista.marcar(servicio.id, destino, motivo: motivo);
+    vibrarPasoGuardado();
   } on ToqueNoValido catch (error) {
+    vibrarBloqueo();
     mensajero.showSnackBar(SnackBar(content: Text(error.mensaje)));
   }
 }
@@ -118,6 +122,7 @@ Future<void> abrirRecogidoOEntregado(
 /// Por qué no se puede marcar Recogido, en una hoja inferior. En un bloqueo por capacidad lista
 /// los vehículos que falta marcar como Entregado.
 Future<void> mostrarBloqueo(BuildContext context, BloqueoDeRecogida bloqueo) {
+  vibrarBloqueo();
   return showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
@@ -156,6 +161,7 @@ Future<void> mostrarBloqueo(BuildContext context, BloqueoDeRecogida bloqueo) {
 /// Por qué no se puede marcar En camino, en una hoja inferior como [mostrarBloqueo]: el mensaje y
 /// los servicios iniciados que falta terminar, cada uno con su estado.
 Future<void> mostrarBloqueoDeInicio(BuildContext context, BloqueoDeInicio bloqueo) {
+  vibrarBloqueo();
   return showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
@@ -199,6 +205,7 @@ Future<bool> confirmarPaso(
   required String destino,
 }) async {
   final paso = nombreEstado(destino);
+  vibrarAtencion();
   final confirmado = await showModalBottomSheet<bool>(
     context: context,
     isScrollControlled: true,
@@ -229,6 +236,7 @@ Future<bool> confirmarPaso(
 
 /// Pide el motivo de la novedad (obligatorio). Devuelve el texto, o null si el conductor cancela.
 Future<String?> pedirMotivoDeNovedad(BuildContext context, {required Servicio servicio}) {
+  vibrarAtencion();
   return showModalBottomSheet<String>(
     context: context,
     isScrollControlled: true,
