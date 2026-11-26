@@ -1,7 +1,9 @@
 // Lo que pasa entre tocar un botón de estado y guardar el evento. En camino pide una confirmación
 // corta, al alcance del pulgar, para que un toque accidental no cambie el estado (dos toques en
-// total). Novedad pide el motivo. Recogido y Entregado abren su pantalla de fotos y nombre
-// (pantalla_paso.dart); un Recogido que no se puede marcar todavía se bloquea aquí, diciendo por qué.
+// total); antes se bloquea si el conductor ya tiene tantos servicios iniciados sin finalizar como
+// puestos tiene la grúa, diciendo cuáles debe terminar. Novedad pide el motivo. Recogido y
+// Entregado abren su pantalla de fotos y nombre (pantalla_paso.dart); un Recogido que no se puede
+// marcar todavía se bloquea aquí, diciendo por qué.
 
 import 'package:material_ui/material_ui.dart';
 
@@ -20,7 +22,8 @@ const String textoServicioCambio = 'El servicio cambió mientras confirmaba. Rev
 /// Un toque en un botón de estado, igual desde el detalle y desde la tarjeta del servicio activo.
 /// En camino pide confirmación y Novedad el motivo; luego el toque queda en la cola. Recogido y
 /// Entregado abren su pantalla de fotos y nombre ([abrirRecogidoOEntregado]). Si el paso no
-/// corresponde, lo dice en un aviso flotante y no guarda nada.
+/// corresponde, lo dice en un aviso flotante y no guarda nada. Un En camino con tantos servicios
+/// iniciados sin finalizar como puestos se bloquea ([mostrarBloqueoDeInicio]) y no guarda nada.
 Future<void> marcarPaso(
   BuildContext context, {
   required Servicio servicio,
@@ -39,6 +42,10 @@ Future<void> marcarPaso(
         lista: lista,
       );
     }
+    if (destino == Estado.enCamino) {
+      final bloqueo = lista.bloqueoDeInicio(servicio);
+      if (bloqueo != null) return await mostrarBloqueoDeInicio(context, bloqueo);
+    }
     if (destino == Estado.novedad) {
       motivo = await pedirMotivoDeNovedad(context, servicio: servicio);
       if (motivo == null) return;
@@ -50,6 +57,13 @@ Future<void> marcarPaso(
     if (actual == null || !puedeMarcar(actual.estado, destino)) {
       mensajero.showSnackBar(const SnackBar(content: Text(textoServicioCambio)));
       return;
+    }
+    if (destino == Estado.enCamino) {
+      final bloqueo = lista.bloqueoDeInicio(actual);
+      if (bloqueo != null) {
+        if (context.mounted) await mostrarBloqueoDeInicio(context, bloqueo);
+        return;
+      }
     }
     // Primero queda guardado en la cola; la pantalla cambia cuando la lista vuelve a leer.
     await lista.marcar(servicio.id, destino, motivo: motivo);
@@ -128,6 +142,42 @@ Future<void> mostrarBloqueo(BuildContext context, BloqueoDeRecogida bloqueo) {
                 ),
               ),
           ],
+          const SizedBox(height: 20),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Entendido', textAlign: TextAlign.center),
+          ),
+        ],
+      );
+    },
+  );
+}
+
+/// Por qué no se puede marcar En camino, en una hoja inferior como [mostrarBloqueo]: el mensaje y
+/// los servicios iniciados que falta terminar, cada uno con su estado.
+Future<void> mostrarBloqueoDeInicio(BuildContext context, BloqueoDeInicio bloqueo) {
+  return showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    builder: (context) {
+      final textos = Theme.of(context).textTheme;
+      return _Hoja(
+        children: [
+          Text(bloqueo.titulo, style: textos.titleLarge),
+          const SizedBox(height: 8),
+          Text(bloqueo.mensaje, key: const Key('bloqueo-inicio'), style: textos.bodyLarge),
+          const SizedBox(height: 16),
+          Text('Falta terminar:', style: textos.titleMedium),
+          const SizedBox(height: 4),
+          for (final servicio in bloqueo.sinFinalizar)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              child: Text(
+                '${_vehiculoDe(servicio)} (${nombreEstado(servicio.estado)})',
+                key: Key('sin-finalizar-${servicio.id}'),
+                style: textos.bodyLarge,
+              ),
+            ),
           const SizedBox(height: 20),
           FilledButton(
             onPressed: () => Navigator.of(context).pop(),

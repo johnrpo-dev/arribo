@@ -23,7 +23,7 @@ import 'almacen_asignaciones.dart';
 import 'estados.dart';
 import 'identificacion.dart';
 import 'requisitos.dart' as requisitos;
-import 'requisitos.dart' show BloqueoDeRecogida;
+import 'requisitos.dart' show BloqueoDeInicio, BloqueoDeRecogida;
 import 'servicio.dart';
 
 class ListaAsignaciones extends ChangeNotifier {
@@ -144,6 +144,12 @@ class ListaAsignaciones extends ChangeNotifier {
   /// sus toques sin enviar.
   BloqueoDeRecogida? bloqueoDeRecogida(Servicio servicio) =>
       requisitos.bloqueoDeRecogida(servicio, _servicios, configuracion: _configuracion);
+
+  /// Por qué [servicio] no se puede marcar En camino todavía (el conductor ya tiene tantos
+  /// servicios iniciados sin finalizar como puestos tiene la grúa), o null si puede. Se calcula con
+  /// el estado que ve el conductor: lo confirmado más sus toques sin enviar. No usa la red.
+  BloqueoDeInicio? bloqueoDeInicio(Servicio servicio) =>
+      requisitos.bloqueoDeInicio(servicio, _servicios);
 
   /// Qué datos le pide digitar la pantalla del Recogido de [servicio] (placa, VIN), o null si
   /// ninguno: el vehículo ya está identificado o la configuración es "al asignar".

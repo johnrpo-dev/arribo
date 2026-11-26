@@ -101,6 +101,18 @@ def a_bordo(servicio: Servicio) -> bool:
     return servicio.estado == Estado.NOVEDAD and servicio.estado_previo == Estado.RECOGIDO
 
 
+# Iniciado y sin finalizar: el conductor ya salió por el vehículo o lo lleva montado.
+INICIADOS = frozenset({Estado.EN_CAMINO, Estado.RECOGIDO})
+
+
+def en_curso(servicio: Servicio) -> bool:
+    """El servicio está iniciado y no se ha finalizado (cuenta para tomar el siguiente): En camino
+    o Recogido, o una novedad abierta desde uno de ellos. Una novedad desde Asignado no cuenta."""
+    if servicio.estado in INICIADOS:
+        return True
+    return servicio.estado == Estado.NOVEDAD and servicio.estado_previo in INICIADOS
+
+
 def estado_solicitud(estados: Iterable[Estado]) -> EstadoSolicitud:
     """El estado de una solicitud se deriva de sus servicios; nunca se guarda a mano."""
     estados = list(estados)

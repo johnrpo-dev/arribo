@@ -31,6 +31,9 @@ const Map<String, String> _avance = {
   Estado.recogido: Estado.entregado,
 };
 
+/// `INICIADOS`: el conductor ya salió por el vehículo o lo lleva montado.
+const Set<String> _iniciados = {Estado.enCamino, Estado.recogido};
+
 /// `NOVEDAD_DESDE`.
 const Set<String> _novedadDesde = {Estado.asignado, Estado.enCamino, Estado.recogido};
 
@@ -56,6 +59,12 @@ class EstadoDeServicio {
   /// El vehículo ocupa un puesto de la grúa: recogido, o novedad que venía de recogido.
   bool get aBordo =>
       estado == Estado.recogido || (estado == Estado.novedad && estadoPrevio == Estado.recogido);
+
+  /// Iniciado y sin finalizar (`en_curso` en el servidor): En camino o Recogido, o una novedad que
+  /// venía de uno de ellos. Cuenta para tomar el siguiente servicio.
+  bool get enCurso =>
+      _iniciados.contains(estado) ||
+      (estado == Estado.novedad && _iniciados.contains(estadoPrevio));
 
   /// Como queda al marcar [destino]; el mismo si ese paso no sigue al estado actual.
   EstadoDeServicio marcar(String destino) {

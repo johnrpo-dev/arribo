@@ -1,5 +1,5 @@
 {
-  "descripcion": "Casos compartidos de las reglas que la app del conductor copia del servidor. La regla vive en backend/nucleo/; la app la repite en conductor/lib/asignaciones/ (estados.dart, capacidad.dart, identificacion.dart) y conductor/lib/fotos/foto.dart. Los recorren backend/tests/nucleo/test_casos_compartidos.py y conductor/test/casos_compartidos_test.dart. Las secciones identificacion.al_recoger e identificacion.completar tratan la placa o el VIN que el conductor digita al recoger (1a-13b). Si una regla cambia en nucleo/, su prueba falla hasta que este archivo cambie, y entonces falla la de la app hasta que cambie su copia. El vehículo también se identifica por su número de bodega (campo numero_bodega; si falta, no tiene): cuenta como la placa o el VIN, salvo en un desvare, que exige la placa.",
+  "descripcion": "Casos compartidos de las reglas que la app del conductor copia del servidor. La regla vive en backend/nucleo/; la app la repite en conductor/lib/asignaciones/ (estados.dart, capacidad.dart, identificacion.dart) y conductor/lib/fotos/foto.dart. Los recorren backend/tests/nucleo/test_casos_compartidos.py y conductor/test/casos_compartidos_test.dart. La sección inicio (y estados.en_curso) es la regla de los servicios iniciados sin finalizar: al marcar En camino, los otros servicios del conductor que están En camino o Recogido (o en novedad desde uno de ellos) no pueden llegar a la capacidad de la grúa del servicio que se inicia; sin_finalizar es lo que se le muestra al conductor (nucleo/capacidad.py verificar_inicio, conductor/lib/asignaciones/capacidad.dart verificarInicio). Las secciones identificacion.al_recoger e identificacion.completar tratan la placa o el VIN que el conductor digita al recoger (1a-13b). Si una regla cambia en nucleo/, su prueba falla hasta que este archivo cambie, y entonces falla la de la app hasta que cambie su copia. El vehículo también se identifica por su número de bodega (campo numero_bodega; si falta, no tiene): cuenta como la placa o el VIN, salvo en un desvare, que exige la placa.",
   "estados": {
     "todos": [
       "pendiente_asignar",
@@ -382,6 +382,53 @@
         "estado_previo": "recogido",
         "a_bordo": true
       }
+    ],
+    "en_curso": [
+      {
+        "estado": "pendiente_asignar",
+        "estado_previo": null,
+        "en_curso": false
+      },
+      {
+        "estado": "asignado",
+        "estado_previo": null,
+        "en_curso": false
+      },
+      {
+        "estado": "en_camino",
+        "estado_previo": null,
+        "en_curso": true
+      },
+      {
+        "estado": "recogido",
+        "estado_previo": null,
+        "en_curso": true
+      },
+      {
+        "estado": "entregado",
+        "estado_previo": null,
+        "en_curso": false
+      },
+      {
+        "estado": "cancelado",
+        "estado_previo": null,
+        "en_curso": false
+      },
+      {
+        "estado": "novedad",
+        "estado_previo": "asignado",
+        "en_curso": false
+      },
+      {
+        "estado": "novedad",
+        "estado_previo": "en_camino",
+        "en_curso": true
+      },
+      {
+        "estado": "novedad",
+        "estado_previo": "recogido",
+        "en_curso": true
+      }
     ]
   },
   "capacidad": [
@@ -519,6 +566,166 @@
   "capacidad_invalida": [
     0,
     -1
+  ],
+  "inicio": [
+    {
+      "nombre": "grúa de un puesto sin servicios iniciados: puede marcar En camino",
+      "capacidad": 1,
+      "otros": [
+        {
+          "id": "ABC123",
+          "estado": "asignado",
+          "estado_previo": null
+        },
+        {
+          "id": "XYZ789",
+          "estado": "pendiente_asignar",
+          "estado_previo": null
+        }
+      ],
+      "bloquea": false,
+      "sin_finalizar": []
+    },
+    {
+      "nombre": "grúa de un puesto con un servicio en camino: bloquea y dice cuál terminar",
+      "capacidad": 1,
+      "otros": [
+        {
+          "id": "ABC123",
+          "estado": "en_camino",
+          "estado_previo": null
+        },
+        {
+          "id": "XYZ789",
+          "estado": "asignado",
+          "estado_previo": null
+        }
+      ],
+      "bloquea": true,
+      "sin_finalizar": [
+        "ABC123"
+      ]
+    },
+    {
+      "nombre": "grúa de un puesto con un vehículo recogido: bloquea",
+      "capacidad": 1,
+      "otros": [
+        {
+          "id": "ABC123",
+          "estado": "recogido",
+          "estado_previo": null
+        }
+      ],
+      "bloquea": true,
+      "sin_finalizar": [
+        "ABC123"
+      ]
+    },
+    {
+      "nombre": "un servicio entregado o cancelado ya está finalizado",
+      "capacidad": 1,
+      "otros": [
+        {
+          "id": "ABC123",
+          "estado": "entregado",
+          "estado_previo": null
+        },
+        {
+          "id": "XYZ789",
+          "estado": "cancelado",
+          "estado_previo": null
+        }
+      ],
+      "bloquea": false,
+      "sin_finalizar": []
+    },
+    {
+      "nombre": "novedad desde En camino: sigue iniciado y bloquea",
+      "capacidad": 1,
+      "otros": [
+        {
+          "id": "ABC123",
+          "estado": "novedad",
+          "estado_previo": "en_camino"
+        }
+      ],
+      "bloquea": true,
+      "sin_finalizar": [
+        "ABC123"
+      ]
+    },
+    {
+      "nombre": "novedad desde Recogido: sigue iniciado y bloquea",
+      "capacidad": 1,
+      "otros": [
+        {
+          "id": "ABC123",
+          "estado": "novedad",
+          "estado_previo": "recogido"
+        }
+      ],
+      "bloquea": true,
+      "sin_finalizar": [
+        "ABC123"
+      ]
+    },
+    {
+      "nombre": "novedad desde Asignado: no se había iniciado, no bloquea",
+      "capacidad": 1,
+      "otros": [
+        {
+          "id": "ABC123",
+          "estado": "novedad",
+          "estado_previo": "asignado"
+        }
+      ],
+      "bloquea": false,
+      "sin_finalizar": []
+    },
+    {
+      "nombre": "grúa de dos puestos con uno en camino: admite el segundo",
+      "capacidad": 2,
+      "otros": [
+        {
+          "id": "ABC123",
+          "estado": "en_camino",
+          "estado_previo": null
+        },
+        {
+          "id": "XYZ789",
+          "estado": "asignado",
+          "estado_previo": null
+        }
+      ],
+      "bloquea": false,
+      "sin_finalizar": []
+    },
+    {
+      "nombre": "grúa de dos puestos con uno recogido y uno en camino: bloquea el tercero y dice los dos",
+      "capacidad": 2,
+      "otros": [
+        {
+          "id": "ABC123",
+          "estado": "recogido",
+          "estado_previo": null
+        },
+        {
+          "id": "JKL456",
+          "estado": "asignado",
+          "estado_previo": null
+        },
+        {
+          "id": "XYZ789",
+          "estado": "en_camino",
+          "estado_previo": null
+        }
+      ],
+      "bloquea": true,
+      "sin_finalizar": [
+        "ABC123",
+        "XYZ789"
+      ]
+    }
   ],
   "identificacion": {
     "placas": [

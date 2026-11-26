@@ -103,6 +103,7 @@ class EventoEstadoInline(SoloLecturaInline):
         "resultado",
         "motivo_conflicto",
         "capacidad_excedida",
+        "inicio_excedido",
         "actor",
         "conductor",
         "motivo",
@@ -141,10 +142,11 @@ class EventoEstadoAdmin(SoloLecturaAdmin):
         "resultado",
         "motivo_conflicto",
         "capacidad_excedida",
+        "inicio_excedido",
         "actor",
         "conductor",
     )
-    list_filter = ("resultado", "origen", "destino", "capacidad_excedida")
+    list_filter = ("resultado", "origen", "destino", "capacidad_excedida", "inicio_excedido")
     search_fields = (
         "id",
         "servicio__vehiculo__placa",

@@ -1,10 +1,11 @@
 """Operaciones del panel contra PostgreSQL: rechazan exactamente lo que rechaza el núcleo, cada
-cambio deja un solo evento, y Recogido exige identificación y un puesto libre en la grúa.
+cambio deja un solo evento, Recogido exige identificación y un puesto libre en la grúa, y En camino
+exige que el conductor no tenga ya tantos servicios iniciados sin finalizar como puestos.
 """
 import pytest
 
 from flota.models import grua_vigente
-from nucleo.capacidad import CapacidadExcedida
+from nucleo.capacidad import CapacidadExcedida, InicioExcedido
 from nucleo.estados import (
     Estado,
     Resolucion,
@@ -454,6 +455,117 @@ def test_la_capacidad_se_cuenta_con_la_grua_guardada_en_el_servicio(
     servicio = crear_servicio(E.EN_CAMINO, grua=grua2)
     operaciones.cambiar_estado(servicio, E.RECOGIDO, actor=usuario)
     assert servicio.estado == E.RECOGIDO
+
+
+# --- Servicios iniciados sin finalizar al marcar En camino desde el panel ------------------------
+
+
+def test_con_un_servicio_en_camino_no_deja_iniciar_otro_y_dice_cual_terminar(
+    crear_servicio, grua1, usuario
+):
+    iniciado = crear_servicio(E.EN_CAMINO)
+    servicio = crear_servicio(E.ASIGNADO)
+    assert servicio.grua == grua1 and grua1.capacidad == 1
+    with pytest.raises(InicioExcedido) as error:
+        operaciones.cambiar_estado(servicio, E.EN_CAMINO, actor=usuario)
+    assert error.value.capacidad == 1
+    assert error.value.sin_finalizar == [f"{iniciado.vehiculo.placa} (En camino)"]
+    assert str(error.value) == (
+        f"Tiene un servicio iniciado y no se ha finalizado: {iniciado.vehiculo.placa} "
+        "(En camino). Debe terminarlo para tomar el siguiente."
+    )
+    assert foto(servicio)[0] == E.ASIGNADO
+    assert not EventoEstado.objects.exists()
+
+
+def test_un_vehiculo_recogido_tambien_es_un_servicio_sin_finalizar(crear_servicio, usuario):
+    crear_servicio(E.RECOGIDO)
+    servicio = crear_servicio(E.ASIGNADO)
+    with pytest.raises(InicioExcedido):
+        operaciones.cambiar_estado(servicio, E.EN_CAMINO, actor=usuario)
+    assert foto(servicio)[0] == E.ASIGNADO
+
+
+@pytest.mark.parametrize("previo", [E.EN_CAMINO, E.RECOGIDO])
+def test_una_novedad_desde_un_servicio_iniciado_sigue_sin_finalizar(
+    crear_servicio, usuario, previo
+):
+    en_novedad = crear_servicio(E.NOVEDAD, previo=previo)
+    servicio = crear_servicio(E.ASIGNADO)
+    with pytest.raises(InicioExcedido) as error:
+        operaciones.cambiar_estado(servicio, E.EN_CAMINO, actor=usuario)
+    assert error.value.sin_finalizar == [f"{en_novedad.vehiculo.placa} (Novedad)"]
+
+
+def test_una_novedad_desde_asignado_no_se_habia_iniciado(crear_servicio, usuario):
+    crear_servicio(E.NOVEDAD, previo=E.ASIGNADO)
+    servicio = crear_servicio(E.ASIGNADO)
+    operaciones.cambiar_estado(servicio, E.EN_CAMINO, actor=usuario)
+    assert servicio.estado == E.EN_CAMINO
+
+
+@pytest.mark.parametrize("terminado", [E.ENTREGADO, E.CANCELADO])
+def test_un_servicio_entregado_o_cancelado_ya_esta_finalizado(crear_servicio, usuario, terminado):
+    crear_servicio(terminado)
+    servicio = crear_servicio(E.ASIGNADO)
+    operaciones.cambiar_estado(servicio, E.EN_CAMINO, actor=usuario)
+    assert servicio.estado == E.EN_CAMINO
+
+
+def test_entregar_el_servicio_iniciado_deja_tomar_el_siguiente(crear_servicio, usuario):
+    primero = crear_servicio(E.ASIGNADO)
+    segundo = crear_servicio(E.ASIGNADO)
+    operaciones.cambiar_estado(primero, E.EN_CAMINO, actor=usuario)
+    with pytest.raises(InicioExcedido):
+        operaciones.cambiar_estado(segundo, E.EN_CAMINO, actor=usuario)
+    operaciones.cambiar_estado(primero, E.RECOGIDO, actor=usuario)
+    with pytest.raises(InicioExcedido):
+        operaciones.cambiar_estado(segundo, E.EN_CAMINO, actor=usuario)
+    operaciones.cambiar_estado(primero, E.ENTREGADO, actor=usuario)
+    operaciones.cambiar_estado(segundo, E.EN_CAMINO, actor=usuario)
+    assert segundo.estado == E.EN_CAMINO
+
+
+def test_grua_de_dos_puestos_admite_dos_iniciados_pero_no_un_tercero(
+    crear_servicio, beto, grua2, usuario
+):
+    crear_servicio(E.RECOGIDO, conductor=beto)
+    segundo = crear_servicio(E.ASIGNADO, conductor=beto)
+    tercero = crear_servicio(E.ASIGNADO, conductor=beto)
+    assert grua2.capacidad == 2
+
+    operaciones.cambiar_estado(segundo, E.EN_CAMINO, actor=usuario)
+    assert segundo.estado == E.EN_CAMINO
+    with pytest.raises(InicioExcedido) as error:
+        operaciones.cambiar_estado(tercero, E.EN_CAMINO, actor=usuario)
+    assert len(error.value.sin_finalizar) == 2
+    assert str(error.value).startswith(
+        "La grúa tiene 2 puestos y ya tiene 2 servicios iniciados sin finalizar: "
+    )
+    assert str(error.value).endswith("Termine uno para tomar el siguiente.")
+    assert tercero.estado == E.ASIGNADO
+    assert tercero.eventos.count() == 0
+
+
+def test_los_servicios_iniciados_de_otro_conductor_no_cuentan(crear_servicio, beto, usuario):
+    crear_servicio(E.EN_CAMINO, conductor=beto)
+    crear_servicio(E.RECOGIDO, conductor=beto)
+    servicio = crear_servicio(E.ASIGNADO)  # Ana, sin nada iniciado
+    operaciones.cambiar_estado(servicio, E.EN_CAMINO, actor=usuario)
+    assert servicio.estado == E.EN_CAMINO
+
+
+def test_se_cuentan_los_del_conductor_en_cualquier_grua_con_la_capacidad_del_que_inicia(
+    crear_servicio, grua2, usuario
+):
+    # Ana tiene un servicio iniciado con la grúa de dos puestos (de antes) y hoy la de uno.
+    crear_servicio(E.EN_CAMINO, grua=grua2)
+    con_la_de_uno = crear_servicio(E.ASIGNADO)
+    with pytest.raises(InicioExcedido):
+        operaciones.cambiar_estado(con_la_de_uno, E.EN_CAMINO, actor=usuario)
+    con_la_de_dos = crear_servicio(E.ASIGNADO, grua=grua2)
+    operaciones.cambiar_estado(con_la_de_dos, E.EN_CAMINO, actor=usuario)
+    assert con_la_de_dos.estado == E.EN_CAMINO
 
 
 def test_el_servicio_en_nucleo_refleja_lo_guardado(crear_servicio):

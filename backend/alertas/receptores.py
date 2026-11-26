@@ -72,11 +72,13 @@ def _por_revisar(dato) -> str:
 
 
 def alertar_por_evento_guardado(
-    sender, evento, montados=(), identificacion_por_revisar=(), **kwargs
+    sender, evento, montados=(), sin_finalizar=(), identificacion_por_revisar=(), **kwargs
 ):
     """Un evento en conflicto abre "conflicto de sincronización"; un Recogido aplicado con la grúa
-    llena abre "capacidad excedida"; un Recogido aplicado cuya placa o VIN digitados no quedaron en
-    el vehículo abre "placa o VIN digitado por revisar". Las tres apuntan al evento."""
+    llena abre "capacidad excedida"; un En camino aplicado cuando el conductor ya tenía tantos
+    servicios iniciados sin finalizar como puestos abre "servicio iniciado sin finalizar el
+    anterior"; un Recogido aplicado cuya placa o VIN digitados no quedaron en el vehículo abre
+    "placa o VIN digitado por revisar". Todas apuntan al evento."""
     if evento.resultado == ResultadoEvento.CONFLICTO:
         motivo = DETALLE.get(evento.motivo_conflicto, "No encajó con el estado del servicio.")
         abrir_alerta(
@@ -104,6 +106,16 @@ def alertar_por_evento_guardado(
             f"{_toque(evento)} con la grúa {grua} llena (capacidad {grua.capacidad}).{llevaba} "
             "Se aplicó porque el vehículo ya está montado; revise qué servicio falta marcar "
             "como Entregado.",
+        )
+    if evento.inicio_excedido:
+        grua = evento.servicio.grua
+        cuales = f": {'; '.join(sin_finalizar)}" if sin_finalizar else ""
+        abrir_alerta(
+            TipoAlerta.INICIO_EXCEDIDO,
+            evento,
+            f"{_toque(evento)} con servicios iniciados sin finalizar{cuales} (grúa {grua}, "
+            f"capacidad {grua.capacidad}). Se aplicó porque el conductor ya salió por el "
+            "vehículo; revise con él qué servicio debe terminar primero.",
         )
 
 

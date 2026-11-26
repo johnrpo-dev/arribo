@@ -1,5 +1,7 @@
-// Lo que exige la app antes de guardar un Recogido o un Entregado.
+// Lo que exige la app antes de guardar un En camino, un Recogido o un Entregado.
 //
+// - En camino: que el conductor no tenga ya tantos servicios iniciados sin finalizar como puestos
+//   tiene la grúa (copia del servidor, capacidad.dart). Se le dice cuáles debe terminar primero.
 // - Recogido: el vehículo identificado (placa o VIN; un desvare, placa) y un puesto libre en la
 //   grúa. Las dos reglas son copia del servidor (identificacion.dart y capacidad.dart). Con la
 //   configuración "placa/VIN al recoger", si al vehículo le falta, el conductor la digita en la
@@ -69,6 +71,45 @@ BloqueoDeRecogida? bloqueoDeRecogida(
     );
   }
   return null;
+}
+
+/// Por qué no se puede marcar En camino todavía: el conductor ya tiene tantos servicios iniciados
+/// sin finalizar como puestos tiene la grúa. [mensaje] es el texto para el conductor y
+/// [sinFinalizar], los servicios que debe terminar antes de tomar el siguiente.
+class BloqueoDeInicio {
+  const BloqueoDeInicio({required this.titulo, required this.mensaje, required this.sinFinalizar});
+
+  final String titulo;
+  final String mensaje;
+  final List<Servicio> sinFinalizar;
+}
+
+/// El bloqueo de un En camino de [servicio], o null si puede marcarlo. [ronda] son los servicios
+/// del conductor con el estado que él ve (el confirmado más sus toques sin enviar).
+BloqueoDeInicio? bloqueoDeInicio(Servicio servicio, Iterable<Servicio> ronda) {
+  final excedido = capacidadParaIniciar(servicio, ronda);
+  if (excedido == null) return null;
+  final cuantos = excedido.sinFinalizar.length;
+  final capacidad = excedido.capacidad;
+  if (capacidad == 1 && cuantos == 1) {
+    return BloqueoDeInicio(
+      titulo: 'Servicio sin finalizar',
+      mensaje:
+          'Tiene un servicio iniciado y no se ha finalizado. Debe terminarlo para tomar el '
+          'siguiente.',
+      sinFinalizar: excedido.sinFinalizar,
+    );
+  }
+  final puestos = capacidad == 1 ? '1 puesto' : '$capacidad puestos';
+  final sobran = cuantos - capacidad + 1;
+  final termine = sobran == 1 ? 'Termine uno' : 'Termine $sobran';
+  return BloqueoDeInicio(
+    titulo: 'Servicios sin finalizar',
+    mensaje:
+        'La grúa tiene $puestos y ya tiene $cuantos servicios iniciados sin finalizar. '
+        '$termine para tomar el siguiente.',
+    sinFinalizar: excedido.sinFinalizar,
+  );
 }
 
 /// ¿El conductor puede digitar la placa o el VIN que le falten al vehículo al recogerlo? Sí,

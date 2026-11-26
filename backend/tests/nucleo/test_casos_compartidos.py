@@ -1,6 +1,7 @@
 """Las reglas que la app del conductor copia cumplen los casos de `docs/casos-reglas.json`.
 
-La app repite en Dart la máquina de estados, la capacidad, la identificación del vehículo (también
+La app repite en Dart la máquina de estados, la capacidad (al recoger y los servicios iniciados sin
+finalizar al marcar En camino), la identificación del vehículo (también
 la placa o el VIN digitados al recoger) y los límites de las fotos. Ese archivo es el contrato entre
 las dos copias: lo recorren estas pruebas y `conductor/test/casos_compartidos_test.dart`. Si una
 regla cambia aquí, estas pruebas fallan hasta que el archivo cambie; y con el archivo cambiado falla
@@ -11,12 +12,18 @@ from pathlib import Path
 
 import pytest
 
-from nucleo.capacidad import CapacidadExcedida, verificar_recogida
+from nucleo.capacidad import (
+    CapacidadExcedida,
+    InicioExcedido,
+    verificar_inicio,
+    verificar_recogida,
+)
 from nucleo.estados import (
     Estado,
     Servicio,
     TransicionInvalida,
     a_bordo,
+    en_curso,
     puede_transicionar,
     transicionar,
 )
@@ -104,6 +111,13 @@ def test_a_bordo_como_dice_el_archivo(caso):
     assert a_bordo(_servicio(caso)) == caso["a_bordo"]
 
 
+@pytest.mark.parametrize(
+    "caso", ESTADOS["en_curso"], ids=lambda c: f"{c['estado']}/{c['estado_previo']}"
+)
+def test_en_curso_como_dice_el_archivo(caso):
+    assert en_curso(_servicio(caso)) == caso["en_curso"]
+
+
 # ---------- capacidad ----------
 
 
@@ -123,6 +137,27 @@ def test_capacidad_bloquea_y_dice_que_falta_entregar_como_dice_el_archivo(caso):
 def test_capacidad_invalida_como_dice_el_archivo(capacidad):
     with pytest.raises(ValueError):
         verificar_recogida(capacidad, [])
+
+
+# ---------- servicios iniciados sin finalizar (al marcar En camino) ----------
+
+
+@pytest.mark.parametrize("caso", CASOS["inicio"], ids=_nombre)
+def test_inicio_bloquea_y_dice_que_falta_terminar_como_dice_el_archivo(caso):
+    iniciados = [otro["id"] for otro in caso["otros"] if en_curso(_servicio(otro))]
+    if caso["bloquea"]:
+        with pytest.raises(InicioExcedido) as error:
+            verificar_inicio(caso["capacidad"], iniciados)
+        assert error.value.sin_finalizar == caso["sin_finalizar"]
+    else:
+        verificar_inicio(caso["capacidad"], iniciados)
+        assert caso["sin_finalizar"] == []
+
+
+@pytest.mark.parametrize("capacidad", CASOS["capacidad_invalida"])
+def test_capacidad_invalida_al_iniciar_como_dice_el_archivo(capacidad):
+    with pytest.raises(ValueError):
+        verificar_inicio(capacidad, [])
 
 
 # ---------- identificación ----------

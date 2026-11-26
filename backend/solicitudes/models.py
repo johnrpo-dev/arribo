@@ -713,6 +713,12 @@ class EventoEstado(models.Model):
         default=False,
         help_text="Recogido aplicado aunque la grúa ya iba llena (celular desactualizado).",
     )
+    inicio_excedido = models.BooleanField(
+        "inicio excedido",
+        default=False,
+        help_text="En camino aplicado aunque el conductor ya tenía tantos servicios iniciados sin "
+        "finalizar como puestos tiene la grúa (celular desactualizado).",
+    )
 
     objects = EventoEstadoQuerySet.as_manager()
 

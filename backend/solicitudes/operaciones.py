@@ -6,15 +6,17 @@ los datos, se llama al núcleo y se guarda lo que decide.
 
 - Panel: `asignar`, `reasignar`, `cambiar_estado`, `resolver_novedad`, y `mover_en_ronda` (el
   orden en que el conductor atiende sus servicios; no es un cambio de estado). Si una regla no se cumple,
-  lanzan la excepción del núcleo (TransicionInvalida, CapacidadExcedida, IdentificacionIncompleta)
-  o una de este módulo, y no queda ni evento ni cambio.
+  lanzan la excepción del núcleo (TransicionInvalida, CapacidadExcedida, InicioExcedido,
+  IdentificacionIncompleta) o una de este módulo, y no queda ni evento ni cambio.
 - App del conductor: `aplicar_evento_del_conductor`, `aplicar_lote_del_conductor` y
   `sincronizar_lote_del_conductor` (la que usa la API; las tres pasan por `_aplicar_evento`). Nunca
   rechazan lo que el conductor hizo: si no encaja, el evento se guarda como conflicto con su
   motivo, el servicio sigue igual y se avisa con `senales.evento_del_conductor_guardado` (`alertas`
   abre la alerta a logística). Solo se rechaza lo que no se puede guardar: un id ya usado con
   otro contenido o un servicio que no existe. Un Recogido puede traer la placa o el VIN que el
-  conductor digitó (1a-13b): completan el vehículo y lo que no encaje queda por revisar.
+  conductor digitó (1a-13b): completan el vehículo y lo que no encaje queda por revisar. Un
+  Recogido con la grúa llena o un En camino con tantos servicios iniciados sin finalizar como
+  puestos se aplican igual (el hecho físico manda), quedan marcados en el evento y abren alerta.
 
 Cuando un servicio queda Entregado (desde el panel o la app) se envía `senales.servicio_entregado`
 en la misma transacción; `cobros` la escucha para crear la línea de cobro sin que esta app lo importe.
@@ -32,13 +34,19 @@ from django.utils import timezone
 
 from configuracion.models import configuracion_vigente
 from flota.models import Conductor, Grua, grua_vigente
-from nucleo.capacidad import CapacidadExcedida, verificar_recogida
+from nucleo.capacidad import (
+    CapacidadExcedida,
+    InicioExcedido,
+    verificar_inicio,
+    verificar_recogida,
+)
 from nucleo.estados import (
     TERMINALES,
     Estado,
     Resolucion,
     TransicionInvalida,
     a_bordo,
+    en_curso,
     transicionar,
 )
 from nucleo.estados import Servicio as ServicioNucleo
@@ -64,6 +72,7 @@ from nucleo.sincronizacion import Evento, Motivo, Resultado, decidir, es_reenvio
 
 from .disponibilidad import motivos_de_bloqueo
 from .models import (
+    ETIQUETAS_ESTADO,
     VALORES_EN_RONDA,
     EstadoRegistro,
     EventoEstado,
@@ -198,7 +207,9 @@ def cambiar_estado(servicio, destino, *, actor, motivo=None, nombre_quien=None) 
     """Cambio de estado hecho desde el panel: cancelar o abrir una novedad (con motivo), o marcar
     en camino, recogido o entregado en nombre del conductor.
 
-    Recogido exige la placa o el VIN del vehículo y que la grúa tenga un puesto libre.
+    Recogido exige la placa o el VIN del vehículo y que la grúa tenga un puesto libre. En camino
+    exige que el conductor no tenga ya tantos servicios iniciados sin finalizar como puestos tiene
+    la grúa (InicioExcedido, con los que debe terminar).
     """
     destino = Estado(destino)
     if destino == Estado.ASIGNADO:
@@ -206,6 +217,8 @@ def cambiar_estado(servicio, destino, *, actor, motivo=None, nombre_quien=None) 
     with transaction.atomic():
         bloqueado = _bloquear(servicio)
         nuevo = transicionar(bloqueado.como_nucleo(), destino, motivo=motivo)
+        if destino == Estado.EN_CAMINO:
+            _verificar_inicio(bloqueado)
         if destino == Estado.RECOGIDO:
             _exigir_identificacion(bloqueado)
             _verificar_capacidad(bloqueado)
@@ -263,6 +276,7 @@ class Aplicacion:
     motivo: Motivo | None = None
     duplicado: bool = False
     capacidad_excedida: bool = False
+    inicio_excedido: bool = False
 
     @property
     def resumen(self) -> Resultado:
@@ -435,8 +449,8 @@ def _aplicar_evento(evento: EventoDelConductor) -> Aplicacion:
 
     El evento, el cambio de estado, la línea de cobro (al quedar Entregado), la placa o el VIN
     digitados que completan el vehículo (al quedar Recogido), el enlace de las fotos que lo
-    esperaban y la alerta (conflicto, capacidad excedida o identificación por revisar) van en una
-    sola transacción.
+    esperaban y la alerta (conflicto, capacidad excedida, inicio excedido o identificación por
+    revisar) van en una sola transacción.
     """
     evento_id = uuid.UUID(evento.id)
     if _ya_recibido(evento_id):
@@ -462,6 +476,15 @@ def _aplicar_evento(evento: EventoDelConductor) -> Aplicacion:
                 return _repetido(evento)
             resultado, motivo = decision.resultado, decision.motivo
             capacidad_excedida, montados, por_revisar = False, [], []
+            inicio_excedido, sin_finalizar = False, []
+            if resultado == Resultado.APLICADO and evento.destino == Estado.EN_CAMINO:
+                try:
+                    _verificar_inicio(servicio)
+                except InicioExcedido as excedido:
+                    # El conductor ya salió por el vehículo: el hecho físico manda. La app lo
+                    # bloquea antes; esto solo pasa con un celular desactualizado.
+                    inicio_excedido = True
+                    sin_finalizar = excedido.sin_finalizar
             if resultado == Resultado.APLICADO and evento.destino == Estado.RECOGIDO:
                 try:
                     _exigir_identificacion_al_recoger(servicio, evento)
@@ -492,6 +515,7 @@ def _aplicar_evento(evento: EventoDelConductor) -> Aplicacion:
                 resultado=ResultadoEvento(resultado.value),
                 motivo_conflicto=motivo.value if motivo else "",
                 capacidad_excedida=capacidad_excedida,
+                inicio_excedido=inicio_excedido,
             )
             if resultado == Resultado.APLICADO:
                 _cambiar(servicio, decision.servicio)
@@ -502,6 +526,7 @@ def _aplicar_evento(evento: EventoDelConductor) -> Aplicacion:
                 sender=EventoEstado,
                 evento=guardado,
                 montados=montados,
+                sin_finalizar=sin_finalizar,
                 identificacion_por_revisar=por_revisar,
             )
     except IntegrityError:
@@ -517,6 +542,7 @@ def _aplicar_evento(evento: EventoDelConductor) -> Aplicacion:
         resultado=resultado,
         motivo=motivo,
         capacidad_excedida=capacidad_excedida,
+        inicio_excedido=inicio_excedido,
     )
 
 
@@ -543,6 +569,7 @@ def _repetido(evento: EventoDelConductor) -> Aplicacion:
         motivo=Motivo(guardado.motivo_conflicto) if guardado.motivo_conflicto else None,
         duplicado=True,
         capacidad_excedida=guardado.capacidad_excedida,
+        inicio_excedido=guardado.inicio_excedido,
     )
 
 
@@ -774,6 +801,25 @@ def _verificar_capacidad(servicio):
     )
     montados = [str(otro) for otro in activos if a_bordo(otro.como_nucleo())]
     verificar_recogida(grua.capacidad, montados)
+
+
+def _verificar_inicio(servicio):
+    """Antes de marcar En camino: el conductor del servicio no tiene ya tantos servicios iniciados
+    sin finalizar (`nucleo.estados.en_curso`) como puestos tiene la grúa de este servicio. Se
+    cuentan sus otros servicios, en cualquier grúa.
+
+    Se bloquea el conductor (la regla es suya): dos En camino simultáneos del mismo conductor se
+    cuentan uno tras otro aunque sean de grúas distintas. Después la grúa, como al recoger.
+    """
+    Conductor.objects.select_for_update().get(pk=servicio.conductor_id)
+    grua = Grua.objects.select_for_update().get(pk=servicio.grua_id)
+    activos = _ronda(servicio.conductor_id).exclude(pk=servicio.pk).select_related("vehiculo")
+    iniciados = [
+        f"{otro.vehiculo.identificacion} ({ETIQUETAS_ESTADO[Estado(otro.estado)]})"
+        for otro in activos
+        if en_curso(otro.como_nucleo())
+    ]
+    verificar_inicio(grua.capacidad, iniciados)
 
 
 def _cambiar(servicio: Servicio, nuevo: ServicioNucleo, *, actor=None):

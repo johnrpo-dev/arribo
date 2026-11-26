@@ -7,6 +7,7 @@ from nucleo.estados import (
     Servicio,
     TransicionInvalida,
     a_bordo,
+    en_curso,
     estado_solicitud,
     reasignar,
     resolver_novedad,
@@ -106,6 +107,19 @@ def test_a_bordo_incluye_la_novedad_con_vehiculo_montado():
     assert a_bordo(transicionar(en(E.RECOGIDO), E.NOVEDAD, motivo="x"))
     assert not a_bordo(transicionar(en(E.EN_CAMINO), E.NOVEDAD, motivo="x"))
     assert not a_bordo(en(E.ENTREGADO))
+
+
+def test_en_curso_es_iniciado_y_sin_finalizar():
+    assert en_curso(en(E.EN_CAMINO))
+    assert en_curso(en(E.RECOGIDO))
+    for estado in (E.PENDIENTE_ASIGNAR, E.ASIGNADO, E.ENTREGADO, E.CANCELADO):
+        assert not en_curso(en(estado)), estado
+
+
+def test_novedad_cuenta_como_en_curso_solo_si_ya_habia_iniciado():
+    assert en_curso(transicionar(en(E.EN_CAMINO), E.NOVEDAD, motivo="x"))
+    assert en_curso(transicionar(en(E.RECOGIDO), E.NOVEDAD, motivo="x"))
+    assert not en_curso(transicionar(en(E.ASIGNADO), E.NOVEDAD, motivo="x"))
 
 
 @pytest.mark.parametrize(

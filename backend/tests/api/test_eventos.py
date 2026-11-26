@@ -83,6 +83,7 @@ def test_un_evento_valido_se_aplica_y_la_respuesta_trae_el_estado_actual_del_ser
                 "motivo": None,
                 "detalle": None,
                 "capacidad_excedida": False,
+                "inicio_excedido": False,
                 "servicio": en_su_ronda(servicio, "en_camino"),
             }
         ],
@@ -542,6 +543,74 @@ def test_entregar_y_recoger_en_el_mismo_lote_no_excede_la_capacidad(sesion, crea
     assert not Alerta.objects.exists()
 
 
+# --- Servicios iniciados sin finalizar: se revalida en el servidor (desde 1.5) --------------------
+
+
+def test_en_camino_con_un_servicio_sin_finalizar_se_aplica_con_la_marca_y_abre_alerta(
+    sesion, crear_servicio
+):
+    iniciado = crear_servicio(E.EN_CAMINO)  # Ana, grúa de un puesto
+    servicio = crear_servicio(E.ASIGNADO)
+    evento = evento_json(servicio, E.EN_CAMINO)
+
+    (resultado,) = enviar(sesion, evento)
+
+    # Ya salió por el vehículo: se aplica, queda marcado y logística se entera.
+    assert (resultado["resultado"], resultado["inicio_excedido"]) == ("aplicado", True)
+    assert (resultado["motivo"], resultado["capacidad_excedida"]) == (None, False)
+    assert estado_de(servicio) == E.EN_CAMINO
+    fila = guardado(evento)
+    assert (fila.resultado, fila.inicio_excedido) == (ResultadoEvento.APLICADO, True)
+    alerta = alertas_de(evento, TipoAlerta.INICIO_EXCEDIDO).get()
+    assert "GRU001" in alerta.mensaje and "capacidad 1" in alerta.mensaje
+    assert f"{iniciado.vehiculo.placa} (En camino)" in alerta.mensaje  # dice cuál sigue iniciado
+    assert not alertas_de(evento).exists()  # no es un conflicto
+    assert not alertas_de(evento, TipoAlerta.CAPACIDAD_EXCEDIDA).exists()
+
+
+def test_el_reenvio_de_un_en_camino_marcado_responde_la_marca_de_la_primera_vez(
+    sesion, crear_servicio
+):
+    iniciado = crear_servicio(E.EN_CAMINO)
+    servicio = crear_servicio(E.ASIGNADO)
+    evento = evento_json(servicio, E.EN_CAMINO)
+    enviar(sesion, evento)
+    operaciones.cambiar_estado(iniciado, E.CANCELADO, actor=None, motivo="Ya no va")
+
+    (repetido,) = enviar(sesion, evento)
+
+    assert (repetido["duplicado"], repetido["inicio_excedido"]) == (True, True)
+    assert alertas_de(evento, TipoAlerta.INICIO_EXCEDIDO).count() == 1
+
+
+def test_en_camino_con_puesto_libre_no_queda_marcado_ni_alerta(sesion_beto, beto, crear_servicio):
+    crear_servicio(E.EN_CAMINO, conductor=beto)  # grúa de dos puestos
+    servicio = crear_servicio(E.ASIGNADO, conductor=beto)
+    evento = evento_json(servicio, E.EN_CAMINO)
+
+    (resultado,) = enviar(sesion_beto, evento)
+
+    assert (resultado["resultado"], resultado["inicio_excedido"]) == ("aplicado", False)
+    assert not Alerta.objects.exists()
+
+
+def test_entregar_e_iniciar_el_siguiente_en_el_mismo_lote_no_excede(sesion, crear_servicio):
+    primero = crear_servicio(E.RECOGIDO)
+    segundo = crear_servicio(E.ASIGNADO)
+
+    # Llegan al revés: por secuencia, primero se entrega el que estaba iniciado.
+    resultados = enviar(
+        sesion,
+        evento_json(segundo, E.EN_CAMINO, secuencia=2),
+        evento_json(primero, E.ENTREGADO, secuencia=1),
+    )
+
+    assert [(r["resultado"], r["inicio_excedido"]) for r in resultados] == [
+        ("aplicado", False)
+    ] * 2
+    assert not Alerta.objects.exists()
+
+
 # --- Línea de cobro: en la misma transacción que el Entregado ------------------------------------
 
 
@@ -615,10 +684,11 @@ def test_un_conflicto_en_un_lote_no_detiene_los_demas(sesion, crear_servicio, us
 
 
 def test_un_evento_que_falla_no_tumba_los_de_otros_servicios_y_frena_los_del_suyo(
-    sesion, monkeypatch, crear_servicio
+    sesion, monkeypatch, crear_servicio, grua2
 ):
     con_falla = crear_servicio(E.EN_CAMINO)
-    independiente = crear_servicio(E.ASIGNADO)
+    # Con la grúa de dos puestos: iniciarlo con el otro en camino no excede (ni abre alerta).
+    independiente = crear_servicio(E.ASIGNADO, grua=grua2)
     recogido = evento_json(con_falla, E.RECOGIDO, secuencia=1)
     en_camino = evento_json(independiente, E.EN_CAMINO, secuencia=2)
     entregado = evento_json(con_falla, E.ENTREGADO, secuencia=3)

@@ -1,6 +1,7 @@
 // Lo que exige la app antes de guardar un Recogido o un Entregado: identificación del vehículo
 // (digitada en la pantalla si le falta, 1a-13b) y puesto libre en la grúa (Recogido), mínimo de
-// fotos y nombre de quien entrega o recibe (los dos).
+// fotos y nombre de quien entrega o recibe (los dos). Y antes de un En camino: que el conductor no
+// tenga ya tantos servicios iniciados sin finalizar como puestos tiene la grúa.
 
 import 'package:arribo_conductor/asignaciones/requisitos.dart';
 import 'package:arribo_conductor/asignaciones/servicio.dart';
@@ -331,6 +332,92 @@ void main() {
       ], configuracion: configuracion)!;
 
       expect(bloqueo.titulo, 'La grúa va llena');
+    });
+  });
+
+  group('servicios iniciados sin finalizar (al marcar En camino)', () {
+    test('grúa de un puesto con otro servicio en camino: bloquea con el mensaje del dueño', () {
+      final iniciado = servicio(41, placa: 'ABC123');
+      final siguiente = servicio(42, estado: 'asignado', placa: 'XYZ789');
+
+      final bloqueo = bloqueoDeInicio(siguiente, [iniciado, siguiente])!;
+
+      expect(bloqueo.titulo, 'Servicio sin finalizar');
+      expect(
+        bloqueo.mensaje,
+        'Tiene un servicio iniciado y no se ha finalizado. Debe terminarlo para tomar el '
+        'siguiente.',
+      );
+      expect(bloqueo.sinFinalizar.map((s) => s.id), [41]);
+    });
+
+    test('un recogido, o una novedad desde En camino o Recogido, siguen iniciados', () {
+      final siguiente = servicio(42, estado: 'asignado', placa: 'XYZ789');
+      for (final (estado, previo) in [
+        ('recogido', null),
+        ('novedad', 'en_camino'),
+        ('novedad', 'recogido'),
+      ]) {
+        final otro = servicio(41, estado: estado, estadoPrevio: previo);
+        expect(bloqueoDeInicio(siguiente, [otro, siguiente])?.sinFinalizar.map((s) => s.id), [
+          41,
+        ], reason: '$estado/$previo');
+      }
+    });
+
+    test('asignados, una novedad desde Asignado, entregados y cancelados no cuentan', () {
+      final siguiente = servicio(42, estado: 'asignado', placa: 'XYZ789');
+      final otros = [
+        servicio(41, estado: 'asignado'),
+        servicio(43, estado: 'novedad', estadoPrevio: 'asignado'),
+        servicio(44, estado: 'entregado'),
+        servicio(45, estado: 'cancelado'),
+      ];
+
+      expect(bloqueoDeInicio(siguiente, [...otros, siguiente]), isNull);
+    });
+
+    test(
+      'cuentan los servicios del conductor en cualquier grúa, con la capacidad del que inicia',
+      () {
+        final enOtraGrua = servicio(41, grua: 9, capacidad: 3);
+        final siguiente = servicio(42, estado: 'asignado', placa: 'XYZ789');
+
+        expect(bloqueoDeInicio(siguiente, [enOtraGrua, siguiente])?.sinFinalizar.length, 1);
+      },
+    );
+
+    test('con capacidad 2 deja iniciar el segundo y bloquea el tercero diciendo los dos', () {
+      final primero = servicio(41, estado: 'recogido', capacidad: 2);
+      final segundo = servicio(42, placa: 'XYZ789', capacidad: 2);
+      final tercero = servicio(43, estado: 'asignado', placa: 'JKL456', capacidad: 2);
+      final segundoSinIniciar = servicio(42, estado: 'asignado', placa: 'XYZ789', capacidad: 2);
+
+      expect(bloqueoDeInicio(segundoSinIniciar, [primero, segundoSinIniciar, tercero]), isNull);
+
+      final bloqueo = bloqueoDeInicio(tercero, [primero, segundo, tercero])!;
+      expect(bloqueo.titulo, 'Servicios sin finalizar');
+      expect(
+        bloqueo.mensaje,
+        'La grúa tiene 2 puestos y ya tiene 2 servicios iniciados sin finalizar. Termine uno '
+        'para tomar el siguiente.',
+      );
+      expect(bloqueo.sinFinalizar.map((s) => s.id), [41, 42]);
+    });
+
+    test('con más iniciados que puestos dice cuántos terminar', () {
+      final siguiente = servicio(43, estado: 'asignado', placa: 'JKL456');
+      final bloqueo = bloqueoDeInicio(siguiente, [
+        servicio(41),
+        servicio(42, estado: 'recogido', placa: 'XYZ789'),
+        siguiente,
+      ])!;
+
+      expect(
+        bloqueo.mensaje,
+        'La grúa tiene 1 puesto y ya tiene 2 servicios iniciados sin finalizar. Termine 2 para '
+        'tomar el siguiente.',
+      );
     });
   });
 }
