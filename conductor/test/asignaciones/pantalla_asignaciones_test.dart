@@ -85,8 +85,11 @@ void main() {
     expect(find.text('ABC123'), findsOneWidget);
     expect(find.text('XYZ789'), findsOneWidget);
     expect(find.text('Calle 10 # 43-20, El Poblado'), findsWidgets);
-    expect(find.text('Portería Autos del Valle · 604 444 5566'), findsNWidgets(2));
+    // El contacto y los lugares completos van en la tarjeta activa (41); la otra, compacta, dice
+    // dónde recoger en una línea.
+    expect(find.text('Portería Autos del Valle · 604 444 5566'), findsOneWidget);
     expect(find.text('Taller Belén · 310 222 3344'), findsOneWidget);
+    expect(find.text('Recoger en: Calle 10 # 43-20, El Poblado'), findsOneWidget);
     expect(
       find.text('Sin conexión. Se muestra lo guardado en el celular. Actualizado hoy, 9:30 a. m.'),
       findsOneWidget,
@@ -108,6 +111,10 @@ void main() {
     expect(find.text('Desvare'), findsOneWidget);
     expect(find.text('Hora: Hoy, 2:30 p. m.'), findsOneWidget);
     expect(find.text('Hora: Inmediato'), findsOneWidget);
+    // El desvare (42) va compacto: el destino no está en la lista, sí en su detalle.
+    expect(find.text('Sin destino registrado.'), findsNothing);
+    await tester.tap(find.text('XYZ789'));
+    await tester.pumpAndSettle();
     expect(find.text('Sin destino registrado.'), findsOneWidget);
   });
 
@@ -152,6 +159,8 @@ void main() {
   testWidgets('un toque en Llamar abre el marcador con el teléfono del contacto', (tester) async {
     await abrirApp(tester);
 
+    await tester.ensureVisible(find.text('Llamar').first);
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Llamar').first);
     await tester.pumpAndSettle();
 
@@ -161,6 +170,8 @@ void main() {
   testWidgets('un toque en Maps y en Waze abre la dirección de recogida', (tester) async {
     await abrirApp(tester);
 
+    await tester.ensureVisible(find.text('Waze').first);
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Maps').first);
     await tester.tap(find.text('Waze').first);
     await tester.pumpAndSettle();
@@ -176,6 +187,8 @@ void main() {
     );
     await tester.pumpAndSettle();
 
+    await tester.ensureVisible(find.text('Waze').first);
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Waze').first);
     await tester.pumpAndSettle();
 
@@ -208,7 +221,7 @@ void main() {
     expect(tester.takeException(), isNull);
 
     // Recorre la lista completa: las dos tarjetas se construyen y se dibujan sin desbordarse.
-    await tester.scrollUntilVisible(find.text('Sin destino registrado.'), 300);
+    await tester.scrollUntilVisible(find.text('Recoger en: Calle 10 # 43-20, El Poblado'), 300);
     await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);
 
