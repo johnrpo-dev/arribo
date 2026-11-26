@@ -113,7 +113,7 @@ void main() {
     expect(find.text('Hora: Inmediato'), findsOneWidget);
     // El desvare (42) va compacto: el destino no está en la lista, sí en su detalle.
     expect(find.text('Sin destino registrado.'), findsNothing);
-    await tester.tap(find.text('XYZ789'));
+    await abrirDetalleDe(tester, 'XYZ789');
     await tester.pumpAndSettle();
     expect(find.text('Sin destino registrado.'), findsOneWidget);
   });
@@ -199,7 +199,7 @@ void main() {
     pantallaAlta(tester);
     await abrirApp(tester);
 
-    await tester.tap(find.text('ABC123'));
+    await abrirDetalleDe(tester, 'ABC123');
     await tester.pumpAndSettle();
 
     expect(find.text('Servicio N.º 41'), findsOneWidget);
@@ -228,7 +228,7 @@ void main() {
     await tester.scrollUntilVisible(find.text('ABC123'), -300);
     await tester.ensureVisible(find.text('ABC123'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('ABC123'));
+    await abrirDetalleDe(tester, 'ABC123');
     await tester.pumpAndSettle();
     expect(find.text('Servicio N.º 41'), findsOneWidget);
     // El detalle tiene además el texto seleccionable de la ubicación: se desplaza la lista.

@@ -334,7 +334,7 @@ void main() {
       await tester.pumpAndSettle();
       await tester.runAsync(lista.actualizar);
       await tester.pumpAndSettle();
-      await tester.tap(find.text('ABC123'));
+      await abrirDetalleDe(tester, 'ABC123');
       await tester.pumpAndSettle();
       expect(find.text('Servicio N.º 41'), findsOneWidget);
       final antes = peticionesA('/api/v1/asignaciones/').length;

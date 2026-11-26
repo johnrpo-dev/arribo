@@ -122,7 +122,7 @@ void main() {
   Future<void> abrirDetalle(WidgetTester tester, {String placa = 'ABC123'}) async {
     pantallaAlta(tester);
     await abrirApp(tester);
-    await tester.tap(find.text(placa));
+    await abrirDetalleDe(tester, placa);
     await tester.pumpAndSettle();
   }
 
@@ -597,7 +597,7 @@ void main() {
     await abrirApp(tester);
     await tester.ensureVisible(find.text('ABC123'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('ABC123'));
+    await abrirDetalleDe(tester, 'ABC123');
     await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);
 
@@ -646,7 +646,7 @@ void main() {
       await abrirApp(tester);
       expect(find.byKey(const Key('espera-ida')), findsOneWidget); // en la tarjeta de la lista
 
-      await tocar(tester, find.text('XYZ789'));
+      await abrirDetalleDe(tester, 'XYZ789');
 
       expect(find.byKey(const Key('aviso-espera-ida')), findsOneWidget);
       expect(find.text('Disponible cuando se entregue la ida.'), findsOneWidget);
@@ -664,7 +664,7 @@ void main() {
       await tester.pumpAndSettle();
       if (find.byType(BackButton).evaluate().isNotEmpty) await volver(tester);
 
-      await tocar(tester, find.text('XYZ789'));
+      await abrirDetalleDe(tester, 'XYZ789');
 
       expect(find.byKey(const Key('aviso-espera-ida')), findsNothing);
       expect(find.text('Marcar En camino'), findsOneWidget);

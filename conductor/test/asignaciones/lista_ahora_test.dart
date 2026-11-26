@@ -276,6 +276,114 @@ void main() {
     });
   });
 
+  group('si el servicio cambia mientras se confirma', () {
+    Future<void> confirmarTrasCambio(WidgetTester tester, List<Map<String, Object?>> nueva) async {
+      pantallaAlta(tester);
+      await abrirApp(tester);
+      await tocar(tester, find.byKey(const Key('tarjeta-marcar-en_camino')));
+      expect(find.text('¿Marcar En camino?'), findsOneWidget);
+
+      // Con la confirmación abierta, llega la lista nueva del servidor.
+      servidor.responder = (_) async => listaCorrecta(nueva, etag: '"e2"');
+      await lista.actualizar();
+      await tester.pumpAndSettle();
+      await tocar(tester, find.byKey(const Key('confirmar')));
+    }
+
+    testWidgets('si ya no admite ese paso, no guarda nada y lo dice', (tester) async {
+      await confirmarTrasCambio(tester, [
+        {...servicioJson(id: 41, estado: 'novedad'), 'estado_previo': 'asignado'},
+        servicioJson(id: 42, ordenRonda: 2, placa: 'XYZ789'),
+      ]);
+
+      expect(await cola(tester), isEmpty);
+      expect(
+        find.text('El servicio cambió mientras confirmaba. Revíselo de nuevo.'),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('si ya no está en la lista, no guarda nada y lo dice', (tester) async {
+      await confirmarTrasCambio(tester, [servicioJson(id: 42, ordenRonda: 2, placa: 'XYZ789')]);
+
+      expect(await cola(tester), isEmpty);
+      expect(
+        find.text('El servicio cambió mientras confirmaba. Revíselo de nuevo.'),
+        findsOneWidget,
+      );
+    });
+  });
+
+  group('cómo se abre el detalle', () {
+    testWidgets('la tarjeta activa solo se abre con "Ver detalle", no al tocarla', (tester) async {
+      pantallaAlta(tester);
+      await abrirApp(tester);
+
+      await tocar(tester, find.text('ABC123'));
+      expect(find.text('Servicio N.º 41'), findsNothing);
+      expect(find.text('Mis servicios'), findsOneWidget);
+
+      await tocar(tester, en(41, find.text('Ver detalle')));
+      expect(find.text('Servicio N.º 41'), findsOneWidget);
+    });
+
+    testWidgets('entre "Marcar …" y "Ver detalle" de la tarjeta activa hay 12 dp', (tester) async {
+      pantallaAlta(tester);
+      await abrirApp(tester);
+
+      final marcar = tester.getRect(find.byKey(const Key('tarjeta-marcar-en_camino')));
+      final detalle = tester.getRect(
+        find.ancestor(of: en(41, find.text('Ver detalle')), matching: find.byType(TextButton)),
+      );
+      expect(detalle.top - marcar.bottom, 12);
+    });
+
+    testWidgets('una compacta se abre al tocarla en cualquier parte', (tester) async {
+      pantallaAlta(tester);
+      await abrirApp(tester);
+
+      await tocar(tester, find.text('XYZ789'));
+      expect(find.text('Servicio N.º 42'), findsOneWidget);
+    });
+
+    testWidgets('TalkBack lee una compacta como un solo botón corto', (tester) async {
+      final semantica = tester.ensureSemantics();
+      pantallaAlta(tester);
+      await abrirApp(tester);
+
+      expect(
+        tester.getSemantics(find.byKey(const Key('tarjeta-compacta-42'))),
+        isSemantics(
+          label: 'XYZ789, Asignado. Ver detalle',
+          isButton: true,
+          hasTapAction: true,
+        ),
+      );
+      expect(find.bySemanticsLabel('XYZ789, Asignado. Ver detalle'), findsOneWidget);
+      // Su "Ver detalle" se ve, pero no se anuncia aparte; el de la activa sí.
+      expect(en(42, find.text('Ver detalle')), findsOneWidget);
+      expect(find.bySemanticsLabel('Ver detalle'), findsOneWidget);
+      semantica.dispose();
+    });
+  });
+
+  testWidgets('dos toques reales seguidos en "Marcar En camino" guardan un solo evento', (
+    tester,
+  ) async {
+    pantallaAlta(tester);
+    await abrirApp(tester);
+
+    await tester.tap(find.byKey(const Key('tarjeta-marcar-en_camino')));
+    await tester.tap(find.byKey(const Key('tarjeta-marcar-en_camino')));
+    await tester.pumpAndSettle();
+    await tocar(tester, find.byKey(const Key('confirmar')));
+
+    expect(find.text('¿Marcar En camino?', skipOffstage: false), findsNothing);
+    final eventos = await cola(tester);
+    expect(eventos, hasLength(1));
+    expect(eventos.single['destino'], 'en_camino');
+  });
+
   group('el recuadro de estado', () {
     testWidgets('sin conexión y con cambios pendientes, un solo recuadro con las dos filas', (
       tester,

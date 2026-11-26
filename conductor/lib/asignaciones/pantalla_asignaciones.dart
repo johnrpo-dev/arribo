@@ -576,7 +576,7 @@ class TarjetaServicio extends StatelessWidget {
             style: textos.bodyLarge?.copyWith(color: colores.textoSecundario),
           ),
         ],
-        SizedBox(height: conBoton ? 4 : 12),
+        const SizedBox(height: 12),
         Align(
           alignment: Alignment.centerRight,
           child: TextButton(onPressed: alTocar, child: const Text('Ver detalle')),
@@ -584,28 +584,44 @@ class TarjetaServicio extends StatelessWidget {
       ],
     );
 
-    return Card(
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: alTocar,
-        child: activa
-            ? Stack(
-                children: [
-                  Padding(padding: const EdgeInsets.fromLTRB(22, 16, 16, 16), child: contenido),
-                  // La franja del color del estado, dentro de la forma de la tarjeta.
-                  Positioned(
-                    left: 0,
-                    top: 0,
-                    bottom: 0,
-                    width: 6,
-                    child: ColoredBox(
-                      key: const Key('franja-activa'),
-                      color: colores.deEstado(servicio.estado).texto,
-                    ),
-                  ),
-                ],
-              )
-            : Padding(padding: const EdgeInsets.all(16), child: contenido),
+    if (activa) {
+      // La activa no se abre al tocarla en cualquier parte (un roce con guantes al desplazar):
+      // solo con "Ver detalle". Y TalkBack lee cada parte por separado.
+      return Card(
+        clipBehavior: Clip.antiAlias,
+        child: Stack(
+          children: [
+            Padding(padding: const EdgeInsets.fromLTRB(22, 16, 16, 16), child: contenido),
+            // La franja del color del estado, dentro de la forma de la tarjeta.
+            Positioned(
+              left: 0,
+              top: 0,
+              bottom: 0,
+              width: 6,
+              child: ColoredBox(
+                key: const Key('franja-activa'),
+                color: colores.deEstado(servicio.estado).texto,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+    // Una compacta se abre al tocarla en cualquier parte (es lo único que hace) y TalkBack la lee
+    // como un solo botón corto; "Ver detalle" se ve, pero no se anuncia aparte.
+    return Semantics(
+      key: Key('tarjeta-compacta-${servicio.id}'),
+      container: true,
+      button: true,
+      label: '${identificacionDe(vehiculo)}, ${nombreEstado(servicio.estado)}. Ver detalle',
+      onTap: alTocar,
+      excludeSemantics: true,
+      child: Card(
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: alTocar,
+          child: Padding(padding: const EdgeInsets.all(16), child: contenido),
+        ),
       ),
     );
   }

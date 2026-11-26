@@ -14,6 +14,9 @@ import 'pantalla_paso.dart';
 import 'requisitos.dart';
 import 'servicio.dart';
 
+/// Lo que se le dice al conductor si el servicio cambió mientras confirmaba un paso.
+const String textoServicioCambio = 'El servicio cambió mientras confirmaba. Revíselo de nuevo.';
+
 /// Un toque en un botón de estado, igual desde el detalle y desde la tarjeta del servicio activo.
 /// En camino pide confirmación y Novedad el motivo; luego el toque queda en la cola. Recogido y
 /// Entregado abren su pantalla de fotos y nombre ([abrirRecogidoOEntregado]). Si el paso no
@@ -40,6 +43,12 @@ Future<void> marcarPaso(
       motivo = await pedirMotivoDeNovedad(context, servicio: servicio);
       if (motivo == null) return;
     } else if (!await confirmarPaso(context, servicio: servicio, destino: destino)) {
+      return;
+    }
+    // Mientras confirmaba, la lista pudo cambiar (llegó del servidor): se revisa contra lo de ahora.
+    final actual = lista.servicio(servicio.id);
+    if (actual == null || !puedeMarcar(actual.estado, destino)) {
+      mensajero.showSnackBar(const SnackBar(content: Text(textoServicioCambio)));
       return;
     }
     // Primero queda guardado en la cola; la pantalla cambia cuando la lista vuelve a leer.
