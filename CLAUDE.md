@@ -126,6 +126,11 @@ no reimplementan la regla. Si una regla cambia, se cambia en `nucleo/` con su pr
 - Se valida en el celular antes de marcar Recogido y se revalida en el servidor.
 - Al bloquear, se le muestra al conductor qué vehículo le falta marcar como Entregado.
 - A un conductor sí se le pueden asignar más vehículos que su capacidad: los atiende en rondas.
+- Al marcar En camino, sus otros servicios iniciados sin finalizar (`en_curso`: En camino o Recogido,
+  o Novedad cuyo estado previo era uno de ellos) no pueden llegar a la capacidad de la grúa del
+  servicio que inicia (`verificar_inicio`): "Tiene un servicio iniciado y no se ha finalizado. Debe
+  terminarlo para tomar el siguiente." La app y el panel bloquean; un En camino que llega de la app
+  igual se aplica, marcado `inicio_excedido` y con alerta a logística.
 
 **Cobro por línea** (`nucleo/cobro.py`). El estado de cobro vive en la línea (servicio × pagador), no en el servicio.
 - Sin valor → Por facturar → Facturado (número obligatorio) → Pagado. No cobrable aparte.

@@ -185,6 +185,7 @@ class ResultadoEvento {
     this.motivo,
     this.detalle,
     this.capacidadExcedida = false,
+    this.inicioExcedido = false,
     this.servicio,
   });
 
@@ -200,6 +201,11 @@ class ResultadoEvento {
   /// El texto en español para el conductor.
   final String? detalle;
   final bool capacidadExcedida;
+
+  /// Un En camino aplicado aunque el conductor ya tenía tantos servicios iniciados sin finalizar
+  /// como puestos tiene la grúa (desde la revisión 1.5). La app lo bloquea antes; esto solo pasa
+  /// con datos desactualizados.
+  final bool inicioExcedido;
 
   /// El servicio al terminar el lote; null si no existe o el evento no se pudo leer.
   final EstadoRemoto? servicio;
@@ -225,6 +231,7 @@ class ResultadoEvento {
       motivo: motivo is String ? motivo : null,
       detalle: detalle is String && detalle.trim().isNotEmpty ? detalle : null,
       capacidadExcedida: json['capacidad_excedida'] == true,
+      inicioExcedido: json['inicio_excedido'] == true,
       servicio: servicio is Map<String, Object?> ? EstadoRemoto.desdeJson(servicio) : null,
     );
   }

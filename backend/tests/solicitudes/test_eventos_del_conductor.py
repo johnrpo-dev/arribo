@@ -394,6 +394,51 @@ def test_recogido_con_puesto_libre_no_queda_marcado(crear_servicio, beto, evento
     assert guardado(datos["id"]).capacidad_excedida is False
 
 
+# --- Servicios iniciados sin finalizar desde la app: se aplica y se marca ----------------------
+
+
+def test_en_camino_con_otro_servicio_sin_finalizar_se_aplica_y_queda_marcado(
+    crear_servicio, evento_app
+):
+    crear_servicio(E.EN_CAMINO)  # Ana, grúa de un puesto, ya tiene uno iniciado
+    servicio = crear_servicio(E.ASIGNADO)
+    datos = evento_app(servicio, E.EN_CAMINO)
+
+    # El conductor ya salió por el vehículo: el hecho físico manda.
+    assert aplicar_evento_del_conductor(**datos) == APLICADO
+
+    assert estado_de(servicio) == E.EN_CAMINO
+    evento = guardado(datos["id"])
+    assert (evento.resultado, evento.inicio_excedido) == (EventoEstado.Resultado.APLICADO, True)
+    assert evento.capacidad_excedida is False
+
+
+def test_en_camino_con_una_novedad_desde_asignado_no_queda_marcado(crear_servicio, evento_app):
+    crear_servicio(E.NOVEDAD, previo=E.ASIGNADO)
+    servicio = crear_servicio(E.ASIGNADO)
+    datos = evento_app(servicio, E.EN_CAMINO)
+    assert aplicar_evento_del_conductor(**datos) == APLICADO
+    assert guardado(datos["id"]).inicio_excedido is False
+
+
+def test_en_camino_con_puesto_libre_no_queda_marcado(crear_servicio, beto, evento_app):
+    crear_servicio(E.RECOGIDO, conductor=beto)  # grúa de dos puestos
+    servicio = crear_servicio(E.ASIGNADO, conductor=beto)
+    datos = evento_app(servicio, E.EN_CAMINO, conductor=beto)
+    assert aplicar_evento_del_conductor(**datos) == APLICADO
+    assert guardado(datos["id"]).inicio_excedido is False
+
+
+def test_en_camino_en_conflicto_no_se_marca_aunque_haya_servicios_sin_finalizar(
+    crear_servicio, evento_app
+):
+    crear_servicio(E.EN_CAMINO)
+    servicio = crear_servicio(E.CANCELADO)
+    datos = evento_app(servicio, E.EN_CAMINO)
+    assert aplicar_evento_del_conductor(**datos) == CONFLICTO
+    assert guardado(datos["id"]).inicio_excedido is False
+
+
 def test_sin_identificacion_es_conflicto_aunque_tambien_exceda_la_capacidad(
     crear_servicio, nuevo_vehiculo, evento_app
 ):

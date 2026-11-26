@@ -115,6 +115,26 @@ void main() {
     expect(resultado.servicio, isNull);
   });
 
+  test(
+    'lee inicio_excedido (desde 1.5); sin el campo, un servidor anterior, queda en false',
+    () async {
+      final servidor = ServidorFalso(
+        (_) async => respuestaEventos([
+          {...resultadoJson(a), 'inicio_excedido': true},
+          {...resultadoJson(b)}..remove('inicio_excedido'),
+        ]),
+      );
+
+      final resultados = await servidor.api().enviarEventos('t', [
+        evento(a),
+        evento(b, servicio: 42),
+      ]);
+
+      expect(resultados[0].inicioExcedido, isTrue);
+      expect(resultados[1].inicioExcedido, isFalse);
+    },
+  );
+
   test('si faltan resultados, no se usa ninguno', () async {
     final servidor = ServidorFalso((_) async => respuestaEventos([resultadoJson(a)]));
 

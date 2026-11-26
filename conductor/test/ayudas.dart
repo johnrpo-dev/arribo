@@ -223,6 +223,7 @@ Map<String, Object?> resultadoJson(
   'motivo': motivo,
   'detalle': detalle,
   'capacidad_excedida': false,
+  'inicio_excedido': false,
   'servicio': servicio,
 };
 

@@ -671,6 +671,138 @@ void main() {
     });
   });
 
+  group('servicios iniciados sin finalizar (al marcar En camino)', () {
+    const placas = {41: 'ABC123', 42: 'XYZ789', 43: 'JKL456'};
+
+    /// Lo guardado con señal, con la grúa de [capacidad] puestos en todos los servicios.
+    Future<void> guardarEnGrua(
+      Map<int, String> estados, {
+      required int capacidad,
+      Map<int, String> previos = const {},
+    }) async {
+      eventos = ServidorDeEventos(estados)..previos.addAll(previos);
+      await AlmacenAsignaciones(prueba.base).reemplazar(
+        servicios: [
+          for (final MapEntry(key: id, value: estado) in estados.entries)
+            Servicio.desdeJson({
+              ...servicioJson(id: id, estado: estado, placa: placas[id]),
+              'estado_previo': estado == 'novedad' ? previos[id] : null,
+              'grua': {'id': 2, 'placa': 'GRU001', 'capacidad': capacidad},
+            }),
+        ],
+        configuracion: const ConfiguracionApp(minimoFotos: 4, momentoPlacaVin: 'recoger'),
+        etag: '"e1"',
+        hora: ahora.subtract(const Duration(minutes: 30)),
+      );
+    }
+
+    String textoDe(WidgetTester tester, Key llave) => tester.widget<Text>(find.byKey(llave)).data!;
+
+    testWidgets(
+      'grúa de un puesto con otro servicio en camino: bloquea, dice cuál terminar y no guarda nada',
+      (tester) async {
+        await guardarEnGrua({41: 'en_camino', 42: 'asignado'}, capacidad: 1);
+        await abrirDetalle(tester, placa: 'XYZ789');
+
+        await tocar(tester, find.text('Marcar En camino'));
+
+        expect(find.text('¿Marcar En camino?'), findsNothing);
+        expect(find.text('Servicio sin finalizar'), findsOneWidget);
+        expect(
+          textoDe(tester, const Key('bloqueo-inicio')),
+          'Tiene un servicio iniciado y no se ha finalizado. Debe terminarlo para tomar el '
+          'siguiente.',
+        );
+        expect(find.text('Falta terminar:'), findsOneWidget);
+        expect(
+          textoDe(tester, const Key('sin-finalizar-41')),
+          'ABC123 · Mazda CX-30 Rojo (En camino)',
+        );
+        expect(find.byKey(const Key('sin-finalizar-42')), findsNothing);
+        await tocar(tester, find.text('Entendido'));
+
+        expect(await cola(tester), isEmpty);
+        expect(find.text('Marcar En camino'), findsOneWidget);
+      },
+    );
+
+    testWidgets('una novedad desde En camino sigue iniciada y bloquea', (tester) async {
+      await guardarEnGrua(
+        {41: 'novedad', 42: 'asignado'},
+        capacidad: 1,
+        previos: {41: 'en_camino'},
+      );
+      await abrirDetalle(tester, placa: 'XYZ789');
+
+      await tocar(tester, find.text('Marcar En camino'));
+
+      expect(textoDe(tester, const Key('sin-finalizar-41')), 'ABC123 · Mazda CX-30 Rojo (Novedad)');
+      await tocar(tester, find.text('Entendido'));
+      expect(await cola(tester), isEmpty);
+    });
+
+    testWidgets('una novedad desde Asignado no se había iniciado: deja marcar En camino', (
+      tester,
+    ) async {
+      await guardarEnGrua({41: 'novedad', 42: 'asignado'}, capacidad: 1, previos: {41: 'asignado'});
+      await abrirDetalle(tester, placa: 'XYZ789');
+
+      await tocar(tester, find.text('Marcar En camino'));
+
+      expect(find.byKey(const Key('bloqueo-inicio')), findsNothing);
+      expect(find.text('¿Marcar En camino?'), findsOneWidget);
+    });
+
+    testWidgets('con capacidad 2 deja iniciar el segundo y bloquea el tercero', (tester) async {
+      await guardarEnGrua({41: 'en_camino', 42: 'asignado', 43: 'asignado'}, capacidad: 2);
+      await abrirDetalle(tester, placa: 'XYZ789');
+
+      // El segundo: hay un puesto libre.
+      await tocar(tester, find.text('Marcar En camino'));
+      expect(find.byKey(const Key('bloqueo-inicio')), findsNothing);
+      await tocar(tester, find.byKey(const Key('confirmar')));
+      expect((await cola(tester)).map((e) => (e['servicio_id'], e['destino'])), [
+        (42, 'en_camino'),
+      ]);
+      await volver(tester);
+
+      // El tercero: ya hay dos iniciados sin finalizar (uno de ellos, un toque sin enviar).
+      await abrirDetalleDe(tester, 'JKL456');
+      await tocar(tester, find.text('Marcar En camino'));
+      expect(find.text('Servicios sin finalizar'), findsOneWidget);
+      expect(
+        textoDe(tester, const Key('bloqueo-inicio')),
+        'La grúa tiene 2 puestos y ya tiene 2 servicios iniciados sin finalizar. Termine uno '
+        'para tomar el siguiente.',
+      );
+      expect(find.byKey(const Key('sin-finalizar-41')), findsOneWidget);
+      expect(find.byKey(const Key('sin-finalizar-42')), findsOneWidget);
+      await tocar(tester, find.text('Entendido'));
+      expect((await cola(tester)).length, 1);
+    });
+
+    testWidgets('sin señal, al marcar Entregado el anterior deja iniciar el siguiente', (
+      tester,
+    ) async {
+      await guardarEnGrua({41: 'recogido', 42: 'asignado'}, capacidad: 1);
+      await abrirDetalle(tester);
+      await tocar(tester, find.text('Marcar Entregado'));
+      await completarPaso(tester);
+      await tester.pumpAndSettle();
+      if (find.byType(BackButton).evaluate().isNotEmpty) await volver(tester);
+
+      await abrirDetalleDe(tester, 'XYZ789');
+      await tocar(tester, find.text('Marcar En camino'));
+      expect(find.byKey(const Key('bloqueo-inicio')), findsNothing);
+      await tocar(tester, find.byKey(const Key('confirmar')));
+
+      expect((await cola(tester)).map((e) => (e['servicio_id'], e['destino'])), [
+        (41, 'entregado'),
+        (42, 'en_camino'),
+      ]);
+    });
+  });
+
   group('cabecera del detalle', () {
     testWidgets('muestra la placa en grande y la barra de avance del estado', (tester) async {
       final semantica = tester.ensureSemantics();

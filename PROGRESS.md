@@ -1763,6 +1763,37 @@ tiene botón de actualizar información".
   4. Con la app sin señal, el panel de arriba dice que no hay conexión y cuántos cambios faltan.
 - **Pruebas:** app 539 (`flutter test`), `flutter analyze` sin problemas. El servidor no cambió.
 
+### Regla nueva (26/11/2026) · Servicios iniciados según la capacidad de la grúa
+
+- **Qué pasaba.** Con dos servicios asignados, la app dejaba marcar los dos En camino: ninguna regla
+  lo limitaba.
+- **Regla (decidida por el dueño).** Se le pueden asignar varios servicios, pero los que tiene
+  iniciados y sin finalizar (En camino o Recogido, o una novedad abierta desde ellos) no pasan de
+  los puestos de la grúa. Grúa de 1 puesto (la mayoría): con un servicio iniciado no puede marcar
+  En camino otro hasta entregarlo. Grúa de 2 puestos: dos a la vez.
+  - Núcleo: `nucleo.estados.en_curso` y `nucleo.capacidad.verificar_inicio`; casos compartidos en
+    `docs/casos-reglas.json` (sección `inicio`), que recorren el servidor y la app.
+  - App: antes de confirmar En camino muestra "Tiene un servicio iniciado y no se ha finalizado.
+    Debe terminarlo para tomar el siguiente." con el servicio que falta; no guarda nada. Funciona sin
+    señal.
+  - Servidor: el panel no puede marcar En camino si se pasa (hoy no hay botón que lo haga). Un En
+    camino de la app que no cumpla (celular con la app vieja) se aplica, porque es lo que pasó, y abre
+    la alerta nueva "Inicio excedido" a logística. API revisión 1.5 (`inicio_excedido`). Se bloquea
+    por conductor para que dos En camino simultáneos se cuenten uno tras otro.
+  - Migraciones nuevas: `solicitudes/0009_inicio_excedido`, `alertas/0004_inicio_excedido`
+    (`runserver` en desarrollo las aplica al arrancar).
+- **Hecho por** `savvy-flow:savvy-careful`; revisado por la sesión principal (ajuste: el bloqueo
+  por conductor). Supuestos en `QUESTIONS.md`.
+- **Cómo probar (menos de 5 minutos).** Reiniciar el panel e instalar la app nueva
+  (`flutter run --release` desde `conductor/`).
+  1. Asignarle al conductor dos servicios con una grúa de 1 puesto.
+  2. En la app, marcar En camino el primero.
+  3. Abrir el detalle del segundo y tocar "Marcar En camino": sale el aviso con la placa del
+     primero y no se marca.
+  4. Entregar el primero: ahora el segundo sí se puede marcar En camino.
+- **Pruebas:** servidor 2419 (`uv run pytest -q`), ruff sin errores; app 565 (`flutter test`),
+  `flutter analyze` sin problemas.
+
 ## Escalamientos
 
 Ninguno todavía.

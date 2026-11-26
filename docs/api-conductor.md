@@ -1,4 +1,4 @@
-# API de la app del conductor (contrato versión 1, revisión 1.4)
+# API de la app del conductor (contrato versión 1, revisión 1.5)
 
 Contrato entre el servidor (`backend/api/`) y la app Flutter (`conductor/`). Lo usan la sincronización
 (1a-10), las pantallas de la app (1a-11 a 1a-13) y el push (1a-14). Si el código y este documento no
@@ -17,6 +17,7 @@ Revisiones (cambios compatibles: no cambian `"version": 1` ni la ruta `/api/v1/`
 | 1.2 | 1a-14 | `PUT /api/v1/push/` registra el token de push del celular; `POST /salir/` lo borra; la lista y el detalle dejan los servicios "vistos por el conductor" (ver "Avisos push") |
 | 1.3 | 1a-08h | Cada servicio trae `regreso_de` y `espera_ida`: un regreso no avanza hasta que su ida esté entregada; si llega igual, es conflicto `ida_sin_entregar` (ver "El regreso espera a su ida") |
 | 1.4 | Número de bodega | `vehiculo` trae `numero_bodega`. El vehículo queda identificado con placa, VIN o número de bodega (al menos uno); un desvare sigue exigiendo la placa. El conductor no lo digita: solo lo ve |
+| 1.5 | Servicios iniciados | Cada resultado de evento trae `inicio_excedido`: un `en_camino` aplicado aunque el conductor ya tenía tantos servicios iniciados sin finalizar como puestos tiene la grúa (ver "Respuesta" de los eventos). La app bloquea antes ese En camino |
 
 ## Reglas generales
 
@@ -408,6 +409,7 @@ enviaron** (el resultado N es del evento N):
       "motivo": null,
       "detalle": null,
       "capacidad_excedida": false,
+      "inicio_excedido": false,
       "servicio": {"id": 41, "estado": "en_camino", "estado_previo": null,
                    "a_bordo": false, "en_su_ronda": true}
     },
@@ -418,6 +420,7 @@ enviaron** (el resultado N es del evento N):
       "motivo": "servicio_cancelado",
       "detalle": "El servicio ya estaba cancelado.",
       "capacidad_excedida": false,
+      "inicio_excedido": false,
       "servicio": {"id": 42, "estado": "cancelado", "estado_previo": null,
                    "a_bordo": false, "en_su_ronda": false}
     }
@@ -439,6 +442,12 @@ enviaron** (el resultado N es del evento N):
 - **`capacidad_excedida`** es `true` en un `recogido` que se aplicó aunque la grúa ya iba llena. Se
   aplica porque el vehículo ya está montado, queda marcado en el evento y abre una alerta a
   logística. La app bloquea antes ese Recogido (1a-13); esto solo pasa con datos desactualizados.
+- **`inicio_excedido`** (desde 1.5) es `true` en un `en_camino` que se aplicó aunque el conductor ya
+  tenía tantos servicios iniciados sin finalizar (En camino o Recogido, o en novedad desde uno de
+  ellos) como puestos tiene la grúa de ese servicio. Se aplica porque el conductor ya salió por el
+  vehículo, queda marcado en el evento y abre una alerta a logística. La app bloquea antes ese En
+  camino; esto solo pasa con datos desactualizados. Como `capacidad_excedida`, en un duplicado es
+  el de la primera vez.
 - **`servicio`** es el estado del servicio **al terminar el lote** (no después de cada evento), para
   que la app corrija el suyo: `estado`, `estado_previo` y `a_bordo` como en la lista de asignaciones,
   y `en_su_ronda` (si sigue apareciendo en `GET /asignaciones/`). Si el servicio terminó, viene con

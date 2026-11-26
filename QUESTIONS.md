@@ -7,6 +7,31 @@ Formato: fecha, tarea, pregunta, qué se asumió mientras tanto (si se asumió a
 
 ## Abiertas
 
+### Servicios iniciados sin finalizar (26/11/2026)
+
+- **2026-11-26. Decisión del dueño.** Un conductor puede tener varios servicios asignados, pero los
+  que ha iniciado y no ha finalizado no pueden pasar de la capacidad de la grúa: con un puesto, si
+  uno está En camino o Recogido, no marca En camino otro hasta entregar el primero; con dos, puede
+  tener dos iniciados. Mensaje: "Tiene un servicio iniciado y no se ha finalizado. Debe terminarlo
+  para tomar el siguiente.", con los servicios que faltan (placa, VIN o "bodega X", y su estado).
+  Regla en `nucleo/capacidad.py` (`verificar_inicio`) y `nucleo/estados.py` (`en_curso`).
+- **2026-11-26. Cómo se cuenta.** Asumido: por conductor (todos sus otros servicios, en cualquier
+  grúa), con la capacidad de la grúa guardada en el servicio que se inicia. Cuenta como iniciado
+  En camino, Recogido y una Novedad abierta desde uno de ellos; una Novedad desde Asignado no. Solo
+  se revisa al marcar En camino; la regla de Recogido (vehículos montados) sigue igual.
+- **2026-11-26. Desde la app, sin rechazar.** Asumido: la app bloquea antes (también sin señal) y el
+  panel no deja marcarlo; si un En camino llega igual de la app (celular desactualizado), se aplica,
+  queda marcado `inicio_excedido` y abre la alerta "Servicio iniciado sin finalizar el anterior". El
+  panel no tiene hoy un botón para marcar En camino en nombre del conductor: la operación
+  `cambiar_estado` lanza `InicioExcedido` con el mensaje para cuando exista.
+- **2026-11-26. Novedad desde En camino.** Mientras logística no la resuelva, ese servicio sigue
+  ocupando el puesto y el conductor no puede iniciar otro (con grúa de un puesto). Si se prefiere
+  que una novedad libere el puesto, cambia solo `en_curso` y los casos de `docs/casos-reglas.json`.
+- **2026-11-26. Textos de la app.** Asumido: título "Servicio sin finalizar" (o "Servicios sin
+  finalizar"), el mensaje del dueño y debajo "Falta terminar:" con cada servicio y su estado. Con
+  grúa de dos puestos: "La grúa tiene 2 puestos y ya tiene 2 servicios iniciados sin finalizar.
+  Termine uno para tomar el siguiente."
+
 ### Servicio activo en la app (26/11/2026)
 
 - **2026-11-26. ¿Cuál es el servicio "Ahora" del conductor?** Asumido: en el orden de la lista

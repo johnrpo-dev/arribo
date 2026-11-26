@@ -12,7 +12,7 @@ import pytest
 from django.db import connection
 
 from alertas.models import Alerta, TipoAlerta
-from nucleo.capacidad import CapacidadExcedida
+from nucleo.capacidad import CapacidadExcedida, InicioExcedido
 from nucleo.estados import Estado, TransicionInvalida
 from nucleo.registro import CierreNoPermitido
 from nucleo.sincronizacion import Resultado
@@ -132,6 +132,44 @@ def test_dos_recogidas_a_la_vez_desde_la_app_se_aplican_y_solo_una_queda_marcada
     assert salidas == [Resultado.APLICADO, Resultado.APLICADO]
     marcas = sorted(EventoEstado.objects.values_list("capacidad_excedida", flat=True))
     assert marcas == [False, True]
+
+
+def test_dos_en_camino_a_la_vez_con_una_grua_de_un_puesto_desde_el_panel_dejan_pasar_uno(
+    crear_servicio, usuario
+):
+    primero = crear_servicio(E.ASIGNADO)
+    segundo = crear_servicio(E.ASIGNADO)
+
+    salidas = en_paralelo(
+        lambda: operaciones.cambiar_estado(primero, E.EN_CAMINO, actor=usuario),
+        lambda: operaciones.cambiar_estado(segundo, E.EN_CAMINO, actor=usuario),
+    )
+
+    errores = [s for s in salidas if isinstance(s, Exception)]
+    assert len(errores) == 1 and isinstance(errores[0], InicioExcedido), salidas
+    assert EventoEstado.objects.count() == 1
+    estados = []
+    for servicio in (primero, segundo):
+        servicio.refresh_from_db()
+        estados.append(servicio.estado)
+    assert sorted(estados) == sorted([E.EN_CAMINO, E.ASIGNADO])
+
+
+def test_dos_en_camino_a_la_vez_desde_la_app_se_aplican_y_solo_uno_queda_marcado(
+    crear_servicio, evento_app
+):
+    primero = crear_servicio(E.ASIGNADO)
+    segundo = crear_servicio(E.ASIGNADO)
+
+    salidas = en_paralelo(
+        lambda: aplicar_evento_del_conductor(**evento_app(primero, E.EN_CAMINO, secuencia=1)),
+        lambda: aplicar_evento_del_conductor(**evento_app(segundo, E.EN_CAMINO, secuencia=2)),
+    )
+
+    assert salidas == [Resultado.APLICADO, Resultado.APLICADO]
+    marcas = sorted(EventoEstado.objects.values_list("inicio_excedido", flat=True))
+    assert marcas == [False, True]
+    assert Alerta.objects.filter(tipo=TipoAlerta.INICIO_EXCEDIDO).count() == 1
 
 
 def test_cerrar_como_no_concretada_y_asignar_a_la_vez_deja_pasar_solo_uno(

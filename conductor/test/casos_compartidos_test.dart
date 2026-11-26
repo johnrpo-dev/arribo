@@ -1,5 +1,5 @@
-// Las copias de las reglas del servidor que tiene la app (estados, capacidad, identificación del
-// vehículo y límites de las fotos) cumplen los casos de docs/casos-reglas.json, el mismo archivo
+// Las copias de las reglas del servidor que tiene la app (estados, capacidad al recoger y al
+// marcar En camino, identificación del vehículo y límites de las fotos) cumplen los casos de docs/casos-reglas.json, el mismo archivo
 // que recorre backend/tests/nucleo/test_casos_compartidos.py. Si una regla cambia en el servidor y
 // no en la app, esta prueba falla.
 
@@ -86,6 +86,16 @@ void main() {
         expect(estado.aBordo, caso['a_bordo'], reason: '$caso');
       }
     });
+
+    test('iniciado y sin finalizar (en curso) en los mismos estados que en el servidor', () {
+      for (final caso in lista(estados['en_curso'])) {
+        final estado = EstadoDeServicio(
+          caso['estado']! as String,
+          caso['estado_previo'] as String?,
+        );
+        expect(estado.enCurso, caso['en_curso'], reason: '$caso');
+      }
+    });
   });
 
   group('capacidad', () {
@@ -110,6 +120,32 @@ void main() {
     test('una capacidad menor que 1 no es válida', () {
       for (final capacidad in (casos['capacidad_invalida']! as List<Object?>).cast<int>()) {
         expect(() => verificarRecogida(capacidad, const <String>[]), throwsArgumentError);
+      }
+    });
+  });
+
+  group('servicios iniciados sin finalizar (al marcar En camino)', () {
+    for (final caso in lista(casos['inicio'])) {
+      test('${caso['nombre']}', () {
+        final iniciados = [
+          for (final otro in lista(caso['otros']))
+            if (EstadoDeServicio(
+              otro['estado']! as String,
+              otro['estado_previo'] as String?,
+            ).enCurso)
+              otro['id']! as String,
+        ];
+
+        final excedido = verificarInicio(caso['capacidad']! as int, iniciados);
+
+        expect(excedido != null, caso['bloquea']);
+        expect(excedido?.sinFinalizar ?? const <String>[], caso['sin_finalizar']);
+      });
+    }
+
+    test('una capacidad menor que 1 no es válida', () {
+      for (final capacidad in (casos['capacidad_invalida']! as List<Object?>).cast<int>()) {
+        expect(() => verificarInicio(capacidad, const <String>[]), throwsArgumentError);
       }
     });
   });

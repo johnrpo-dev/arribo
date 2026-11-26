@@ -10,7 +10,9 @@ Entregado y no se guarda el evento. Argumentos: `servicio` (ya guardado como Ent
 
 `evento_del_conductor_guardado`: cada vez que se guarda un evento de la app (aplicado o en
 conflicto), en la misma transacción que el evento. Argumentos: `evento` (el EventoEstado),
-`montados` (los vehículos que la grúa ya llevaba, si el Recogido excedió la capacidad) e
+`montados` (los vehículos que la grúa ya llevaba, si el Recogido excedió la capacidad),
+`sin_finalizar` (los servicios que el conductor tenía iniciados sin finalizar, si el En camino
+excedió la capacidad de la grúa) e
 `identificacion_por_revisar` (los `nucleo.identificacion.DatoPorRevisar` de la placa o el VIN que
 el conductor digitó al recoger y que no quedaron en el vehículo; vacío si no hay). La escucha
 `alertas`: si la alerta no se puede abrir, el evento no se guarda y el celular lo reenvía.

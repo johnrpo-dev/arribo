@@ -120,6 +120,7 @@ def _ilegible(conductor, crudo, errores) -> dict:
         "detalle": DETALLE[Motivo.DATOS_INVALIDOS],
         "campos": errores if isinstance(crudo, dict) else {"evento": ["Debe ser un objeto."]},
         "capacidad_excedida": False,
+        "inicio_excedido": False,
         "servicio": None,
     }
     try:
@@ -147,6 +148,7 @@ def _resultado(aplicacion, servicio) -> dict:
         "motivo": aplicacion.motivo.value if aplicacion.motivo else None,
         "detalle": DETALLE[aplicacion.motivo] if aplicacion.motivo else None,
         "capacidad_excedida": aplicacion.capacidad_excedida,
+        "inicio_excedido": aplicacion.inicio_excedido,
         "servicio": servicio,
     }
 
