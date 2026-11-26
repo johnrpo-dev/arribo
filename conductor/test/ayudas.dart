@@ -14,7 +14,7 @@ import 'package:flutter/services.dart' show SystemChannels;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
-import 'package:material_ui/material_ui.dart' show Card;
+import 'package:material_ui/material_ui.dart' show Card, Key, Scrollable;
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 /// Sin aislado aparte: las consultas terminan en microtareas y funcionan también dentro de
@@ -575,6 +575,19 @@ http.Response fotoDemasiadoGrande() => errorDelContrato(
   'La foto pesa más de 5 MB.',
   extra: {'maximo_bytes': 5242880},
 );
+
+/// Lo que se desplaza en el contenido de la pantalla (la lista, el detalle o el paso), el de más
+/// afuera: no el texto de la franja sin señal, que también se desplaza cuando no cabe. Para
+/// `scrollUntilVisible`, que sin `scrollable:` exige un solo desplazable en pantalla.
+Finder get desplazableDelContenido => find.byElementPredicate((elemento) {
+  if (elemento.widget is! Scrollable) return false;
+  var enLaFranja = false;
+  elemento.visitAncestorElements((ancestro) {
+    enLaFranja = ancestro.widget.key == const Key('franja-sin-senal');
+    return !enLaFranja;
+  });
+  return !enLaFranja;
+}, description: 'desplazable del contenido').first;
 
 /// "Ver detalle" de la tarjeta de la lista que muestra [texto] (por ejemplo, la placa). La
 /// tarjeta del servicio activo no se abre al tocarla en cualquier parte: solo con ese botón.

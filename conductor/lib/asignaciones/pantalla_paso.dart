@@ -320,27 +320,32 @@ class _PantallaPasoState extends State<PantallaPaso> {
         final listo = !_cargando && servicio != null && enCurso != null;
         return Scaffold(
           appBar: AppBar(title: Text('Marcar $paso')),
-          body: _cargando
-              ? const Center(child: CircularProgressIndicator())
-              : !listo
-              ? _SinPaso(paso: paso, enLaLista: servicio != null)
-              : _Contenido(
-                  servicio: servicio,
-                  paso: enCurso,
-                  minimoFotos: minimoFotos,
-                  porDigitar: _porDigitar(servicio),
-                  placa: _placa,
-                  vin: _vin,
-                  nombre: _nombre,
-                  ocupado: _ocupado,
-                  aviso: _aviso,
-                  faltantes: _faltantes,
-                  alEscribirPlaca: _alEscribirPlaca,
-                  alEscribirVin: _alEscribirVin,
-                  alEscribirNombre: _alEscribirNombre,
-                  alTomarFoto: _tomarFoto,
-                  alQuitarFoto: _quitarFoto,
-                ),
+          // Sin señal, el aviso queda fijo arriba, fuera de lo que se desplaza.
+          body: ConFranjaSinSenal(
+            visible: widget.lista.sinConexion,
+            texto: textoSinSenalAlMarcar,
+            child: _cargando
+                ? const Cargando('Preparando el paso…')
+                : !listo
+                ? _SinPaso(paso: paso, enLaLista: servicio != null)
+                : _Contenido(
+                    servicio: servicio,
+                    paso: enCurso,
+                    minimoFotos: minimoFotos,
+                    porDigitar: _porDigitar(servicio),
+                    placa: _placa,
+                    vin: _vin,
+                    nombre: _nombre,
+                    ocupado: _ocupado,
+                    aviso: _aviso,
+                    faltantes: _faltantes,
+                    alEscribirPlaca: _alEscribirPlaca,
+                    alEscribirVin: _alEscribirVin,
+                    alEscribirNombre: _alEscribirNombre,
+                    alTomarFoto: _tomarFoto,
+                    alQuitarFoto: _quitarFoto,
+                  ),
+          ),
           bottomNavigationBar: !listo
               ? null
               : Material(

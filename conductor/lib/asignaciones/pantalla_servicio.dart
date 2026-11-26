@@ -45,19 +45,24 @@ class PantallaServicio extends StatelessWidget {
         void alEntender(EventoLocal evento) => lista.sincronizador.marcarVisto(evento.id);
         return Scaffold(
           appBar: AppBar(title: Text('Servicio N.º $id')),
-          body: !lista.cargada
-              ? const Center(child: CircularProgressIndicator())
-              : servicio == null
-              ? _FueraDeLaLista(avisos: avisos, alEntender: alEntender)
-              : _Detalle(
-                  servicio: servicio,
-                  pendiente: lista.pendientesDe(id) > 0,
-                  fotosPendientes: lista.fotos.pendientesDe(id),
-                  avisos: avisos,
-                  alEntender: alEntender,
-                  ahora: reloj(),
-                  abrirEnlace: abrirEnlace,
-                ),
+          // Sin señal, el aviso queda fijo arriba, fuera de lo que se desplaza.
+          body: ConFranjaSinSenal(
+            visible: lista.sinConexion,
+            texto: textoSinSenalAlMarcar,
+            child: !lista.cargada
+                ? const Cargando('Cargando el servicio…')
+                : servicio == null
+                ? _FueraDeLaLista(avisos: avisos, alEntender: alEntender)
+                : _Detalle(
+                    servicio: servicio,
+                    pendiente: lista.pendientesDe(id) > 0,
+                    fotosPendientes: lista.fotos.pendientesDe(id),
+                    avisos: avisos,
+                    alEntender: alEntender,
+                    ahora: reloj(),
+                    abrirEnlace: abrirEnlace,
+                  ),
+          ),
           bottomNavigationBar: servicio == null
               ? null
               : _Acciones(servicio: servicio, lista: lista),

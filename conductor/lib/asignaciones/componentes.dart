@@ -483,3 +483,107 @@ class FilaDato extends StatelessWidget {
     );
   }
 }
+
+/// Lo que dice la franja sin señal en el detalle y en la pantalla del paso.
+const String textoSinSenalAlMarcar = 'Sin conexión. Lo que marque se envía cuando vuelva la señal.';
+
+/// El aviso de que no hay señal, arriba de la pantalla y fuera de lo que se desplaza: sigue a la
+/// vista aunque el conductor baje por la lista. Aparece y desaparece cambiando de alto, sin saltos.
+/// Se anuncia a TalkBack al aparecer, con el texto completo.
+///
+/// Con letra muy grande no pasa de la cuarta parte del alto de la pantalla, para que quede espacio
+/// para el contenido: si el texto no cabe, se desplaza dentro de la franja.
+class FranjaSinSenal extends StatefulWidget {
+  const FranjaSinSenal({super.key, required this.visible, required this.texto});
+
+  /// Solo sin conexión (`lista.sinConexion`).
+  final bool visible;
+  final String texto;
+
+  @override
+  State<FranjaSinSenal> createState() => _FranjaSinSenalState();
+}
+
+class _FranjaSinSenalState extends State<FranjaSinSenal> {
+  /// Propio de la franja: la barra y el texto se desplazan juntos, sin tocar el de la pantalla.
+  final _desplazamiento = ScrollController();
+
+  @override
+  void dispose() {
+    _desplazamiento.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colores = context.colores;
+    return TamanoAnimado(
+      child: !widget.visible
+          ? const SizedBox(width: double.infinity)
+          : Semantics(
+              liveRegion: true,
+              container: true,
+              label: widget.texto,
+              excludeSemantics: true,
+              child: Container(
+                key: const Key('franja-sin-senal'),
+                width: double.infinity,
+                constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(context).height * 0.25),
+                decoration: BoxDecoration(
+                  color: colores.avisoFondo,
+                  border: Border(bottom: BorderSide(color: colores.aviso)),
+                ),
+                // Solo se desplaza si el texto no cabe, y solo entonces se ve la barra que avisa
+                // que sigue; a escala normal se ve igual.
+                child: Scrollbar(
+                  controller: _desplazamiento,
+                  thumbVisibility: true,
+                  child: SingleChildScrollView(
+                    controller: _desplazamiento,
+                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Icon(Icons.cloud_off_outlined, color: colores.aviso),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            widget.texto,
+                            style: Theme.of(context).textTheme.bodyLarge
+                                ?.copyWith(color: colores.texto),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+    );
+  }
+}
+
+/// Una pantalla con la [FranjaSinSenal] fija arriba y [child] debajo, en el resto del alto.
+class ConFranjaSinSenal extends StatelessWidget {
+  const ConFranjaSinSenal({
+    super.key,
+    required this.visible,
+    required this.texto,
+    required this.child,
+  });
+
+  final bool visible;
+  final String texto;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        FranjaSinSenal(visible: visible, texto: texto),
+        Expanded(child: child),
+      ],
+    );
+  }
+}
